@@ -1,0 +1,5 @@
+{
+  "name": "BlockLua Web",
+  "description": "A professional Blockly-based IDE for Roblox Luau with a modern dark theme, real-time code generation, and interactive onboarding tutorial.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,6566 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as Blockly from 'blockly';
+import { luaGenerator, Order } from 'blockly/lua';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  BookOpen, 
+  CheckCircle2, 
+  Code2, 
+  Layers, 
+  Play, 
+  Save, 
+  Trash2, 
+  X,
+  Info,
+  ChevronRight,
+  Sparkles,
+  MousePointer2,
+  Cpu,
+  Globe,
+  AlertTriangle,
+  Settings,
+  Monitor,
+  Search,
+  RefreshCw,
+  Copy
+} from 'lucide-react';
+import { useExplorer } from './explorer';
+import { ExplorerTree, getIcon } from './components/Explorer/Explorer';
+import { InsertObjectMenu } from './components/Explorer/InsertObjectMenu';
+import { defineCustomBlocks } from './blocks';
+import { defineCustomGenerators } from './generators';
+import { toolbox } from './toolbox';
+
+const CATEGORIES = [
+  { name: 'Comment', color: '#999999' },
+  { name: 'Debug', color: '#ff8c1a' },
+  { name: 'Logic', color: '#4c97ff' },
+  { name: 'Math', color: '#59c059' },
+  { name: 'Text', color: '#ffab19' },
+  { name: 'Sound', color: '#59c059' },
+  { name: 'Values', color: '#4cbfe6' },
+  { name: 'Variables', color: '#ff661a' },
+  { name: 'Variables 2', color: '#ff661a' },
+  { name: 'Lists', color: '#cf142b' },
+  { name: 'Loops', color: '#48a868' },
+  { name: 'World', color: '#4c97ff' },
+  { name: 'Instance', color: '#6600ff' },
+  { name: 'Part', color: '#4d4d4d' },
+  { name: 'Character', color: '#ff3355' },
+  { name: 'Model', color: '#9966ff' },
+  { name: 'Gui', color: '#cf63cf' },
+  { name: 'Player', color: '#0fbd8c' },
+  { name: 'Clickdetector', color: '#ff8c1a' },
+  { name: 'Marketplace', color: '#4c97ff' },
+  { name: 'Tweening', color: '#59c059' },
+  { name: 'Client', color: '#ffab19' },
+  { name: 'Server', color: '#40bf4a' },
+  { name: 'Leaderstats', color: '#ff8c1a' },
+  { name: 'Functions', color: '#ff661a' },
+  { name: 'Datastore', color: '#4c97ff' },
+];
+
+export default function App() {
+  const { explorer, setExplorer, toggleExpand, addInstance } = useExplorer();
+  const [selectedInstancePath, setSelectedInstancePath] = useState('game.Workspace');
+  const blocklyDiv = useRef<HTMLDivElement>(null);
+  const workspace = useRef<Blockly.WorkspaceSvg | null>(null);
+  const [view, setView] = useState<'blocks' | 'codes'>('blocks');
+  const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [showClearModal, setShowClearModal] = useState<boolean>(false);
+  const [showMenu, setShowMenu] = useState<boolean>(false);
+  const [showInfo, setShowInfo] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
+  const [showGuide, setShowGuide] = useState<boolean>(false);
+  const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
+  const [definedVariables, setDefinedVariables] = useState<string[]>([]);
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => {
+    return localStorage.getItem('blocklua_tutorial_seen') !== 'true';
+  });
+  const [tutorialStep, setTutorialStep] = useState<number>(0);
+  const [enableEffects, setEnableEffects] = useState<boolean>(true);
+  const [gameStructure, setGameStructure] = useState<any>(null);
+
+  useEffect(() => {
+    (window as any).gameStructure = explorer;
+  }, [explorer]);
+
+  const [searchPanel, setSearchPanel] = useState<{ show: boolean, x: number, y: number }>({ show: false, x: 0, y: 0 });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allBlocks, setAllBlocks] = useState<{ type: string, name: string, category: string, blockDef: any }[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectorTarget, setSelectorTarget] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(288);
+  const [isResizing, setIsResizing] = useState(false);
+  const [showInsertObjectFor, setShowInsertObjectFor] = useState<string | null>(null);
+
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback((e: MouseEvent) => {
+    if (isResizing) {
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth > 150 && newWidth < 600) {
+        setSidebarWidth(newWidth);
+      }
+    }
+  }, [isResizing]);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', resize);
+    window.addEventListener('mouseup', stopResizing);
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [resize, stopResizing]);
+
+  // Resize Blockly workspace when sidebar width changes
+  useEffect(() => {
+    if (workspace.current) {
+      Blockly.svgResize(workspace.current);
+    }
+  }, [sidebarWidth, view]);
+
+  // Bridge for Blockly to open Explorer
+  useEffect(() => {
+    (window as any).openInstanceSelector = (blockId: string) => {
+      setSelectorTarget(blockId);
+    };
+  }, []);
+
+  // Poll for Roblox Studio sync
+  useEffect(() => {
+    let lastTreeString = '';
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/sync');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.tree && data.tree.id === 'game') {
+            const treeString = JSON.stringify(data.tree);
+            if (treeString !== lastTreeString) {
+              lastTreeString = treeString;
+              setExplorer(prev => {
+                // Helper to preserve expanded state
+                const preserveExpanded = (newNode: any, oldNode: any): any => {
+                  if (!oldNode) return newNode;
+                  return {
+                    ...newNode,
+                    expanded: oldNode.expanded,
+                    Children: (newNode.Children || []).map((child: any) => {
+                      const oldChild = (oldNode.Children || []).find((c: any) => c.Name === child.Name && c.ClassName === child.ClassName);
+                      return preserveExpanded(child, oldChild);
+                    })
+                  };
+                };
+                return preserveExpanded(data.tree, prev);
+              });
+            }
+          }
+        }
+      } catch (err) {
+        // Ignore fetch errors
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [setExplorer]);
+
+  const handleInstanceSelect = (path: string) => {
+    // Keep full path as requested by user (e.g., game.Workspace.Part)
+    const displayPath = path;
+    
+    if (selectorTarget && workspace.current) {
+      const block = workspace.current.getBlockById(selectorTarget);
+      if (block) {
+        block.setFieldValue(displayPath, 'NAME');
+      }
+      setSelectorTarget(null);
+    } else {
+      setSelectedInstancePath(displayPath);
+    }
+  };
+
+  const tutorialSteps = [
+    {
+      title: currentLang === 'vi' ? "Chào mừng đến với BlockLua!" : "Welcome to BlockLua!",
+      text: currentLang === 'vi' ? "Hãy cùng xem qua không gian làm việc. Nhấn phím bất kỳ hoặc click để tiếp tục." : "Let's take a quick tour of the workspace. Press any key or click anywhere to continue.",
+      position: "center"
+    },
+    {
+      title: currentLang === 'vi' ? "Hộp Công Cụ (Toolbox)" : "The Toolbox",
+      text: currentLang === 'vi' ? "Nơi chứa tất cả các khối lệnh. Nhấn vào một nhóm để mở và kéo khối lệnh ra." : "Here you can find all the blocks. Click a category to open it, and drag blocks out.",
+      position: "left"
+    },
+    {
+      title: currentLang === 'vi' ? "Không Gian Làm Việc" : "The Workspace",
+      text: currentLang === 'vi' ? "Kéo thả và kết nối các khối lệnh tại đây để tạo logic của bạn." : "Drop your blocks here and connect them together to build your logic.",
+      position: "center"
+    },
+    {
+      title: currentLang === 'vi' ? "Chuyển Đổi Chế Độ Xem" : "View Switcher",
+      text: currentLang === 'vi' ? "Chuyển đổi giữa giao diện Khối lệnh và Mã Luau được tạo ra." : "Toggle between the visual blocks and the generated Luau code.",
+      position: "top"
+    },
+    {
+      title: currentLang === 'vi' ? "Các Hành Động" : "Actions",
+      text: currentLang === 'vi' ? "Lưu dự án, tải lại sau, hoặc xuất mã để dùng trong Roblox Studio." : "Save your project, load it later, or copy the code to Roblox Studio.",
+      position: "top-right"
+    }
+  ];
+
+  const nextTutorialStep = useCallback(() => {
+    if (tutorialStep < tutorialSteps.length - 1) {
+      setTutorialStep(prev => prev + 1);
+    } else {
+      closeTutorial();
+    }
+  }, [tutorialStep, tutorialSteps.length]);
+
+  useEffect(() => {
+    if (!showTutorial) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      nextTutorialStep();
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showTutorial, nextTutorialStep]);
+
+  const closeTutorial = () => {
+    localStorage.setItem('blocklua_tutorial_seen', 'true');
+    setShowTutorial(false);
+  };
+
+  const saveWorkspace = useCallback(() => {
+    if (workspace.current) {
+      const xml = Blockly.Xml.workspaceToDom(workspace.current);
+      const xmlText = Blockly.utils.xml.domToText(xml);
+      localStorage.setItem('blocklua_workspace', xmlText);
+      alert('Workspace saved!');
+    }
+  }, []);
+
+  const loadWorkspace = useCallback(() => {
+    if (workspace.current) {
+      const xmlText = localStorage.getItem('blocklua_workspace');
+      if (xmlText) {
+        const xml = Blockly.utils.xml.textToDom(xmlText);
+        workspace.current.clear();
+        Blockly.Xml.domToWorkspace(xml, workspace.current);
+        alert('Workspace loaded!');
+      } else {
+        alert('No saved workspace found.');
+      }
+    }
+  }, []);
+
+  const isShiftPressedRef = useRef(false);
+  const lastClickShiftState = useRef(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') isShiftPressedRef.current = true;
+      
+      // Handle Z and Y for Undo/Redo
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      if (e.key.toLowerCase() === 'z' && !e.ctrlKey && !e.metaKey) {
+        if (workspace.current) {
+          workspace.current.undo(false);
+        }
+      } else if (e.key.toLowerCase() === 'y' && !e.ctrlKey && !e.metaKey) {
+        if (workspace.current) {
+          workspace.current.undo(true);
+        }
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') isShiftPressedRef.current = false;
+    };
+    const handleMouseDown = (e: MouseEvent) => {
+      lastClickShiftState.current = e.shiftKey;
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    window.addEventListener('mousedown', handleMouseDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      window.removeEventListener('mousedown', handleMouseDown, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!blocklyDiv.current) return;
+
+    // Define custom blocks to match the image
+    defineCustomBlocks();
+    defineCustomGenerators();
+
+      // Comment Category
+      Blockly.Blocks['comment'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("--")
+              .appendField(new Blockly.FieldTextInput("comment"), "TEXT");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#999999");
+        }
+      };
+
+      // Debug Category
+      Blockly.Blocks['print'] = {
+        init: function() {
+          this.appendValueInput("TEXT")
+              .setCheck(null)
+              .appendField("print");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+        }
+      };
+
+      Blockly.Blocks['warn'] = {
+        init: function() {
+          this.appendValueInput("TEXT")
+              .setCheck(null)
+              .appendField("warn");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+        }
+      };
+
+      Blockly.Blocks['run_lua'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("run lua")
+              .appendField(new Blockly.FieldTextInput("-- lua code here"), "CODE");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+        }
+      };
+
+      // Logic Category
+      Blockly.Blocks['wait'] = {
+        init: function() {
+          this.appendValueInput("SECONDS")
+              .setCheck("Number")
+              .appendField("wait");
+          this.appendDummyInput()
+              .appendField("seconds");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+
+      Blockly.Blocks['lua_if'] = {
+        init: function() {
+          this.appendValueInput("CONDITION")
+              .setCheck(null)
+              .appendField("if");
+          this.appendDummyInput()
+              .appendField("then");
+          this.appendStatementInput("DO");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+
+      Blockly.Blocks['logic_negate'] = {
+        init: function() {
+          this.appendValueInput("BOOL").setCheck(null).appendField("not");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+
+      Blockly.Blocks['logic_compare_eq'] = {
+        init: function() {
+          this.appendValueInput("A").setCheck(null);
+          this.appendDummyInput().appendField("=");
+          this.appendValueInput("B").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['logic_compare_lt'] = {
+        init: function() {
+          this.appendValueInput("A").setCheck(null);
+          this.appendDummyInput().appendField("<");
+          this.appendValueInput("B").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['logic_compare_gt'] = {
+        init: function() {
+          this.appendValueInput("A").setCheck(null);
+          this.appendDummyInput().appendField(">");
+          this.appendValueInput("B").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['logic_compare_neq'] = {
+        init: function() {
+          this.appendValueInput("A").setCheck(null);
+          this.appendDummyInput().appendField("≠");
+          this.appendValueInput("B").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['logic_boolean_true'] = {
+        init: function() {
+          this.appendDummyInput().appendField("true");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+
+      Blockly.Blocks['logic_boolean_false'] = {
+        init: function() {
+          this.appendDummyInput().appendField("false");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+
+      Blockly.Blocks['logic_operation_and'] = {
+        init: function() {
+          this.appendValueInput("A").setCheck(null);
+          this.appendDummyInput().appendField("and");
+          this.appendValueInput("B").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['logic_operation_or'] = {
+        init: function() {
+          this.appendValueInput("A").setCheck(null);
+          this.appendDummyInput().appendField("or");
+          this.appendValueInput("B").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      // World Category
+      Blockly.Blocks['world_me'] = {
+        init: function() {
+          this.appendDummyInput().appendField("me");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+
+      Blockly.Blocks['world_this_script'] = {
+        init: function() {
+          this.appendDummyInput().appendField("this script");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+
+      Blockly.Blocks['world_instance'] = {
+        init: function() {
+          const field = new Blockly.FieldTextInput("game.Workspace", (newValue) => {
+            return newValue;
+          });
+          
+          // Custom click handler for the field
+          (field as any).showEditor_ = function() {
+            if ((window as any).openInstanceSelector) {
+              (window as any).openInstanceSelector(this.getSourceBlock()?.id);
+            }
+          };
+
+          this.appendDummyInput()
+              .appendField("instance")
+              .appendField(field, "NAME");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+
+      Blockly.Blocks['world_set_property_direct'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("set")
+              .appendField(new Blockly.FieldTextInput("Transparency"), "PROPERTY")
+              .appendField("of");
+          this.appendValueInput("INSTANCE")
+              .setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_get_property_direct'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldTextInput("Name"), "PROPERTY")
+              .appendField("of");
+          this.appendValueInput("INSTANCE")
+              .setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_find_first_child_direct'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("find")
+              .appendField(new Blockly.FieldTextInput("Child"), "NAME")
+              .appendField("in");
+          this.appendValueInput("INSTANCE")
+              .setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_vector3'] = {
+        init: function() {
+          this.appendDummyInput().appendField("vector3");
+          this.appendValueInput("X").setCheck("Number").appendField("x");
+          this.appendValueInput("Y").setCheck("Number").appendField("y");
+          this.appendValueInput("Z").setCheck("Number").appendField("z");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_vector3_values'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("vector3")
+              .appendField(new Blockly.FieldTextInput("0"), "X")
+              .appendField(new Blockly.FieldTextInput("0"), "Y")
+              .appendField(new Blockly.FieldTextInput("0"), "Z");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_get_instance_by_path'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get instance by path");
+          this.appendValueInput("PATH").setCheck("String");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_set_property'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set");
+          this.appendValueInput("PROPERTY").setCheck("String");
+          this.appendDummyInput().appendField("of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_get_property'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get property");
+          this.appendValueInput("PROPERTY").setCheck("String");
+          this.appendDummyInput().appendField("of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_find_first_child'] = {
+        init: function() {
+          this.appendDummyInput().appendField("find");
+          this.appendValueInput("NAME").setCheck("String");
+          this.appendDummyInput().appendField("in");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_color3'] = {
+        init: function() {
+          this.appendDummyInput().appendField("color 3");
+          this.appendValueInput("R").setCheck("Number").appendField("r (number)");
+          this.appendValueInput("G").setCheck("Number").appendField("g (number)");
+          this.appendValueInput("B").setCheck("Number").appendField("b (number)");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_color3_values'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("color 3")
+              .appendField(new Blockly.FieldTextInput("0"), "R")
+              .appendField(new Blockly.FieldTextInput("0"), "G")
+              .appendField(new Blockly.FieldTextInput("0"), "B");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_create_instance_direct'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("create")
+              .appendField(new Blockly.FieldTextInput("Part"), "CLASS")
+              .appendField("in");
+          this.appendValueInput("PARENT").setCheck(null);
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _instance", "scratch-var-label"), "VAR_LABEL");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['world_clone_instance'] = {
+        init: function() {
+          this.appendDummyInput().appendField("clone");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _clone", "scratch-var-label"), "VAR_LABEL");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Instance Category
+      Blockly.Blocks['instance_new'] = {
+        init: function() {
+          this.appendDummyInput().appendField("new Instance")
+              .appendField(new Blockly.FieldTextInput("Part"), "CLASS");
+          this.appendValueInput("PARENT").setCheck(null).appendField("parented to");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_wait_for_child'] = {
+        init: function() {
+          this.appendValueInput("PARENT").setCheck(null);
+          this.appendDummyInput().appendField(":WaitForChild(");
+          this.appendValueInput("NAME").setCheck("String");
+          this.appendDummyInput().appendField(")");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_find_first_child'] = {
+        init: function() {
+          this.appendValueInput("PARENT").setCheck(null);
+          this.appendDummyInput().appendField(":FindFirstChild(");
+          this.appendValueInput("NAME").setCheck("String");
+          this.appendDummyInput().appendField(")");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_get_children'] = {
+        init: function() {
+          this.appendValueInput("PARENT").setCheck(null);
+          this.appendDummyInput().appendField(":GetChildren()");
+          this.setOutput(true, "Array");
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_get_descendants'] = {
+        init: function() {
+          this.appendValueInput("PARENT").setCheck(null);
+          this.appendDummyInput().appendField(":GetDescendants()");
+          this.setOutput(true, "Array");
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_clone'] = {
+        init: function() {
+          this.appendDummyInput().appendField("clone");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_child_added'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput()
+              .appendField("child added")
+              .appendField(new Blockly.FieldLabel("var. _child", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_child_removed'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput()
+              .appendField("child removed")
+              .appendField(new Blockly.FieldLabel("var. _child", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_descendant_added'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput()
+              .appendField("descendant added")
+              .appendField(new Blockly.FieldLabel("var. _descendant", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_descendant_removing'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput()
+              .appendField("descendant removing")
+              .appendField(new Blockly.FieldLabel("var. _descendant", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_destroy'] = {
+        init: function() {
+          this.appendDummyInput().appendField("destroy");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_is_a'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput()
+              .appendField("is a")
+              .appendField(new Blockly.FieldTextInput("BasePart"), "CLASS");
+          this.setOutput(true, "Boolean");
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_set_name'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".Name =");
+          this.appendValueInput("VALUE").setCheck("String");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_get_name'] = {
+        init: function() {
+          this.appendDummyInput().appendField("name of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, "String");
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_get_parent'] = {
+        init: function() {
+          this.appendDummyInput().appendField("parent of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['instance_set_parent'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".Parent =");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#6600ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Part Category
+      Blockly.Blocks['part_set_anchored'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".Anchored =");
+          this.appendValueInput("VALUE").setCheck("Boolean");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_set_cancollide'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".CanCollide =");
+          this.appendValueInput("VALUE").setCheck("Boolean");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_set_cantouch'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".CanTouch =");
+          this.appendValueInput("VALUE").setCheck("Boolean");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_set_castshadow'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".CastShadow =");
+          this.appendValueInput("VALUE").setCheck("Boolean");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_set_color'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".Color =");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_set_orientation'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".Orientation =");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_get_orientation'] = {
+        init: function() {
+          this.appendDummyInput().appendField("orientation of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_set_position'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".Position =");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_get_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("position of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_set_size'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".Size =");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_get_size'] = {
+        init: function() {
+          this.appendDummyInput().appendField("size of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_touched_by_part'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput()
+              .appendField("touched by part")
+              .appendField(new Blockly.FieldLabel("var. _touched_part", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_touched_by_character'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput()
+              .appendField("touched by character")
+              .appendField(new Blockly.FieldLabel("var. _touched_part", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['part_set_transparency'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(".Transparency =");
+          this.appendValueInput("VALUE").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4d4d4d");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['math_number_custom'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("number")
+              .appendField(new Blockly.FieldTextInput("0"), "NUM");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+        }
+      };
+
+      Blockly.Blocks['math_arithmetic_add'] = {
+        init: function() {
+          this.appendValueInput("A").setCheck("Number");
+          this.appendDummyInput().appendField("+");
+          this.appendValueInput("B").setCheck("Number");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['math_random_custom'] = {
+        init: function() {
+          this.appendDummyInput().appendField("random from");
+          this.appendValueInput("FROM").setCheck("Number");
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("TO").setCheck("Number");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['math_round'] = {
+        init: function() {
+          this.appendDummyInput().appendField("round");
+          this.appendValueInput("NUM").setCheck("Number");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['math_abs'] = {
+        init: function() {
+          this.appendDummyInput().appendField("abs");
+          this.appendValueInput("NUM").setCheck("Number");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['math_ceil'] = {
+        init: function() {
+          this.appendDummyInput().appendField("ceil");
+          this.appendValueInput("NUM").setCheck("Number");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['math_floor'] = {
+        init: function() {
+          this.appendDummyInput().appendField("floor");
+          this.appendValueInput("NUM").setCheck("Number");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['math_expr_1'] = {
+        init: function() {
+          this.appendValueInput("NUM").setCheck("Number");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("* 2 + 1"), "EXPR");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['math_expr_2'] = {
+        init: function() {
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("1 + 2 *"), "EXPR");
+          this.appendValueInput("NUM").setCheck("Number");
+          this.setOutput(true, "Number");
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Text Category
+      Blockly.Blocks['text_string_custom'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("string")
+              .appendField(new Blockly.FieldTextInput(""), "TEXT");
+          this.setOutput(true, "String");
+          this.setColour("#ffab19");
+        }
+      };
+
+      Blockly.Blocks['text_join_custom'] = {
+        init: function() {
+          this.appendDummyInput().appendField("join");
+          this.appendValueInput("A").setCheck("String");
+          this.appendDummyInput().appendField("with");
+          this.appendValueInput("B").setCheck("String");
+          this.setOutput(true, "String");
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['text_length_custom'] = {
+        init: function() {
+          this.appendDummyInput().appendField("length of");
+          this.appendValueInput("TEXT").setCheck("String");
+          this.setOutput(true, "Number");
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['text_to_upper'] = {
+        init: function() {
+          this.appendDummyInput().appendField("to upper case");
+          this.appendValueInput("TEXT").setCheck("String");
+          this.setOutput(true, "String");
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['text_to_lower'] = {
+        init: function() {
+          this.appendDummyInput().appendField("to lower case");
+          this.appendValueInput("TEXT").setCheck("String");
+          this.setOutput(true, "String");
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Values Category
+      Blockly.Blocks['values_to_string'] = {
+        init: function() {
+          this.appendValueInput("VALUE").setCheck(null);
+          this.appendDummyInput().appendField("to string");
+          this.setOutput(true, "String");
+          this.setColour("#4cbfe6");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['values_to_number'] = {
+        init: function() {
+          this.appendValueInput("VALUE").setCheck(null);
+          this.appendDummyInput().appendField("to number");
+          this.setOutput(true, "Number");
+          this.setColour("#4cbfe6");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Variables Category
+      Blockly.Blocks['variables_create'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("var. create")
+              .appendField(new Blockly.FieldTextInput("x"), "VAR")
+              .appendField("with value");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff661a");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Helper for variable autocomplete
+      const addVariableAutocomplete = (block: Blockly.Block, fieldName: string) => {
+        const varField = block.getField(fieldName);
+        if (varField) {
+          (varField as any).showEditor_ = function(this: any, e?: Event) {
+            const workspace = this.getSourceBlock()?.workspace;
+            if (!workspace) return;
+            
+            // Capture mouse position
+            let mouseX: number | undefined;
+            let mouseY: number | undefined;
+            if (e instanceof MouseEvent) {
+              mouseX = e.clientX;
+              mouseY = e.clientY;
+            }
+            const blocks = workspace.getAllBlocks(false);
+            const vars = blocks
+              .filter(b => b.type === 'variables_create')
+              .map(b => b.getFieldValue('VAR'))
+              .filter((v, i, a) => v && a.indexOf(v) === i);
+            
+            // Standard editor
+            (Blockly.FieldTextInput.prototype as any).showEditor_.call(this, e);
+            
+            // Custom dropdown overlay
+            const htmlInput = (Blockly as any).FieldTextInput.htmlInput_ || 
+                              document.querySelector('.blocklyHtmlInput') as HTMLInputElement;
+            
+            if (htmlInput && vars.length > 0) {
+              // Ensure only one dropdown exists
+              const existingDropdown = document.getElementById('variable-autocomplete-dropdown');
+              if (existingDropdown) {
+                existingDropdown.remove();
+              }
+
+              const container = document.createElement('div');
+              container.id = 'variable-autocomplete-dropdown';
+              container.style.position = 'fixed';
+              container.style.zIndex = '20000';
+              container.style.background = 'rgba(255, 255, 255, 0.95)';
+              container.style.backdropFilter = 'blur(10px)';
+              (container.style as any).webkitBackdropFilter = 'blur(10px)';
+              container.style.border = '1px solid rgba(0,0,0,0.1)';
+              container.style.borderRadius = '12px';
+              container.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+              container.style.minWidth = '180px';
+              container.style.padding = '6px';
+              container.style.display = 'flex';
+              container.style.flexDirection = 'column';
+              container.style.gap = '4px';
+              container.style.opacity = '0';
+              container.style.transform = 'translateY(5px)';
+              container.style.transition = 'opacity 0.1s ease, transform 0.1s ease';
+              container.style.fontFamily = 'Inter, sans-serif';
+              
+              // Search Header
+              const searchWrapper = document.createElement('div');
+              searchWrapper.style.padding = '2px';
+              searchWrapper.style.position = 'sticky';
+              searchWrapper.style.top = '0';
+              searchWrapper.style.background = 'transparent';
+              searchWrapper.style.zIndex = '1';
+
+              const searchInput = document.createElement('input');
+              searchInput.type = 'text';
+              searchInput.placeholder = 'Search...';
+              searchInput.style.width = '100%';
+              searchInput.style.padding = '6px 10px';
+              searchInput.style.fontSize = '12px';
+              searchInput.style.border = '1px solid rgba(0,0,0,0.05)';
+              searchInput.style.borderRadius = '8px';
+              searchInput.style.outline = 'none';
+              searchInput.style.background = 'rgba(0,0,0,0.03)';
+              searchInput.style.transition = 'all 0.2s';
+              
+              searchInput.onfocus = () => {
+                searchInput.style.borderColor = '#4c97ff';
+                searchInput.style.background = '#fff';
+                searchInput.style.boxShadow = '0 0 0 2px rgba(76, 151, 255, 0.1)';
+              };
+              searchInput.onblur = () => {
+                searchInput.style.borderColor = 'rgba(0,0,0,0.05)';
+                searchInput.style.background = 'rgba(0,0,0,0.03)';
+                searchInput.style.boxShadow = 'none';
+              };
+              
+              const title = document.createElement('div');
+              title.textContent = 'Variables';
+              title.style.fontSize = '9px';
+              title.style.fontWeight = '700';
+              title.style.color = '#4c97ff';
+              title.style.textTransform = 'uppercase';
+              title.style.letterSpacing = '0.05em';
+              title.style.padding = '2px 8px';
+              
+              searchWrapper.appendChild(title);
+              searchWrapper.appendChild(searchInput);
+              container.appendChild(searchWrapper);
+
+              const listContainer = document.createElement('div');
+              listContainer.style.overflowY = 'auto';
+              // Max 3 items visible (approx 32px each)
+              listContainer.style.maxHeight = '96px';
+              listContainer.style.display = 'flex';
+              listContainer.style.flexDirection = 'column';
+              listContainer.style.gap = '2px';
+              listContainer.style.padding = '2px';
+              // Custom scrollbar styling
+              listContainer.style.scrollbarWidth = 'thin';
+              listContainer.style.scrollbarColor = 'rgba(0,0,0,0.2) transparent';
+              container.appendChild(listContainer);
+              
+              let selectedIndex = -1;
+              const updateDropdown = (filter = '') => {
+                listContainer.innerHTML = '';
+                selectedIndex = -1;
+                const searchTerm = filter.toLowerCase();
+                
+                // Smart sorting: prefix matches first, then contains
+                const filtered = vars
+                  .filter(v => v.toLowerCase().includes(searchTerm))
+                  .sort((a, b) => {
+                    const aLow = a.toLowerCase();
+                    const bLow = b.toLowerCase();
+                    const aStarts = aLow.startsWith(searchTerm);
+                    const bStarts = bLow.startsWith(searchTerm);
+                    if (aStarts && !bStarts) return -1;
+                    if (!aStarts && bStarts) return 1;
+                    return aLow.localeCompare(bLow);
+                  });
+                
+                if (filtered.length === 0) {
+                  const item = document.createElement('div');
+                  item.textContent = filter === '' ? 'No variables found' : 'No matches found';
+                  item.style.padding = '12px 14px';
+                  item.style.fontSize = '13px';
+                  item.style.color = '#999999';
+                  item.style.fontStyle = 'italic';
+                  item.style.textAlign = 'center';
+                  listContainer.appendChild(item);
+                  return;
+                }
+                
+                filtered.forEach((v, idx) => {
+                  const item = document.createElement('div');
+                  item.id = `autocomplete-item-${idx}`;
+                  
+                  // Highlight match
+                  if (searchTerm && v.toLowerCase().includes(searchTerm)) {
+                    const index = v.toLowerCase().indexOf(searchTerm);
+                    const before = v.substring(0, index);
+                    const match = v.substring(index, index + searchTerm.length);
+                    const after = v.substring(index + searchTerm.length);
+                    item.innerHTML = `${before}<span style="color: #4c97ff; font-weight: 600;">${match}</span>${after}`;
+                  } else {
+                    item.textContent = v;
+                  }
+                  
+                  item.style.padding = '8px 12px';
+                  item.style.cursor = 'pointer';
+                  item.style.fontSize = '13px';
+                  item.style.color = '#1a1a1a';
+                  item.style.borderRadius = '8px';
+                  item.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+                  item.style.marginBottom = '1px';
+                  item.style.fontWeight = '500';
+                  
+                  const selectItem = () => {
+                    this.setValue(v);
+                    this.render_();
+                    (Blockly as any).WidgetDiv.hide();
+                  };
+
+                  item.onmouseover = () => {
+                    // Update index on hover
+                    selectedIndex = idx;
+                    updateSelection();
+                  };
+                  item.onmouseout = () => {
+                    selectedIndex = -1;
+                    updateSelection();
+                  };
+                  item.onmousedown = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectItem();
+                  };
+                  listContainer.appendChild(item);
+                });
+
+                const updateSelection = () => {
+                  const items = listContainer.querySelectorAll('div[id^="autocomplete-item-"]');
+                  items.forEach((item: any, idx) => {
+                    if (idx === selectedIndex) {
+                      item.style.background = 'rgba(76, 151, 255, 0.1)';
+                      item.style.color = '#4c97ff';
+                      item.style.transform = 'translateX(4px)';
+                      item.scrollIntoView({ block: 'nearest' });
+                    } else {
+                      item.style.background = 'transparent';
+                      item.style.color = '#1a1a1a';
+                      item.style.transform = 'translateX(0)';
+                    }
+                  });
+                };
+
+                // Expose for key handler
+                (container as any).handleKey = (key: string) => {
+                  const items = listContainer.querySelectorAll('div[id^="autocomplete-item-"]');
+                  if (key === 'ArrowDown') {
+                    selectedIndex = (selectedIndex + 1) % items.length;
+                    updateSelection();
+                  } else if (key === 'ArrowUp') {
+                    selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+                    updateSelection();
+                  } else if (key === 'Enter') {
+                    if (selectedIndex >= 0 && selectedIndex < filtered.length) {
+                      const v = filtered[selectedIndex];
+                      this.setValue(v);
+                      this.render_();
+                      (Blockly as any).WidgetDiv.hide();
+                    } else if (filtered.length > 0) {
+                      // If nothing selected, pick the first match (best match)
+                      const v = filtered[0];
+                      this.setValue(v);
+                      this.render_();
+                      (Blockly as any).WidgetDiv.hide();
+                    } else {
+                      // If no matches, accept the typed text
+                      const v = searchInput.value;
+                      if (v) {
+                        this.setValue(v);
+                        this.render_();
+                      }
+                      (Blockly as any).WidgetDiv.hide();
+                    }
+                  }
+                };
+              };
+
+              const positionDropdown = () => {
+                const rect = htmlInput.getBoundingClientRect();
+                container.style.minWidth = Math.max(220, rect.width) + 'px';
+                
+                // Use mouse position if available, otherwise fallback to input rect
+                let targetX = mouseX !== undefined ? mouseX : rect.left;
+                let targetY = mouseY !== undefined ? mouseY + 10 : rect.bottom + 4;
+
+                container.style.left = targetX + 'px';
+                container.style.top = targetY + 'px';
+                document.body.appendChild(container);
+                
+                const dropdownRect = container.getBoundingClientRect();
+                
+                // Boundary checks
+                if (targetX + dropdownRect.width > window.innerWidth) {
+                  container.style.left = (window.innerWidth - dropdownRect.width - 16) + 'px';
+                }
+                if (targetY + dropdownRect.height > window.innerHeight) {
+                  container.style.top = (targetY - dropdownRect.height - 20) + 'px';
+                }
+
+                requestAnimationFrame(() => {
+                  container.style.opacity = '1';
+                  container.style.transform = 'translateY(0)';
+                });
+              };
+
+              updateDropdown('');
+              positionDropdown();
+              
+              // Focus search input immediately
+              setTimeout(() => searchInput.focus(), 50);
+
+              // Handle Escape and Arrow keys
+              searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                  (Blockly as any).WidgetDiv.hide();
+                } else if (['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+                  if ((container as any).handleKey) {
+                    e.preventDefault();
+                    (container as any).handleKey(e.key);
+                  }
+                }
+              });
+
+              // Update on search input
+              searchInput.addEventListener('input', (e: any) => {
+                updateDropdown(e.target.value);
+              });
+
+              // Also update if user types in the original Blockly input
+              const inputHandler = (e: any) => {
+                searchInput.value = e.target.value;
+                updateDropdown(e.target.value);
+              };
+              htmlInput.addEventListener('input', inputHandler);
+
+              // Click outside logic
+              const clickOutsideHandler = (e: Event) => {
+                if (!container.contains(e.target as Node) && e.target !== htmlInput) {
+                  (Blockly as any).WidgetDiv.hide();
+                }
+              };
+              window.addEventListener('mousedown', clickOutsideHandler, true);
+              window.addEventListener('touchstart', clickOutsideHandler, true);
+              window.addEventListener('wheel', clickOutsideHandler, true);
+
+              const windowBlurHandler = () => {
+                (Blockly as any).WidgetDiv.hide();
+              };
+              window.addEventListener('blur', windowBlurHandler);
+
+              // Cleanup on hide
+              const oldHide = (Blockly as any).WidgetDiv.hide;
+              (Blockly as any).WidgetDiv.hide = function() {
+                htmlInput.removeEventListener('input', inputHandler);
+                window.removeEventListener('mousedown', clickOutsideHandler, true);
+                window.removeEventListener('touchstart', clickOutsideHandler, true);
+                window.removeEventListener('wheel', clickOutsideHandler, true);
+                window.removeEventListener('blur', windowBlurHandler);
+                
+                if (container.parentNode) {
+                  container.style.opacity = '0';
+                  container.style.transform = 'translateY(10px)';
+                  setTimeout(() => {
+                    if (container.parentNode) container.parentNode.removeChild(container);
+                  }, 200);
+                }
+                
+                (Blockly as any).WidgetDiv.hide = oldHide;
+                oldHide.call(Blockly.WidgetDiv);
+              };
+            }
+          };
+        }
+      };
+
+      Blockly.Blocks['variables_set_custom'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("var. set")
+              .appendField(new Blockly.FieldTextInput("x"), "VAR")
+              .appendField("to");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff661a");
+          this.setInputsInline(true);
+          addVariableAutocomplete(this, "VAR");
+        }
+      };
+
+      Blockly.Blocks['variables_change_custom'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("var. change")
+              .appendField(new Blockly.FieldTextInput("x"), "VAR")
+              .appendField("by");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff661a");
+          this.setInputsInline(true);
+          addVariableAutocomplete(this, "VAR");
+        }
+      };
+
+      Blockly.Blocks['variables_get_custom'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("var.")
+              .appendField(new Blockly.FieldTextInput("x"), "VAR");
+          this.setOutput(true, null);
+          this.setColour("#ff661a");
+          addVariableAutocomplete(this, "VAR");
+        }
+      };
+
+      // Variables 2 Category Blocks
+      const createVarReporter = (type: string, label: string) => {
+        Blockly.Blocks[type] = {
+          init: function() {
+            this.appendDummyInput().appendField(label);
+            this.setOutput(true, null);
+            this.setColour("#ff661a");
+          }
+        };
+      };
+
+      createVarReporter('var_count', 'var. _count');
+      createVarReporter('var_child', 'var. _child');
+      createVarReporter('var_descendant', 'var. _descendant');
+      createVarReporter('var_instance', 'var. _instance');
+      createVarReporter('var_clone', 'var. _clone');
+      createVarReporter('var_touched_part', 'var. _touched_part');
+      createVarReporter('var_climb_speed', 'var. _climb_speed');
+      createVarReporter('var_humanoid', 'var. _humanoid');
+      createVarReporter('var_character_model', 'var. _character_model');
+      createVarReporter('var_new_health', 'var. _new_health');
+      createVarReporter('var_reached_goal', 'var. _reached_goal');
+      createVarReporter('var_input', 'var. _input');
+      createVarReporter('var_mouse_input', 'var. _mouse_input');
+      createVarReporter('var_touch_input', 'var. _touch_input');
+      createVarReporter('var_player', 'var. _player');
+      createVarReporter('var_click_detector', 'var. _click_detector');
+      createVarReporter('var_productid', 'var. _productid');
+      createVarReporter('var_key_input', 'var. _key_input');
+      createVarReporter('var_received_data', 'var. _received_data');
+      createVarReporter('var_data', 'var. _data');
+      createVarReporter('var_value', 'var. _value');
+
+      // Lists Category
+      Blockly.Blocks['lists_empty'] = {
+        init: function() {
+          this.appendDummyInput().appendField("empty list");
+          this.setOutput(true, "Array");
+          this.setColour("#cf142b");
+        }
+      };
+
+      Blockly.Blocks['lists_set_item'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set item");
+          this.appendValueInput("INDEX").setCheck("Number");
+          this.appendDummyInput().appendField("of");
+          this.appendValueInput("LIST").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf142b");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['lists_get_item'] = {
+        init: function() {
+          this.appendDummyInput().appendField("item");
+          this.appendValueInput("INDEX").setCheck("Number");
+          this.appendDummyInput().appendField("of");
+          this.appendValueInput("LIST").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#cf142b");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['lists_insert'] = {
+        init: function() {
+          this.appendDummyInput().appendField("insert");
+          this.appendValueInput("ITEM").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("LIST").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf142b");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['lists_remove'] = {
+        init: function() {
+          this.appendDummyInput().appendField("remove item");
+          this.appendValueInput("INDEX").setCheck("Number");
+          this.appendDummyInput().appendField("from");
+          this.appendValueInput("LIST").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf142b");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Loops Category
+      Blockly.Blocks['loops_while_lua'] = {
+        init: function() {
+          this.appendValueInput("CONDITION").setCheck(null).appendField("while");
+          this.appendDummyInput().appendField("do");
+          this.appendStatementInput("DO");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#48a868");
+        }
+      };
+
+      // Helper to create the "var." clickable label
+      const createVarLabel = (name: string, color: string) => {
+        const field = new Blockly.FieldLabel(name, "scratch-var-label");
+        // We'll handle the click via the workspace listener or a custom field if needed
+        // For now, let's use a custom field to ensure it's clickable and looks like a block
+        return field;
+      };
+
+      Blockly.Blocks['loops_repeat_lua'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("repeat")
+              .appendField(new Blockly.FieldLabel("var. _count", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField("from");
+          this.appendValueInput("FROM").setCheck("Number");
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("TO").setCheck("Number");
+          this.appendStatementInput("DO");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#48a868");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['loops_for_children'] = {
+        init: function() {
+          this.appendDummyInput().appendField("loop through children of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _child", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#48a868");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['loops_for_descendants'] = {
+        init: function() {
+          this.appendDummyInput().appendField("loop through descendants of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _descendant", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#48a868");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['loops_break_lua'] = {
+        init: function() {
+          this.appendDummyInput().appendField("break this loop");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#48a868");
+        }
+      };
+
+      // Special reporter blocks for the "var." labels
+      Blockly.Blocks['var_reporter'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("var.")
+              .appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.setOutput(true, null);
+          this.setColour("#ff66cc"); // Pink color
+        }
+      };
+
+      // Placeholder blocks for inputs (Shadows) - Darker colors, with faded text
+      Blockly.Blocks['placeholder_string'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("string", "faded-placeholder-text"));
+          this.setOutput(true, "String");
+          this.setColour("#3d99b8"); // Teal/Blue like in the image
+        }
+      };
+      Blockly.Blocks['placeholder_number'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("number", "faded-placeholder-text"));
+          this.setOutput(true, "Number");
+          this.setColour("#666666"); // Grayish like in the image
+        }
+      };
+      Blockly.Blocks['placeholder_boolean'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("true/false", "faded-placeholder-text"));
+          this.setOutput(true, "Boolean");
+          this.setColour("#4c97ff"); // Blue like in the image
+        }
+      };
+      Blockly.Blocks['placeholder_color3'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("color3", "faded-placeholder-text"));
+          this.setOutput(true, null);
+          this.setColour("#666666");
+        }
+      };
+      Blockly.Blocks['placeholder_vector3'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("vector3", "faded-placeholder-text"));
+          this.setOutput(true, null);
+          this.setColour("#666666");
+        }
+      };
+      Blockly.Blocks['placeholder_instance'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("instance", "faded-placeholder-text"));
+          this.setOutput(true, null);
+          this.setColour("#3d79cc"); // Darker World/Logic color
+        }
+      };
+      Blockly.Blocks['placeholder_index'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("index", "faded-placeholder-text"));
+          this.setOutput(true, "Number");
+          this.setColour("#a61022"); // Darker Lists color
+        }
+      };
+      Blockly.Blocks['placeholder_variable'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("variable", "faded-placeholder-text"));
+          this.setOutput(true, null);
+          this.setColour("#cc5214"); // Darker Variables color
+        }
+      };
+      Blockly.Blocks['placeholder_any'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("any", "faded-placeholder-text"));
+          this.setOutput(true, null);
+          this.setColour("#3d99b8"); // Darker Values color
+        }
+      };
+      Blockly.Blocks['placeholder_condition'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("condition", "faded-placeholder-text"));
+          this.setOutput(true, null);
+          this.setColour("#3d79cc"); // Darker Logic color
+        }
+      };
+
+      // Character Category
+      Blockly.Blocks['character_is_climbing'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("is climbing");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _climb_speed", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_damage'] = {
+        init: function() {
+          this.appendDummyInput().appendField("damage");
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("by");
+          this.appendValueInput("NUMBER").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_died'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("died");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_equip_tool'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("equip tool:");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_get_humanoid'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get humanoid from model");
+          this.appendValueInput("MODEL").setCheck(null);
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _humanoid", "scratch-var-label"), "VAR_LABEL");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_get_model_from_humanoid'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get model from humanoid");
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _character_model", "scratch-var-label"), "VAR_LABEL");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_set_health'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField(".Health =");
+          this.appendValueInput("VALUE").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_health_changed'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("Health changed");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _new_health", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_jump'] = {
+        init: function() {
+          this.appendDummyInput().appendField("jump");
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_set_jump_height'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField(".JumpHeight =");
+          this.appendValueInput("VALUE").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_set_jump_power'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField(".JumpPower =");
+          this.appendValueInput("VALUE").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_kill'] = {
+        init: function() {
+          this.appendDummyInput().appendField("kill");
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_set_max_health'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField(".MaxHealth =");
+          this.appendValueInput("VALUE").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_move_to'] = {
+        init: function() {
+          this.appendDummyInput().appendField("move");
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("POSITION").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_finished_moving'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("finished moving");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _reached_goal", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_player_of'] = {
+        init: function() {
+          this.appendDummyInput().appendField("player of");
+          this.appendValueInput("CHARACTER").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_unequip_tool'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("unequip tool");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['character_set_walk_speed'] = {
+        init: function() {
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField(".WalkSpeed =");
+          this.appendValueInput("VALUE").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff3355");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Model Category
+      Blockly.Blocks['model_break_joints'] = {
+        init: function() {
+          this.appendDummyInput().appendField("break joints of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#9966ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['model_get_orientation'] = {
+        init: function() {
+          this.appendDummyInput().appendField("orientation of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#9966ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['model_get_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("position of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#9966ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['model_get_size'] = {
+        init: function() {
+          this.appendDummyInput().appendField("size of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#9966ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['model_set_primary_part'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set primary part of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("PART").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#9966ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['model_set_orientation'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set orientation of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#9966ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['model_set_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set position of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#9966ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Gui Category
+      Blockly.Blocks['gui_get_mouse'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get mouse");
+          this.setOutput(true, null);
+          this.setColour("#cf63cf");
+        }
+      };
+      Blockly.Blocks['gui_get_player_gui'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get PlayerGui of");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_new_instance'] = {
+        init: function() {
+          this.appendDummyInput().appendField("new Gui Instance")
+              .appendField(new Blockly.FieldTextInput("ScreenGui"), "CLASS");
+          this.appendValueInput("PARENT").setCheck(null).appendField("parented to");
+          this.setOutput(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_button_clicked'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("(gui button) clicked");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_input_began'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("input began");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_input_ended'] = {
+        init: function() {
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("input ended");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_is_left_mouse'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is left mouse button");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_is_middle_mouse'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is middle mouse button");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_is_right_mouse'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is right mouse button");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_is_touch'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is touch");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _touch_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_mouse_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("mouse input");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("position");
+          this.setOutput(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_set_invisible'] = {
+        init: function() {
+          this.appendDummyInput().appendField("invisible");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_set_visible'] = {
+        init: function() {
+          this.appendDummyInput().appendField("visible");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['gui_touch_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("touch input");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("position");
+          this.setOutput(true, null);
+          this.setColour("#cf63cf");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Player Category
+      Blockly.Blocks['player_get_character'] = {
+        init: function() {
+          this.appendDummyInput().appendField("character of");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour("#0fbd8c");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['player_get_by_name'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get player by name");
+          this.appendValueInput("NAME").setCheck("String");
+          this.setOutput(true, null);
+          this.setColour("#0fbd8c");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['player_kick'] = {
+        init: function() {
+          this.appendDummyInput().appendField("kick");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.appendDummyInput().appendField("reason:");
+          this.appendValueInput("REASON").setCheck("String");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#0fbd8c");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['player_joined'] = {
+        init: function() {
+          this.appendDummyInput().appendField("player joined");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#0fbd8c");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['player_leaving'] = {
+        init: function() {
+          this.appendDummyInput().appendField("player leaving");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#0fbd8c");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['player_get_user_id'] = {
+        init: function() {
+          this.appendDummyInput().appendField("user id of");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.setOutput(true, "Number");
+          this.setColour("#0fbd8c");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Clickdetector Category
+      Blockly.Blocks['clickdetector_add'] = {
+        init: function() {
+          this.appendDummyInput().appendField("add click detector to");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _click_detector", "scratch-var-label"), "VAR_LABEL");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['clickdetector_clicked'] = {
+        init: function() {
+          this.appendValueInput("CLICK_DETECTOR").setCheck(null);
+          this.appendDummyInput().appendField("clicked");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['clickdetector_hover_enter'] = {
+        init: function() {
+          this.appendValueInput("CLICK_DETECTOR").setCheck(null);
+          this.appendDummyInput().appendField("hover enter");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['clickdetector_hover_leave'] = {
+        init: function() {
+          this.appendValueInput("CLICK_DETECTOR").setCheck(null);
+          this.appendDummyInput().appendField("hover leave");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['clickdetector_right_clicked'] = {
+        init: function() {
+          this.appendValueInput("CLICK_DETECTOR").setCheck(null);
+          this.appendDummyInput().appendField("right clicked");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Marketplace Category
+      Blockly.Blocks['marketplace_owns_asset'] = {
+        init: function() {
+          this.appendDummyInput().appendField("does");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.appendDummyInput().appendField("owns asset");
+          this.appendValueInput("ASSET_ID").setCheck(null);
+          this.appendDummyInput().appendField("?");
+          this.setOutput(true, "Boolean");
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['marketplace_owns_gamepass'] = {
+        init: function() {
+          this.appendDummyInput().appendField("does");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.appendDummyInput().appendField("owns gamepass");
+          this.appendValueInput("GAMEPASS_ID").setCheck(null);
+          this.appendDummyInput().appendField("?");
+          this.setOutput(true, "Boolean");
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['marketplace_product_bought'] = {
+        init: function() {
+          this.appendDummyInput().appendField("product bought");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _productId", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['marketplace_prompt_asset'] = {
+        init: function() {
+          this.appendDummyInput().appendField("prompt asset");
+          this.appendValueInput("ASSET_ID").setCheck(null);
+          this.appendDummyInput().appendField("purchase to");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['marketplace_prompt_gamepass'] = {
+        init: function() {
+          this.appendDummyInput().appendField("prompt game pass");
+          this.appendValueInput("GAMEPASS_ID").setCheck(null);
+          this.appendDummyInput().appendField("purchase to");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['marketplace_prompt_product'] = {
+        init: function() {
+          this.appendDummyInput().appendField("prompt product");
+          this.appendValueInput("PRODUCT_ID").setCheck(null);
+          this.appendDummyInput().appendField("purchase to");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Tweening Category
+      Blockly.Blocks['tween_animate'] = {
+        init: function() {
+          this.appendDummyInput().appendField("tween");
+          this.appendValueInput("PROPERTY").setCheck("String");
+          this.appendDummyInput().appendField("of");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField(":");
+          this.appendValueInput("GOAL").setCheck(null);
+          this.appendValueInput("TWEEN_INFO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['tween_info_create'] = {
+        init: function() {
+          this.appendDummyInput().appendField("tween info: time");
+          this.appendValueInput("TIME").setCheck("Number");
+          this.appendDummyInput().appendField("easing style");
+          this.appendValueInput("STYLE").setCheck(null);
+          this.appendDummyInput().appendField("easing direction");
+          this.appendDummyInput().appendField(new Blockly.FieldDropdown([
+            ["In", "In"],
+            ["Out", "Out"],
+            ["In/Out", "InOut"]
+          ]), "DIRECTION");
+          this.setOutput(true, null);
+          this.setColour("#59c059");
+          this.setInputsInline(true);
+        }
+      };
+
+      Blockly.Blocks['placeholder_humanoid'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("humanoid", "faded-placeholder-text"));
+          this.setOutput(true, null);
+          this.setColour("#ff3355");
+        }
+      };
+      Blockly.Blocks['placeholder_player'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField(new Blockly.FieldLabel("player", "faded-placeholder-text"));
+          this.setOutput(true, null);
+          this.setColour("#0fbd8c");
+        }
+      };
+
+      // Client Category
+      Blockly.Blocks['client_fire_server'] = {
+        init: function() {
+          this.appendDummyInput().appendField("fire server");
+          this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
+          this.appendValueInput("DATA").setCheck(null).appendField("data to send");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_input_began'] = {
+        init: function() {
+          this.appendDummyInput().appendField("user input began");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_input_ended'] = {
+        init: function() {
+          this.appendDummyInput().appendField("user input ended");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_is_keyboard'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is keyboard");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _key_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_is_left_mouse'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is left mouse button");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_is_middle_mouse'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is middle mouse button");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_is_right_mouse'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is right mouse button");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_is_touch'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("is touch");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _touch_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_key_is'] = {
+        init: function() {
+          this.appendDummyInput().appendField("if key");
+          this.appendValueInput("KEY").setCheck(null);
+          this.appendDummyInput().appendField("is");
+          this.appendDummyInput().appendField(new Blockly.FieldDropdown([
+            ["Space", "Space"],
+            ["W", "W"],
+            ["A", "A"],
+            ["S", "S"],
+            ["D", "D"],
+            ["E", "E"],
+            ["Q", "Q"],
+            ["F", "F"],
+            ["G", "G"],
+            ["R", "R"],
+            ["T", "T"],
+            ["Y", "Y"],
+            ["U", "U"],
+            ["I", "I"],
+            ["O", "O"],
+            ["P", "P"],
+            ["H", "H"],
+            ["J", "J"],
+            ["K", "K"],
+            ["L", "L"],
+            ["Z", "Z"],
+            ["X", "X"],
+            ["C", "C"],
+            ["V", "V"],
+            ["B", "B"],
+            ["N", "N"],
+            ["M", "M"]
+          ]), "KEY_NAME");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_local_player'] = {
+        init: function() {
+          this.appendDummyInput().appendField("local player");
+          this.setOutput(true, null);
+          this.setColour("#ffab19");
+        }
+      };
+      Blockly.Blocks['client_mouse_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("mouse input");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("position");
+          this.setOutput(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_fired_by_server'] = {
+        init: function() {
+          this.appendDummyInput().appendField("fired by server");
+          this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _received_data", "scratch-var-label"), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['client_touch_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("touch input");
+          this.appendValueInput("INPUT").setCheck(null);
+          this.appendDummyInput().appendField("position");
+          this.setOutput(true, null);
+          this.setColour("#ffab19");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Server Category
+      Blockly.Blocks['server_fired_by_client'] = {
+        init: function() {
+          this.appendDummyInput().appendField("fired by client");
+          this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL_PLAYER");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _data", "scratch-var-label"), "VAR_LABEL_DATA");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#40bf4a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['server_fire_all_clients'] = {
+        init: function() {
+          this.appendDummyInput().appendField("fire all clients");
+          this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
+          this.appendValueInput("DATA").setCheck(null).appendField("data to send");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#40bf4a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['server_fire_client'] = {
+        init: function() {
+          this.appendDummyInput().appendField("fire client");
+          this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
+          this.appendValueInput("PLAYER").setCheck(null).appendField("player");
+          this.appendValueInput("DATA").setCheck(null).appendField("data to send");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#40bf4a");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Leaderstats Category
+      Blockly.Blocks['leaderstats_create_number'] = {
+        init: function() {
+          this.appendDummyInput().appendField("create leaderstats value (number)");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.appendValueInput("DEFAULT").setCheck("Number").appendField("default value");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['leaderstats_create_string'] = {
+        init: function() {
+          this.appendDummyInput().appendField("create leaderstats value (string)");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.appendValueInput("DEFAULT").setCheck("String").appendField("default value");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['leaderstats_enable'] = {
+        init: function() {
+          this.appendDummyInput().appendField("enable leaderstats");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+        }
+      };
+      Blockly.Blocks['leaderstats_get'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get leaderstats");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.appendValueInput("PLAYER").setCheck(null).appendField("of");
+          this.setOutput(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['leaderstats_set'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set leaderstats");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.appendValueInput("PLAYER").setCheck(null).appendField("of");
+          this.appendValueInput("VALUE").setCheck(null).appendField("to");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff8c1a");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Functions Category
+      Blockly.Blocks['functions_define'] = {
+        init: function() {
+          this.appendDummyInput().appendField("define function");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.appendDummyInput().appendField("arguments:");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("arg1, arg2"), "ARGS");
+          this.appendStatementInput("STACK");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff661a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['functions_call'] = {
+        init: function() {
+          this.appendDummyInput().appendField("call function");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.appendDummyInput().appendField("arguments:");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("val1, val2"), "ARGS");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _result", "scratch-var-label"), "VAR_LABEL");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff661a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['functions_return'] = {
+        init: function() {
+          this.appendDummyInput().appendField("return");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff661a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['functions_define_global'] = {
+        init: function() {
+          this.appendDummyInput().appendField("define global function");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.appendDummyInput().appendField("arguments:");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("arg1, arg2"), "ARGS");
+          this.appendStatementInput("STACK");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff661a");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['functions_call_global'] = {
+        init: function() {
+          this.appendDummyInput().appendField("call global function");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
+          this.appendDummyInput().appendField("arguments:");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("val1, val2"), "ARGS");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#ff661a");
+          this.setInputsInline(true);
+        }
+      };
+
+      // Datastore Category
+      Blockly.Blocks['datastore_setup'] = {
+        init: function() {
+          this.appendDummyInput().appendField("setup Datastores for this script");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+      Blockly.Blocks['datastore_instance'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("datastore")
+              .appendField(new Blockly.FieldTextInput("datastore name"), "NAME");
+          this.setOutput(true, null);
+          this.setColour("#4c97ff");
+        }
+      };
+      Blockly.Blocks['datastore_use'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("use datastore")
+              .appendField(new Blockly.FieldTextInput("datastore name"), "NAME");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['datastore_get'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get data");
+          this.appendValueInput("DATASTORE").setCheck(null).appendField("datastore");
+          this.appendValueInput("PLAYER").setCheck(null).appendField("player:");
+          this.appendDummyInput().appendField("value:");
+          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _value", "scratch-var-label"), "VAR_LABEL");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['datastore_save'] = {
+        init: function() {
+          this.appendDummyInput().appendField("save data");
+          this.appendValueInput("DATASTORE").setCheck(null).appendField("datastore");
+          this.appendValueInput("PLAYER").setCheck(null).appendField("player:");
+          this.appendValueInput("VALUE").setCheck(null).appendField("value:");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour("#4c97ff");
+          this.setInputsInline(true);
+        }
+      };
+
+    const defineGenerators = () => {
+      // Comment
+      luaGenerator.forBlock['comment'] = function(block: any) {
+        const text = block.getFieldValue('TEXT');
+        return '-- ' + text + '\n';
+      };
+
+      // Debug
+      luaGenerator.forBlock['print'] = function(block: any) {
+        const text = luaGenerator.valueToCode(block, 'TEXT', Order.NONE) || '""';
+        return 'print(' + text + ')\n';
+      };
+      luaGenerator.forBlock['warn'] = function(block: any) {
+        const text = luaGenerator.valueToCode(block, 'TEXT', Order.NONE) || '""';
+        return 'warn(' + text + ')\n';
+      };
+      luaGenerator.forBlock['run_lua'] = function(block: any) {
+        const code = block.getFieldValue('CODE');
+        return code + '\n';
+      };
+
+      // Logic
+      luaGenerator.forBlock['wait'] = function(block: any) {
+        const seconds = luaGenerator.valueToCode(block, 'SECONDS', Order.NONE) || '0';
+        return 'task.wait(' + seconds + ')\n';
+      };
+      luaGenerator.forBlock['lua_if'] = function(block: any) {
+        const condition = luaGenerator.valueToCode(block, 'CONDITION', Order.NONE) || 'false';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + condition + ' then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['logic_negate'] = function(block: any) {
+        const bool = luaGenerator.valueToCode(block, 'BOOL', Order.UNARY) || 'false';
+        return ['not ' + bool, Order.UNARY];
+      };
+      luaGenerator.forBlock['logic_compare_eq'] = function(block: any) {
+        const a = luaGenerator.valueToCode(block, 'A', Order.RELATIONAL) || 'nil';
+        const b = luaGenerator.valueToCode(block, 'B', Order.RELATIONAL) || 'nil';
+        return [a + ' == ' + b, Order.RELATIONAL];
+      };
+      luaGenerator.forBlock['logic_compare_lt'] = function(block: any) {
+        const a = luaGenerator.valueToCode(block, 'A', Order.RELATIONAL) || '0';
+        const b = luaGenerator.valueToCode(block, 'B', Order.RELATIONAL) || '0';
+        return [a + ' < ' + b, Order.RELATIONAL];
+      };
+      luaGenerator.forBlock['logic_compare_gt'] = function(block: any) {
+        const a = luaGenerator.valueToCode(block, 'A', Order.RELATIONAL) || '0';
+        const b = luaGenerator.valueToCode(block, 'B', Order.RELATIONAL) || '0';
+        return [a + ' > ' + b, Order.RELATIONAL];
+      };
+      luaGenerator.forBlock['logic_compare_neq'] = function(block: any) {
+        const a = luaGenerator.valueToCode(block, 'A', Order.RELATIONAL) || 'nil';
+        const b = luaGenerator.valueToCode(block, 'B', Order.RELATIONAL) || 'nil';
+        return [a + ' ~= ' + b, Order.RELATIONAL];
+      };
+      luaGenerator.forBlock['logic_boolean_true'] = function() {
+        return ['true', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['logic_boolean_false'] = function() {
+        return ['false', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['logic_operation_and'] = function(block: any) {
+        const a = luaGenerator.valueToCode(block, 'A', Order.AND) || 'false';
+        const b = luaGenerator.valueToCode(block, 'B', Order.AND) || 'false';
+        return [a + ' and ' + b, Order.AND];
+      };
+      luaGenerator.forBlock['logic_operation_or'] = function(block: any) {
+        const a = luaGenerator.valueToCode(block, 'A', Order.OR) || 'false';
+        const b = luaGenerator.valueToCode(block, 'B', Order.OR) || 'false';
+        return [a + ' or ' + b, Order.OR];
+      };
+
+      // Math
+      luaGenerator.forBlock['math_number_custom'] = function(block: any) {
+        const num = block.getFieldValue('NUM');
+        return [num, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['math_arithmetic_add'] = function(block: any) {
+        const a = luaGenerator.valueToCode(block, 'A', Order.ADDITIVE) || '0';
+        const b = luaGenerator.valueToCode(block, 'B', Order.ADDITIVE) || '0';
+        return [a + ' + ' + b, Order.ADDITIVE];
+      };
+      luaGenerator.forBlock['math_random_custom'] = function(block: any) {
+        const from = luaGenerator.valueToCode(block, 'FROM', Order.NONE) || '1';
+        const to = luaGenerator.valueToCode(block, 'TO', Order.NONE) || '10';
+        return ['math.random(' + from + ', ' + to + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['math_expr_1'] = function(block: any) {
+        const num = luaGenerator.valueToCode(block, 'NUM', Order.MULTIPLICATIVE) || '0';
+        const expr = block.getFieldValue('EXPR') || '';
+        return [num + ' ' + expr, Order.MULTIPLICATIVE];
+      };
+      luaGenerator.forBlock['math_expr_2'] = function(block: any) {
+        const num = luaGenerator.valueToCode(block, 'NUM', Order.MULTIPLICATIVE) || '0';
+        const expr = block.getFieldValue('EXPR') || '';
+        return [expr + ' ' + num, Order.MULTIPLICATIVE];
+      };
+      luaGenerator.forBlock['math_round'] = function(block: any) {
+        const num = luaGenerator.valueToCode(block, 'NUM', Order.NONE) || '0';
+        return ['math.round(' + num + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['math_abs'] = function(block: any) {
+        const num = luaGenerator.valueToCode(block, 'NUM', Order.NONE) || '0';
+        return ['math.abs(' + num + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['math_ceil'] = function(block: any) {
+        const num = luaGenerator.valueToCode(block, 'NUM', Order.NONE) || '0';
+        return ['math.ceil(' + num + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['math_floor'] = function(block: any) {
+        const num = luaGenerator.valueToCode(block, 'NUM', Order.NONE) || '0';
+        return ['math.floor(' + num + ')', Order.HIGH];
+      };
+
+      // Text
+      luaGenerator.forBlock['text_string_custom'] = function(block: any) {
+        const text = block.getFieldValue('TEXT');
+        return ['"' + text + '"', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['text_join_custom'] = function(block: any) {
+        const a = luaGenerator.valueToCode(block, 'A', Order.CONCATENATION) || '""';
+        const b = luaGenerator.valueToCode(block, 'B', Order.CONCATENATION) || '""';
+        return [a + ' .. ' + b, Order.CONCATENATION];
+      };
+      luaGenerator.forBlock['text_length_custom'] = function(block: any) {
+        const text = luaGenerator.valueToCode(block, 'TEXT', Order.UNARY) || '""';
+        return ['#' + text, Order.UNARY];
+      };
+      luaGenerator.forBlock['text_to_upper'] = function(block: any) {
+        const text = luaGenerator.valueToCode(block, 'TEXT', Order.NONE) || '""';
+        return [text + ':upper()', Order.HIGH];
+      };
+      luaGenerator.forBlock['text_to_lower'] = function(block: any) {
+        const text = luaGenerator.valueToCode(block, 'TEXT', Order.NONE) || '""';
+        return [text + ':lower()', Order.HIGH];
+      };
+
+      // Values
+      luaGenerator.forBlock['values_to_string'] = function(block: any) {
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return ['tostring(' + val + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['values_to_number'] = function(block: any) {
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return ['tonumber(' + val + ')', Order.HIGH];
+      };
+
+      // Variables
+      luaGenerator.forBlock['variables_create'] = function(block: any) {
+        const name = block.getFieldValue('VAR');
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return 'local ' + name + ' = ' + val + '\n';
+      };
+      luaGenerator.forBlock['variables_set_custom'] = function(block: any) {
+        const name = block.getFieldValue('VAR');
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return name + ' = ' + val + '\n';
+      };
+      luaGenerator.forBlock['variables_change_custom'] = function(block: any) {
+        const name = block.getFieldValue('VAR');
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '0';
+        return name + ' = ' + name + ' + ' + val + '\n';
+      };
+      luaGenerator.forBlock['variables_get_custom'] = function(block: any) {
+        const name = block.getFieldValue('VAR');
+        return [name, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['var_reporter'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        // Strip "var. " prefix if present
+        const cleanName = name.startsWith('var. ') ? name.substring(5) : name;
+        return [cleanName, Order.ATOMIC];
+      };
+
+      luaGenerator.forBlock['var_count'] = function() { return ['_count', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_child'] = function() { return ['_child', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_descendant'] = function() { return ['_descendant', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_instance'] = function() { return ['_instance', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_clone'] = function() { return ['_clone', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_touched_part'] = function() { return ['_touched_part', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_climb_speed'] = function() { return ['_climb_speed', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_humanoid'] = function() { return ['_humanoid', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_character_model'] = function() { return ['_character_model', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_new_health'] = function() { return ['_new_health', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_reached_goal'] = function() { return ['_reached_goal', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_input'] = function() { return ['_input', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_mouse_input'] = function() { return ['_mouse_input', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_touch_input'] = function() { return ['_touch_input', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_player'] = function() { return ['_player', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_click_detector'] = function() { return ['_click_detector', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_productid'] = function() { return ['_productid', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_key_input'] = function() { return ['_key_input', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_received_data'] = function() { return ['_received_data', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_data'] = function() { return ['_data', Order.ATOMIC]; };
+      luaGenerator.forBlock['var_value'] = function() { return ['_value', Order.ATOMIC]; };
+
+      // Lists
+      luaGenerator.forBlock['lists_empty'] = function() {
+        return ['{}', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['lists_create'] = function() {
+        return ['{}', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['lists_add'] = function(block: any) {
+        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
+        const item = luaGenerator.valueToCode(block, 'ITEM', Order.NONE) || 'nil';
+        return 'table.insert(' + list + ', ' + item + ')\n';
+      };
+      luaGenerator.forBlock['lists_set_item'] = function(block: any) {
+        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
+        const index = luaGenerator.valueToCode(block, 'INDEX', Order.NONE) || '1';
+        const item = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return list + '[' + index + '] = ' + item + '\n';
+      };
+      luaGenerator.forBlock['lists_get_item'] = function(block: any) {
+        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
+        const index = luaGenerator.valueToCode(block, 'INDEX', Order.NONE) || '1';
+        return [list + '[' + index + ']', Order.HIGH];
+      };
+      luaGenerator.forBlock['lists_get'] = function(block: any) {
+        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
+        const index = luaGenerator.valueToCode(block, 'INDEX', Order.NONE) || '1';
+        return [list + '[' + index + ']', Order.HIGH];
+      };
+      luaGenerator.forBlock['lists_insert'] = function(block: any) {
+        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
+        const item = luaGenerator.valueToCode(block, 'ITEM', Order.NONE) || 'nil';
+        return 'table.insert(' + list + ', ' + item + ')\n';
+      };
+      luaGenerator.forBlock['lists_remove'] = function(block: any) {
+        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
+        const index = luaGenerator.valueToCode(block, 'INDEX', Order.NONE) || '1';
+        return 'table.remove(' + list + ', ' + index + ')\n';
+      };
+      luaGenerator.forBlock['lists_length'] = function(block: any) {
+        const list = luaGenerator.valueToCode(block, 'LIST', Order.UNARY) || '{}';
+        return ['#' + list, Order.UNARY];
+      };
+
+      // Loops
+      luaGenerator.forBlock['loops_repeat_lua'] = function(block: any) {
+        const from = luaGenerator.valueToCode(block, 'FROM', Order.NONE) || '1';
+        const to = luaGenerator.valueToCode(block, 'TO', Order.NONE) || '10';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'for i = ' + from + ', ' + to + ' do\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['loops_while_lua'] = function(block: any) {
+        const condition = luaGenerator.valueToCode(block, 'CONDITION', Order.NONE) || 'false';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'while ' + condition + ' do\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['loops_for_children'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'for _, child in pairs(' + instance + ':GetChildren()) do\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['loops_for_descendants'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'for _, descendant in pairs(' + instance + ':GetDescendants()) do\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['loops_break_lua'] = function() {
+        return 'break\n';
+      };
+      luaGenerator.forBlock['loops_repeat'] = function(block: any) {
+        const times = luaGenerator.valueToCode(block, 'TIMES', Order.NONE) || '0';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'for i = 1, ' + times + ' do\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['loops_while'] = function(block: any) {
+        const condition = luaGenerator.valueToCode(block, 'CONDITION', Order.NONE) || 'false';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'while ' + condition + ' do\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['loops_for'] = function(block: any) {
+        const varName = block.getFieldValue('VAR');
+        const from = luaGenerator.valueToCode(block, 'FROM', Order.NONE) || '1';
+        const to = luaGenerator.valueToCode(block, 'TO', Order.NONE) || '10';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'for ' + varName + ' = ' + from + ', ' + to + ' do\n' + branch + 'end\n';
+      };
+
+      // World
+      luaGenerator.forBlock['world_me'] = function() {
+        return ['script.Parent', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['world_this_script'] = function() {
+        return ['script', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['world_instance'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        return [name, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['world_vector3'] = function(block: any) {
+        const x = luaGenerator.valueToCode(block, 'X', Order.NONE) || '0';
+        const y = luaGenerator.valueToCode(block, 'Y', Order.NONE) || '0';
+        const z = luaGenerator.valueToCode(block, 'Z', Order.NONE) || '0';
+        return ['Vector3.new(' + x + ', ' + y + ', ' + z + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['world_vector3_values'] = function(block: any) {
+        const x = block.getFieldValue('X');
+        const y = block.getFieldValue('Y');
+        const z = block.getFieldValue('Z');
+        return ['Vector3.new(' + x + ', ' + y + ', ' + z + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['world_get_instance_by_path'] = function(block: any) {
+        const path = luaGenerator.valueToCode(block, 'PATH', Order.NONE) || '""';
+        return [path.replace(/"/g, ''), Order.HIGH];
+      };
+      luaGenerator.forBlock['world_set_property_direct'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const property = block.getFieldValue('PROPERTY');
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return instance + '.' + property + ' = ' + val + '\n';
+      };
+      luaGenerator.forBlock['world_get_property_direct'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const property = block.getFieldValue('PROPERTY');
+        return [instance + '.' + property, Order.HIGH];
+      };
+      luaGenerator.forBlock['world_find_first_child_direct'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const name = block.getFieldValue('NAME');
+        return [instance + ':FindFirstChild("' + name + '")', Order.HIGH];
+      };
+      luaGenerator.forBlock['world_set_property'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const property = luaGenerator.valueToCode(block, 'PROPERTY', Order.NONE) || '""';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return instance + '[' + property + '] = ' + val + '\n';
+      };
+      luaGenerator.forBlock['world_get_property'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const property = luaGenerator.valueToCode(block, 'PROPERTY', Order.NONE) || '""';
+        return [instance + '[' + property + ']', Order.HIGH];
+      };
+      luaGenerator.forBlock['world_find_first_child'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const name = luaGenerator.valueToCode(block, 'NAME', Order.NONE) || '""';
+        return [instance + ':FindFirstChild(' + name + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['world_color3'] = function(block: any) {
+        const r = luaGenerator.valueToCode(block, 'R', Order.NONE) || '1';
+        const g = luaGenerator.valueToCode(block, 'G', Order.NONE) || '1';
+        const b = luaGenerator.valueToCode(block, 'B', Order.NONE) || '1';
+        return ['Color3.new(' + r + ', ' + g + ', ' + b + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['world_color3_values'] = function(block: any) {
+        const r = block.getFieldValue('R');
+        const g = block.getFieldValue('G');
+        const b = block.getFieldValue('B');
+        return ['Color3.new(' + r + ', ' + g + ', ' + b + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['world_create_instance_direct'] = function(block: any) {
+        const className = block.getFieldValue('CLASS');
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
+        return 'local _instance = Instance.new("' + className + '", ' + parent + ')\n';
+      };
+      luaGenerator.forBlock['world_clone_instance'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return 'local _clone = ' + instance + ':Clone()\n';
+      };
+
+      // Instance
+      luaGenerator.forBlock['instance_new'] = function(block: any) {
+        const className = block.getFieldValue('CLASS');
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
+        return [`Instance.new("${className}", ${parent})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['instance_destroy'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return instance + ':Destroy()\n';
+      };
+      luaGenerator.forBlock['instance_wait_for_child'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'script.Parent';
+        const name = luaGenerator.valueToCode(block, 'NAME', Order.NONE) || '""';
+        return [`${parent}:WaitForChild(${name})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['instance_find_first_child'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'script.Parent';
+        const name = luaGenerator.valueToCode(block, 'NAME', Order.NONE) || '""';
+        return [`${parent}:FindFirstChild(${name})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['instance_get_children'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'script.Parent';
+        return [`${parent}:GetChildren()`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['instance_get_descendants'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'script.Parent';
+        return [`${parent}:GetDescendants()`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['instance_clone'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [`${instance}:Clone()`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['instance_child_added'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.ChildAdded:Connect(function(child)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['instance_child_removed'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.ChildRemoved:Connect(function(child)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['instance_descendant_added'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.DescendantAdded:Connect(function(descendant)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['instance_descendant_removing'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.DescendantRemoving:Connect(function(descendant)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['instance_is_a'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const className = block.getFieldValue('CLASS');
+        return [instance + ':IsA("' + className + '")', Order.HIGH];
+      };
+      luaGenerator.forBlock['instance_set_name'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const name = luaGenerator.valueToCode(block, 'NAME', Order.NONE) || '""';
+        return instance + '.Name = ' + name + '\n';
+      };
+      luaGenerator.forBlock['instance_get_name'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + '.Name', Order.HIGH];
+      };
+      luaGenerator.forBlock['instance_set_parent'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
+        return instance + '.Parent = ' + parent + '\n';
+      };
+      luaGenerator.forBlock['instance_get_parent'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + '.Parent', Order.HIGH];
+      };
+
+      // Part
+      luaGenerator.forBlock['part_get_transparency'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + '.Transparency', Order.HIGH];
+      };
+      luaGenerator.forBlock['part_set_transparency'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '0';
+        return instance + '.Transparency = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_set_anchored'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = block.getFieldValue('VALUE') === 'TRUE' ? 'true' : 'false';
+        return instance + '.Anchored = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_set_cancollide'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = block.getFieldValue('VALUE') === 'TRUE' ? 'true' : 'false';
+        return instance + '.CanCollide = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_set_cantouch'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = block.getFieldValue('VALUE') === 'TRUE' ? 'true' : 'false';
+        return instance + '.CanTouch = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_set_castshadow'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = block.getFieldValue('VALUE') === 'TRUE' ? 'true' : 'false';
+        return instance + '.CastShadow = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_set_color'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'Color3.new(1,1,1)';
+        return instance + '.Color = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_set_orientation'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'Vector3.new(0,0,0)';
+        return instance + '.Orientation = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_get_orientation'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + '.Orientation', Order.HIGH];
+      };
+      luaGenerator.forBlock['part_set_position'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'Vector3.new(0,0,0)';
+        return instance + '.Position = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_get_position'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + '.Position', Order.HIGH];
+      };
+      luaGenerator.forBlock['part_set_size'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'Vector3.new(1,1,1)';
+        return instance + '.Size = ' + val + '\n';
+      };
+      luaGenerator.forBlock['part_get_size'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + '.Size', Order.HIGH];
+      };
+      luaGenerator.forBlock['part_touched_by_part'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.Touched:Connect(function(otherPart)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['part_touched_by_character'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.Touched:Connect(function(otherPart)\n  local character = otherPart.Parent\n  local humanoid = character:FindFirstChildOfClass("Humanoid")\n  if humanoid then\n' + branch + '  end\nend)\n';
+      };
+
+      // Character
+      luaGenerator.forBlock['character_damage'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const amount = luaGenerator.valueToCode(block, 'NUMBER', Order.NONE) || '0';
+        return humanoid + ':TakeDamage(' + amount + ')\n';
+      };
+      luaGenerator.forBlock['character_is_climbing'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return humanoid + '.Climbing:Connect(function(speed)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['character_died'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return humanoid + '.Died:Connect(function()\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['character_equip_tool'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const tool = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return humanoid + ':EquipTool(' + tool + ')\n';
+      };
+      luaGenerator.forBlock['character_get_humanoid'] = function(block: any) {
+        const model = luaGenerator.valueToCode(block, 'MODEL', Order.NONE) || 'nil';
+        const varName = block.getFieldValue('VAR_LABEL') || 'var. _humanoid';
+        const cleanVarName = varName.replace('var. ', '');
+        return 'local ' + cleanVarName + ' = ' + model + ':FindFirstChildOfClass("Humanoid")\n';
+      };
+      luaGenerator.forBlock['character_get_model_from_humanoid'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const varName = block.getFieldValue('VAR_LABEL') || 'var. _character_model';
+        const cleanVarName = varName.replace('var. ', '');
+        return 'local ' + cleanVarName + ' = ' + humanoid + '.Parent\n';
+      };
+      luaGenerator.forBlock['character_set_health'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '100';
+        return humanoid + '.Health = ' + val + '\n';
+      };
+      luaGenerator.forBlock['character_health_changed'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return humanoid + '.HealthChanged:Connect(function(health)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['character_jump'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        return humanoid + '.Jump = true\n';
+      };
+      luaGenerator.forBlock['character_set_jump_height'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '7.2';
+        return humanoid + '.JumpHeight = ' + val + '\n';
+      };
+      luaGenerator.forBlock['character_set_jump_power'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '50';
+        return humanoid + '.JumpPower = ' + val + '\n';
+      };
+      luaGenerator.forBlock['character_kill'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        return humanoid + '.Health = 0\n';
+      };
+      luaGenerator.forBlock['character_set_max_health'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '100';
+        return humanoid + '.MaxHealth = ' + val + '\n';
+      };
+      luaGenerator.forBlock['character_move_to'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const pos = luaGenerator.valueToCode(block, 'POSITION', Order.NONE) || 'Vector3.new(0,0,0)';
+        return humanoid + ':MoveTo(' + pos + ')\n';
+      };
+      luaGenerator.forBlock['character_finished_moving'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return humanoid + '.MoveToFinished:Connect(function(reached)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['character_player_of'] = function(block: any) {
+        const char = luaGenerator.valueToCode(block, 'CHARACTER', Order.NONE) || 'nil';
+        const varName = block.getFieldValue('VAR_LABEL') || 'var. _player';
+        const cleanVarName = varName.replace('var. ', '');
+        return 'local ' + cleanVarName + ' = game.Players:GetPlayerFromCharacter(' + char + ')\n';
+      };
+      luaGenerator.forBlock['character_unequip_tool'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        return humanoid + ':UnequipTools()\n';
+      };
+      luaGenerator.forBlock['character_set_walk_speed'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '16';
+        return humanoid + '.WalkSpeed = ' + val + '\n';
+      };
+
+      // Model
+      luaGenerator.forBlock['model_break_joints'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return instance + ':BreakJoints()\n';
+      };
+      luaGenerator.forBlock['model_get_orientation'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + ':GetPrimaryPartOrientation()', Order.HIGH];
+      };
+      luaGenerator.forBlock['model_get_position'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + ':GetPrimaryPartCFrame().Position', Order.HIGH];
+      };
+      luaGenerator.forBlock['model_get_size'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return [instance + ':GetExtentsSize()', Order.HIGH];
+      };
+      luaGenerator.forBlock['model_set_primary_part'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const part = luaGenerator.valueToCode(block, 'PART', Order.NONE) || 'nil';
+        return instance + '.PrimaryPart = ' + part + '\n';
+      };
+      luaGenerator.forBlock['model_set_orientation'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'Vector3.new(0,0,0)';
+        return instance + ':SetPrimaryPartOrientation(' + val + ')\n';
+      };
+      luaGenerator.forBlock['model_set_position'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'Vector3.new(0,0,0)';
+        return instance + ':MoveTo(' + val + ')\n';
+      };
+
+      // Gui
+      luaGenerator.forBlock['gui_get_mouse'] = function() {
+        return ['game:GetService("Players").LocalPlayer:GetMouse()', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['gui_get_player_gui'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'game:GetService("Players").LocalPlayer';
+        return [`${player}:WaitForChild("PlayerGui")`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['gui_new_instance'] = function(block: any) {
+        const className = block.getFieldValue('CLASS');
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
+        return [`Instance.new("${className}", ${parent})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['gui_button_clicked'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.MouseButton1Click:Connect(function()\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['gui_input_began'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.InputBegan:Connect(function(input, processed)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['gui_input_ended'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return instance + '.InputEnded:Connect(function(input, processed)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['gui_is_left_mouse'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton1 then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['gui_is_middle_mouse'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton3 then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['gui_is_right_mouse'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton2 then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['gui_is_touch'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.Touch then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['gui_mouse_position'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        return [input + '.Position', Order.HIGH];
+      };
+      luaGenerator.forBlock['gui_set_invisible'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return instance + '.Visible = false\n';
+      };
+      luaGenerator.forBlock['gui_set_visible'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return instance + '.Visible = true\n';
+      };
+      luaGenerator.forBlock['gui_touch_position'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        return [input + '.Position', Order.HIGH];
+      };
+
+      // Player
+      luaGenerator.forBlock['player_get_character'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        return [player + '.Character', Order.HIGH];
+      };
+      luaGenerator.forBlock['player_get_by_name'] = function(block: any) {
+        const name = luaGenerator.valueToCode(block, 'NAME', Order.NONE) || '""';
+        return ['game.Players:FindFirstChild(' + name + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['player_kick'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const reason = luaGenerator.valueToCode(block, 'REASON', Order.NONE) || '""';
+        return player + ':Kick(' + reason + ')\n';
+      };
+      luaGenerator.forBlock['player_get_user_id'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        return [player + '.UserId', Order.HIGH];
+      };
+      luaGenerator.forBlock['player_added'] = function(block: any) {
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'game.Players.PlayerAdded:Connect(function(player)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['player_removing'] = function(block: any) {
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'game.Players.PlayerRemoving:Connect(function(player)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['player_chat_added'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return player + '.Chatted:Connect(function(message)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['player_respawned'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return player + '.CharacterAdded:Connect(function(character)\n' + branch + 'end)\n';
+      };
+
+      // Clickdetector
+      luaGenerator.forBlock['clickdetector_add'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        return 'Instance.new("ClickDetector", ' + parent + ')\n';
+      };
+      luaGenerator.forBlock['clickdetector_clicked'] = function(block: any) {
+        const cd = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return cd + '.MouseClick:Connect(function(player)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['clickdetector_hover_enter'] = function(block: any) {
+        const cd = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return cd + '.MouseHoverEnter:Connect(function(player)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['clickdetector_hover_leave'] = function(block: any) {
+        const cd = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return cd + '.MouseHoverLeave:Connect(function(player)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['clickdetector_right_clicked'] = function(block: any) {
+        const cd = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return cd + '.RightMouseClick:Connect(function(player)\n' + branch + 'end)\n';
+      };
+
+      // Marketplace
+      luaGenerator.forBlock['marketplace_owns_asset'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const assetId = luaGenerator.valueToCode(block, 'ASSET_ID', Order.NONE) || '0';
+        return ['game:GetService("MarketplaceService"):PlayerOwnsAsset(' + player + ', ' + assetId + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['marketplace_owns_gamepass'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || '0';
+        const gamepassId = luaGenerator.valueToCode(block, 'GAMEPASS_ID', Order.NONE) || '0';
+        return ['game:GetService("MarketplaceService"):UserOwnsGamePassAsync(' + player + ', ' + gamepassId + ')', Order.HIGH];
+      };
+      luaGenerator.forBlock['marketplace_product_bought'] = function(block: any) {
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'game:GetService("MarketplaceService").ProcessReceipt = function(receiptInfo)\n' + branch + '\nreturn Enum.ProductPurchaseDecision.PurchaseGranted\nend\n';
+      };
+      luaGenerator.forBlock['marketplace_prompt_asset'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const assetId = luaGenerator.valueToCode(block, 'ASSET_ID', Order.NONE) || '0';
+        return 'game:GetService("MarketplaceService"):PromptPurchase(' + player + ', ' + assetId + ')\n';
+      };
+      luaGenerator.forBlock['marketplace_prompt_gamepass'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const gamepassId = luaGenerator.valueToCode(block, 'GAMEPASS_ID', Order.NONE) || '0';
+        return 'game:GetService("MarketplaceService"):PromptGamePassPurchase(' + player + ', ' + gamepassId + ')\n';
+      };
+      luaGenerator.forBlock['marketplace_prompt_product'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const productId = luaGenerator.valueToCode(block, 'PRODUCT_ID', Order.NONE) || '0';
+        return 'game:GetService("MarketplaceService"):PromptProductPurchase(' + player + ', ' + productId + ')\n';
+      };
+
+      // Tweening
+      luaGenerator.forBlock['tween_animate'] = function(block: any) {
+        const prop = luaGenerator.valueToCode(block, 'PROPERTY', Order.NONE) || '""';
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
+        const goal = luaGenerator.valueToCode(block, 'GOAL', Order.NONE) || '{}';
+        const info = luaGenerator.valueToCode(block, 'TWEEN_INFO', Order.NONE) || 'TweenInfo.new()';
+        return 'game:GetService("TweenService"):Create(' + instance + ', ' + info + ', ' + goal + '):Play()\n';
+      };
+      luaGenerator.forBlock['tween_info_create'] = function(block: any) {
+        const time = luaGenerator.valueToCode(block, 'TIME', Order.NONE) || '1';
+        const style = luaGenerator.valueToCode(block, 'STYLE', Order.NONE) || 'Enum.EasingStyle.Sine';
+        const dir = block.getFieldValue('DIRECTION');
+        return ['TweenInfo.new(' + time + ', Enum.EasingStyle.' + style + ', Enum.EasingDirection.' + dir + ')', Order.HIGH];
+      };
+
+      // Client
+      luaGenerator.forBlock['client_fire_server'] = function(block: any) {
+        const event = luaGenerator.valueToCode(block, 'EVENT', Order.NONE) || 'nil';
+        const data = luaGenerator.valueToCode(block, 'DATA', Order.NONE) || 'nil';
+        return event + ':FireServer(' + data + ')\n';
+      };
+      luaGenerator.forBlock['client_input_began'] = function(block: any) {
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'game:GetService("UserInputService").InputBegan:Connect(function(input, processed)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['client_input_ended'] = function(block: any) {
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'game:GetService("UserInputService").InputEnded:Connect(function(input, processed)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['client_is_keyboard'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.Keyboard then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['client_is_left_mouse'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton1 then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['client_is_middle_mouse'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton3 then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['client_is_right_mouse'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton2 then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['client_is_touch'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.Touch then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['client_local_player'] = function() {
+        return ['game.Players.LocalPlayer', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['client_mouse_position'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        return [input + '.Position', Order.HIGH];
+      };
+      luaGenerator.forBlock['client_fired_by_server'] = function(block: any) {
+        const event = luaGenerator.valueToCode(block, 'EVENT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return event + '.OnClientEvent:Connect(function(data)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['client_touch_position'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
+        return [input + '.Position', Order.HIGH];
+      };
+
+      // Server
+      luaGenerator.forBlock['server_fired_by_client'] = function(block: any) {
+        const event = luaGenerator.valueToCode(block, 'EVENT', Order.NONE) || 'nil';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return event + '.OnServerEvent:Connect(function(player, data)\n' + branch + 'end)\n';
+      };
+      luaGenerator.forBlock['server_fire_all_clients'] = function(block: any) {
+        const event = luaGenerator.valueToCode(block, 'EVENT', Order.NONE) || 'nil';
+        const data = luaGenerator.valueToCode(block, 'DATA', Order.NONE) || 'nil';
+        return event + ':FireAllClients(' + data + ')\n';
+      };
+      luaGenerator.forBlock['server_fire_client'] = function(block: any) {
+        const event = luaGenerator.valueToCode(block, 'EVENT', Order.NONE) || 'nil';
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const data = luaGenerator.valueToCode(block, 'DATA', Order.NONE) || 'nil';
+        return event + ':FireClient(' + player + ', ' + data + ')\n';
+      };
+
+      // Leaderstats
+      luaGenerator.forBlock['leaderstats_create_number'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        const def = luaGenerator.valueToCode(block, 'DEFAULT', Order.NONE) || '0';
+        return 'local val = Instance.new("NumberValue")\nval.Name = "' + name + '"\nval.Value = ' + def + '\nval.Parent = leaderstats\n';
+      };
+      luaGenerator.forBlock['leaderstats_create_string'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        const def = luaGenerator.valueToCode(block, 'DEFAULT', Order.NONE) || '""';
+        return 'local val = Instance.new("StringValue")\nval.Name = "' + name + '"\nval.Value = ' + def + '\nval.Parent = leaderstats\n';
+      };
+      luaGenerator.forBlock['leaderstats_enable'] = function() {
+        return 'game.Players.PlayerAdded:Connect(function(player)\n  local leaderstats = Instance.new("Folder")\n  leaderstats.Name = "leaderstats"\n  leaderstats.Parent = player\nend)\n';
+      };
+      luaGenerator.forBlock['leaderstats_get'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        return [player + '.leaderstats.' + name + '.Value', Order.HIGH];
+      };
+      luaGenerator.forBlock['leaderstats_set'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return player + '.leaderstats.' + name + '.Value = ' + val + '\n';
+      };
+
+      // Functions
+      luaGenerator.forBlock['functions_define'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        const args = block.getFieldValue('ARGS') || '';
+        const branch = luaGenerator.statementToCode(block, 'STACK');
+        return 'local function ' + name + '(' + args + ')\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['functions_call'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        const args = block.getFieldValue('ARGS') || '';
+        return 'local _result = ' + name + '(' + args + ')\n';
+      };
+      luaGenerator.forBlock['functions_return'] = function(block: any) {
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return 'return ' + val + '\n';
+      };
+      luaGenerator.forBlock['functions_define_global'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        const args = block.getFieldValue('ARGS') || '';
+        const branch = luaGenerator.statementToCode(block, 'STACK');
+        return '_G.' + name + ' = function(' + args + ')\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['functions_call_global'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        const args = block.getFieldValue('ARGS') || '';
+        return '_G.' + name + '(' + args + ')\n';
+      };
+
+      // Datastore
+      luaGenerator.forBlock['datastore_setup'] = function() {
+        return 'local DataStoreService = game:GetService("DataStoreService")\n';
+      };
+      luaGenerator.forBlock['datastore_instance'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        return ['DataStoreService:GetDataStore("' + name + '")', Order.HIGH];
+      };
+      luaGenerator.forBlock['datastore_use'] = function(block: any) {
+        const name = block.getFieldValue('NAME');
+        return 'local ds = DataStoreService:GetDataStore("' + name + '")\n';
+      };
+      luaGenerator.forBlock['datastore_get'] = function(block: any) {
+        const ds = luaGenerator.valueToCode(block, 'DATASTORE', Order.NONE) || 'nil';
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        return [ds + ':GetAsync(' + player + '.UserId)', Order.HIGH];
+      };
+      luaGenerator.forBlock['datastore_save'] = function(block: any) {
+        const ds = luaGenerator.valueToCode(block, 'DATASTORE', Order.NONE) || 'nil';
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
+        return 'pcall(function()\n  ' + ds + ':SetAsync(' + player + '.UserId, ' + val + ')\nend)\n';
+      };
+
+      // Placeholders
+      luaGenerator.forBlock['placeholder_string'] = function() { return ['""', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_number'] = function() { return ['0', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_boolean'] = function() { return ['false', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_color3'] = function() { return ['Color3.new(1,1,1)', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_instance'] = function() { return ['nil', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_index'] = function() { return ['1', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_variable'] = function() { return ['var', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_condition'] = function() { return ['false', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_any'] = function() { return ['nil', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_vector3'] = function() { return ['Vector3.new(0,0,0)', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_humanoid'] = function() { return ['nil', Order.ATOMIC]; };
+      luaGenerator.forBlock['placeholder_player'] = function() { return ['nil', Order.ATOMIC]; };
+    };
+
+    defineGenerators();
+
+    
+    const toolbox = {
+      kind: 'categoryToolbox',
+      contents: CATEGORIES.map((cat) => {
+        let blocks: any[] = [];
+        if (cat.name === 'Comment') {
+          blocks = [
+            { kind: 'block', type: 'comment' }
+          ];
+        } else if (cat.name === 'Debug') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'print',
+              inputs: { TEXT: { shadow: { type: 'placeholder_string' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'warn',
+              inputs: { TEXT: { shadow: { type: 'placeholder_string' } } }
+            },
+            { kind: 'block', type: 'run_lua' }
+          ];
+        } else if (cat.name === 'Logic') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'wait',
+              inputs: { SECONDS: { shadow: { type: 'placeholder_number' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'lua_if',
+              inputs: { CONDITION: { shadow: { type: 'placeholder_condition' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'logic_negate',
+              inputs: { BOOL: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'logic_compare_eq', 
+              inputs: { 
+                A: { shadow: { type: 'placeholder_any' } },
+                B: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'logic_compare_lt', 
+              inputs: { 
+                A: { shadow: { type: 'placeholder_any' } },
+                B: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'logic_compare_gt', 
+              inputs: { 
+                A: { shadow: { type: 'placeholder_any' } },
+                B: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'logic_compare_neq', 
+              inputs: { 
+                A: { shadow: { type: 'placeholder_any' } },
+                B: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { kind: 'block', type: 'logic_boolean_true' },
+            { kind: 'block', type: 'logic_boolean_false' },
+            { 
+              kind: 'block', 
+              type: 'logic_operation_and', 
+              inputs: { 
+                A: { shadow: { type: 'placeholder_any' } },
+                B: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'logic_operation_or', 
+              inputs: { 
+                A: { shadow: { type: 'placeholder_any' } },
+                B: { shadow: { type: 'placeholder_any' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'World') {
+          blocks = [
+            { kind: 'block', type: 'world_me' },
+            { kind: 'block', type: 'world_this_script' },
+            { kind: 'block', type: 'world_instance' },
+            { 
+              kind: 'block', 
+              type: 'world_vector3',
+              inputs: {
+                X: { shadow: { type: 'placeholder_number' } },
+                Y: { shadow: { type: 'placeholder_number' } },
+                Z: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { kind: 'block', type: 'world_vector3_values' },
+            { 
+              kind: 'block', 
+              type: 'world_get_instance_by_path',
+              inputs: { PATH: { shadow: { type: 'placeholder_string' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'world_set_property_direct',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'world_get_property_direct',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'world_find_first_child_direct',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'world_color3',
+              inputs: {
+                R: { shadow: { type: 'placeholder_number' } },
+                G: { shadow: { type: 'placeholder_number' } },
+                B: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { kind: 'block', type: 'world_color3_values' },
+            { 
+              kind: 'block', 
+              type: 'world_create_instance_direct',
+              inputs: {
+                PARENT: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'world_clone_instance',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Instance') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'instance_new',
+              inputs: { PARENT: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_wait_for_child',
+              inputs: { 
+                PARENT: { shadow: { type: 'placeholder_instance' } },
+                NAME: { shadow: { type: 'placeholder_string' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_find_first_child',
+              inputs: { 
+                PARENT: { shadow: { type: 'placeholder_instance' } },
+                NAME: { shadow: { type: 'placeholder_string' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_get_children',
+              inputs: { PARENT: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_get_descendants',
+              inputs: { PARENT: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_clone',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_child_added',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_child_removed',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_descendant_added',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_descendant_removing',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_destroy',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_is_a',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_set_name',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_string' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_get_name',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_set_parent',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'instance_get_parent',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            }
+          ];
+        } else if (cat.name === 'Part') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'part_set_anchored',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_boolean' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_set_cancollide',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_boolean' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_set_cantouch',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_boolean' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_set_castshadow',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_boolean' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_set_color',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_color3' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_set_orientation',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_vector3' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_get_orientation',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_set_position',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_vector3' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_get_position',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_set_size',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_vector3' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_get_size',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_touched_by_part',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_touched_by_character',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'part_set_transparency',
+              inputs: {
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_number' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Math') {
+          blocks = [
+            { kind: 'block', type: 'math_number_custom' },
+            { 
+              kind: 'block', 
+              type: 'math_arithmetic_add',
+              inputs: { 
+                A: { shadow: { type: 'placeholder_number' } },
+                B: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'math_random_custom',
+              inputs: { 
+                FROM: { shadow: { type: 'placeholder_number' } },
+                TO: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'math_round',
+              inputs: { NUM: { shadow: { type: 'placeholder_number' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'math_abs',
+              inputs: { NUM: { shadow: { type: 'placeholder_number' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'math_ceil',
+              inputs: { NUM: { shadow: { type: 'placeholder_number' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'math_floor',
+              inputs: { NUM: { shadow: { type: 'placeholder_number' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'math_expr_1',
+              inputs: { NUM: { shadow: { type: 'placeholder_number' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'math_expr_2',
+              inputs: { NUM: { shadow: { type: 'placeholder_number' } } }
+            }
+          ];
+        } else if (cat.name === 'Text') {
+          blocks = [
+            { kind: 'block', type: 'text_string_custom' },
+            { 
+              kind: 'block', 
+              type: 'text_join_custom',
+              inputs: { 
+                A: { shadow: { type: 'placeholder_string' } },
+                B: { shadow: { type: 'placeholder_string' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'text_length_custom',
+              inputs: { TEXT: { shadow: { type: 'placeholder_string' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'text_to_upper',
+              inputs: { TEXT: { shadow: { type: 'placeholder_string' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'text_to_lower',
+              inputs: { TEXT: { shadow: { type: 'placeholder_string' } } }
+            }
+          ];
+        } else if (cat.name === 'Sound') {
+          blocks = [
+            { kind: 'block', type: 'sound_soundid', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } }, VALUE: { shadow: { type: 'placeholder_string' } } } },
+            { kind: 'block', type: 'sound_volume', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } }, VALUE: { shadow: { type: 'placeholder_number' } } } },
+            { kind: 'block', type: 'sound_play', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } } } },
+            { kind: 'block', type: 'sound_stop', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } } } },
+            { kind: 'block', type: 'sound_pause', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } } } },
+            { kind: 'block', type: 'sound_looped', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } }, VALUE: { shadow: { type: 'placeholder_boolean' } } } },
+            { kind: 'block', type: 'sound_playing', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } }, VALUE: { shadow: { type: 'placeholder_boolean' } } } },
+            { kind: 'block', type: 'sound_playbackspeed', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } }, VALUE: { shadow: { type: 'placeholder_number' } } } },
+            { kind: 'block', type: 'sound_timeposition', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } }, VALUE: { shadow: { type: 'placeholder_number' } } } },
+            { kind: 'block', type: 'sound_ended', inputs: { SOUND: { shadow: { type: 'placeholder_instance' } } } }
+          ];
+        } else if (cat.name === 'Values') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'values_to_string',
+              inputs: { VALUE: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'values_to_number',
+              inputs: { VALUE: { shadow: { type: 'placeholder_any' } } }
+            }
+          ];
+        } else if (cat.name === 'Variables') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'variables_create',
+              inputs: { VALUE: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'variables_set_custom',
+              inputs: { VALUE: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'variables_change_custom',
+              inputs: { VALUE: { shadow: { type: 'placeholder_any' } } }
+            },
+            { kind: 'block', type: 'variables_get_custom' }
+          ];
+        } else if (cat.name === 'Variables 2') {
+          blocks = [
+            { kind: 'block', type: 'var_count' },
+            { kind: 'block', type: 'var_child' },
+            { kind: 'block', type: 'var_descendant' },
+            { kind: 'block', type: 'var_instance' },
+            { kind: 'block', type: 'var_clone' },
+            { kind: 'block', type: 'var_touched_part' },
+            { kind: 'block', type: 'var_climb_speed' },
+            { kind: 'block', type: 'var_humanoid' },
+            { kind: 'block', type: 'var_character_model' },
+            { kind: 'block', type: 'var_new_health' },
+            { kind: 'block', type: 'var_reached_goal' },
+            { kind: 'block', type: 'var_input' },
+            { kind: 'block', type: 'var_mouse_input' },
+            { kind: 'block', type: 'var_touch_input' },
+            { kind: 'block', type: 'var_player' },
+            { kind: 'block', type: 'var_click_detector' },
+            { kind: 'block', type: 'var_productid' },
+            { kind: 'block', type: 'var_key_input' },
+            { kind: 'block', type: 'var_received_data' },
+            { kind: 'block', type: 'var_data' },
+            { kind: 'block', type: 'var_value' }
+          ];
+        } else if (cat.name === 'Lists') {
+          blocks = [
+            { kind: 'block', type: 'lists_empty' },
+            { 
+              kind: 'block', 
+              type: 'lists_set_item',
+              inputs: { 
+                INDEX: { shadow: { type: 'placeholder_index' } },
+                LIST: { shadow: { type: 'placeholder_variable' } },
+                VALUE: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'lists_get_item',
+              inputs: { 
+                INDEX: { shadow: { type: 'placeholder_index' } },
+                LIST: { shadow: { type: 'placeholder_variable' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'lists_insert',
+              inputs: { 
+                ITEM: { shadow: { type: 'placeholder_any' } },
+                LIST: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'lists_remove',
+              inputs: { 
+                INDEX: { shadow: { type: 'placeholder_index' } },
+                LIST: { shadow: { type: 'placeholder_any' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Loops') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'loops_while_lua',
+              inputs: { CONDITION: { shadow: { type: 'placeholder_condition' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'loops_repeat_lua',
+              inputs: { 
+                FROM: { shadow: { type: 'placeholder_number' } },
+                TO: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'loops_for_children',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'loops_for_descendants',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { kind: 'block', type: 'loops_break_lua' }
+          ];
+        } else if (cat.name === 'Character') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'character_is_climbing',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_damage',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                NUMBER: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_died',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_equip_tool',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                INSTANCE: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_get_humanoid',
+              inputs: { MODEL: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_get_model_from_humanoid',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_set_health',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                VALUE: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_health_changed',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_jump',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_set_jump_height',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                VALUE: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_set_jump_power',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                VALUE: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_kill',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_set_max_health',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                VALUE: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_move_to',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                POSITION: { shadow: { type: 'placeholder_vector3' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_finished_moving',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_player_of',
+              inputs: { CHARACTER: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_unequip_tool',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'character_set_walk_speed',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                VALUE: { shadow: { type: 'placeholder_number' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Model') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'model_break_joints',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'model_get_orientation',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'model_get_position',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'model_get_size',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'model_set_primary_part',
+              inputs: { 
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                PART: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'model_set_orientation',
+              inputs: { 
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_vector3' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'model_set_position',
+              inputs: { 
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                VALUE: { shadow: { type: 'placeholder_vector3' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Gui') {
+          blocks = [
+            { kind: 'block', type: 'gui_get_mouse' },
+            { 
+              kind: 'block', 
+              type: 'gui_get_player_gui',
+              inputs: { PLAYER: { shadow: { type: 'placeholder_player' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_new_instance',
+              inputs: { PARENT: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_button_clicked',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_input_began',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_input_ended',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_is_left_mouse',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_is_middle_mouse',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_is_right_mouse',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_is_touch',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_mouse_position',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_set_invisible',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_set_visible',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'gui_touch_position',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            }
+          ];
+        } else if (cat.name === 'Player') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'player_get_character',
+              inputs: { PLAYER: { shadow: { type: 'placeholder_player' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'player_get_by_name',
+              inputs: { NAME: { shadow: { type: 'placeholder_string' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'player_kick',
+              inputs: { 
+                PLAYER: { shadow: { type: 'placeholder_player' } },
+                REASON: { shadow: { type: 'placeholder_string' } }
+              }
+            },
+            { kind: 'block', type: 'player_joined' },
+            { kind: 'block', type: 'player_leaving' },
+            { 
+              kind: 'block', 
+              type: 'player_get_user_id',
+              inputs: { PLAYER: { shadow: { type: 'placeholder_player' } } }
+            }
+          ];
+        } else if (cat.name === 'Clickdetector') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'clickdetector_add',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'clickdetector_clicked',
+              inputs: { CLICK_DETECTOR: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'clickdetector_hover_enter',
+              inputs: { CLICK_DETECTOR: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'clickdetector_hover_leave',
+              inputs: { CLICK_DETECTOR: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'clickdetector_right_clicked',
+              inputs: { CLICK_DETECTOR: { shadow: { type: 'placeholder_instance' } } }
+            }
+          ];
+        } else if (cat.name === 'Marketplace') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'marketplace_owns_asset',
+              inputs: { 
+                PLAYER: { shadow: { type: 'placeholder_player' } },
+                ASSET_ID: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'marketplace_owns_gamepass',
+              inputs: { 
+                PLAYER: { shadow: { type: 'placeholder_player' } },
+                GAMEPASS_ID: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { kind: 'block', type: 'marketplace_product_bought' },
+            { 
+              kind: 'block', 
+              type: 'marketplace_prompt_asset',
+              inputs: { 
+                ASSET_ID: { shadow: { type: 'placeholder_number' } },
+                PLAYER: { shadow: { type: 'placeholder_player' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'marketplace_prompt_gamepass',
+              inputs: { 
+                GAMEPASS_ID: { shadow: { type: 'placeholder_number' } },
+                PLAYER: { shadow: { type: 'placeholder_player' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'marketplace_prompt_product',
+              inputs: { 
+                PRODUCT_ID: { shadow: { type: 'placeholder_number' } },
+                PLAYER: { shadow: { type: 'placeholder_player' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Tweening') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'tween_animate',
+              inputs: { 
+                PROPERTY: { shadow: { type: 'placeholder_string' } },
+                INSTANCE: { shadow: { type: 'placeholder_instance' } },
+                GOAL: { shadow: { type: 'placeholder_any' } },
+                TWEEN_INFO: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'tween_info_create',
+              inputs: { 
+                TIME: { shadow: { type: 'placeholder_number' } },
+                STYLE: { shadow: { type: 'placeholder_string' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Client') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'client_fire_server',
+              inputs: { 
+                EVENT: { shadow: { type: 'placeholder_instance' } },
+                DATA: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { kind: 'block', type: 'client_input_began' },
+            { kind: 'block', type: 'client_input_ended' },
+            { 
+              kind: 'block', 
+              type: 'client_is_keyboard',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'client_is_left_mouse',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'client_is_middle_mouse',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'client_is_right_mouse',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'client_is_touch',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'client_key_is',
+              inputs: { KEY: { shadow: { type: 'placeholder_any' } } }
+            },
+            { kind: 'block', type: 'client_local_player' },
+            { 
+              kind: 'block', 
+              type: 'client_mouse_position',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'client_fired_by_server',
+              inputs: { EVENT: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'client_touch_position',
+              inputs: { INPUT: { shadow: { type: 'placeholder_any' } } }
+            }
+          ];
+        } else if (cat.name === 'Server') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'server_fired_by_client',
+              inputs: { EVENT: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'server_fire_all_clients',
+              inputs: { 
+                EVENT: { shadow: { type: 'placeholder_instance' } },
+                DATA: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'server_fire_client',
+              inputs: { 
+                EVENT: { shadow: { type: 'placeholder_instance' } },
+                PLAYER: { shadow: { type: 'placeholder_player' } },
+                DATA: { shadow: { type: 'placeholder_any' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Leaderstats') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'leaderstats_create_number',
+              inputs: { DEFAULT: { shadow: { type: 'placeholder_number' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'leaderstats_create_string',
+              inputs: { DEFAULT: { shadow: { type: 'placeholder_string' } } }
+            },
+            { kind: 'block', type: 'leaderstats_enable' },
+            { 
+              kind: 'block', 
+              type: 'leaderstats_get',
+              inputs: { PLAYER: { shadow: { type: 'placeholder_player' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'leaderstats_set',
+              inputs: { 
+                PLAYER: { shadow: { type: 'placeholder_player' } },
+                VALUE: { shadow: { type: 'placeholder_any' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Functions') {
+          blocks = [
+            { kind: 'block', type: 'functions_define' },
+            { kind: 'block', type: 'functions_call' },
+            { 
+              kind: 'block', 
+              type: 'functions_return',
+              inputs: { VALUE: { shadow: { type: 'placeholder_any' } } }
+            },
+            { kind: 'block', type: 'functions_define_global' },
+            { kind: 'block', type: 'functions_call_global' }
+          ];
+        } else if (cat.name === 'Datastore') {
+          blocks = [
+            { kind: 'block', type: 'datastore_setup' },
+            { kind: 'block', type: 'datastore_instance' },
+            { kind: 'block', type: 'datastore_use' },
+            { 
+              kind: 'block', 
+              type: 'datastore_get',
+              inputs: { 
+                DATASTORE: { shadow: { type: 'placeholder_any' } },
+                PLAYER: { shadow: { type: 'placeholder_player' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'datastore_save',
+              inputs: { 
+                DATASTORE: { shadow: { type: 'placeholder_any' } },
+                PLAYER: { shadow: { type: 'placeholder_player' } },
+                VALUE: { shadow: { type: 'placeholder_any' } }
+              }
+            }
+          ];
+        } else {
+          blocks = [
+            { kind: 'label', text: 'Coming Soon...' }
+          ];
+        }
+
+        return {
+          kind: 'category',
+          name: cat.name,
+          colour: cat.color,
+          cssConfig: {
+            'row': `scratch-category-row scratch-cat-${cat.name.toLowerCase().replace(/\s/g, '-')}`,
+            'icon': 'scratch-category-icon',
+            'label': 'scratch-category-label'
+          },
+          contents: blocks,
+        };
+      }),
+    };
+
+    // Custom Category Icon rendering
+    const originalCategoryCreateDom = (Blockly.ToolboxCategory as any).prototype.createDom;
+    (Blockly.ToolboxCategory as any).prototype.createDom = function() {
+      const dom = originalCategoryCreateDom.call(this);
+      return dom;
+    };
+
+    // Smooth Flyout Animations
+    if (!(Blockly.VerticalFlyout as any).prototype._isPatchedForAnimations) {
+      
+      const animateBlocks = (flyout: any) => {
+        setTimeout(() => {
+          const workspace = flyout.workspace_;
+          if (!workspace) return;
+          const blocks = workspace.getTopBlocks(false);
+          blocks.forEach((block: any, index: number) => {
+            const blockSvg = block.getSvgRoot();
+            if (blockSvg) {
+              blockSvg.style.opacity = '0';
+              blockSvg.style.translate = '-15px 0';
+              blockSvg.style.transition = `opacity 0.2s ease ${index * 0.03}s, translate 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) ${index * 0.03}s`;
+              
+              requestAnimationFrame(() => {
+                blockSvg.style.opacity = '1';
+                blockSvg.style.translate = '0 0';
+              });
+            }
+          });
+        }, 10);
+      };
+
+      const originalShow = (Blockly.VerticalFlyout as any).prototype.show;
+      (Blockly.VerticalFlyout as any).prototype.show = function(xmlList: any) {
+        if (this._transitionTimeout) {
+          clearTimeout(this._transitionTimeout);
+          this._transitionTimeout = null;
+        }
+        
+        const svgGroup = this.svgGroup_;
+        
+        if (this.isVisible() && svgGroup) {
+          // Animate out first
+          svgGroup.classList.remove('flyout-animate-in');
+          svgGroup.classList.add('flyout-animate-out');
+          
+          this._transitionTimeout = setTimeout(() => {
+            originalShow.call(this, xmlList);
+            svgGroup.classList.remove('flyout-animate-out');
+            void svgGroup.offsetWidth;
+            svgGroup.classList.add('flyout-animate-in');
+            animateBlocks(this);
+            this._transitionTimeout = null;
+          }, 150); // Slightly faster transition
+        } else {
+          originalShow.call(this, xmlList);
+          if (svgGroup) {
+            svgGroup.classList.remove('flyout-animate-out');
+            void svgGroup.offsetWidth;
+            svgGroup.classList.add('flyout-animate-in');
+            animateBlocks(this);
+          }
+        }
+      };
+
+      const originalHide = (Blockly.VerticalFlyout as any).prototype.hide;
+      (Blockly.VerticalFlyout as any).prototype.hide = function() {
+        if (this._transitionTimeout) {
+          clearTimeout(this._transitionTimeout);
+          this._transitionTimeout = null;
+        }
+        
+        const svgGroup = this.svgGroup_;
+        if (svgGroup && this.isVisible() && !svgGroup.classList.contains('flyout-animate-out')) {
+          svgGroup.classList.remove('flyout-animate-in');
+          svgGroup.classList.add('flyout-animate-out');
+          this._transitionTimeout = setTimeout(() => {
+            originalHide.call(this);
+            svgGroup.classList.remove('flyout-animate-out');
+            this._transitionTimeout = null;
+          }, 150);
+        } else {
+          originalHide.call(this);
+        }
+      };
+      (Blockly.VerticalFlyout as any).prototype._isPatchedForAnimations = true;
+    }
+
+    // Remove unwanted context menu items safely
+    const registry = Blockly.ContextMenuRegistry.registry;
+    if (registry.getItem('blockInline')) registry.unregister('blockInline');
+    if (registry.getItem('blockCollapseExpand')) registry.unregister('blockCollapseExpand');
+    if (registry.getItem('blockDisable')) registry.unregister('blockDisable');
+    if (registry.getItem('blockComment')) registry.unregister('blockComment');
+
+    // Remove unwanted workspace context menu items
+    ['workspaceCollapse', 'collapseWorkspace', 'workspaceExpand', 'expandWorkspace', 'undoWorkspace', 'redoWorkspace'].forEach(id => {
+      if (registry.getItem(id)) registry.unregister(id);
+    });
+
+    // Add Search Blocks to workspace context menu
+    if (registry.getItem('searchBlocks')) registry.unregister('searchBlocks');
+    registry.register({
+      displayText: function() {
+        return currentLang === 'vi' ? 'Tìm Kiếm Block' : 'Search Blocks';
+      },
+      preconditionFn: function(scope: any) {
+        if (scope.workspace) {
+          return 'enabled';
+        }
+        return 'hidden';
+      },
+      callback: function(scope: any) {
+        setSearchPanel({ 
+          show: true, 
+          x: window.innerWidth / 2 - 160,
+          y: window.innerHeight / 2 - 200
+        });
+        setSearchQuery('');
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      },
+      scopeType: Blockly.ContextMenuRegistry.ScopeType.WORKSPACE,
+      id: 'searchBlocks',
+      weight: 100,
+    });
+
+    // Scratch-like duplication
+    if (registry.getItem('blockDuplicate')) registry.unregister('blockDuplicate');
+    registry.register({
+      displayText: function() {
+        return currentLang === 'vi' ? 'Bản sao' : 'Duplicate';
+      },
+      preconditionFn: function(scope: any) {
+        if (scope.block && scope.block.isDeletable() && scope.block.isMovable()) {
+          return 'enabled';
+        }
+        return 'hidden';
+      },
+      callback: function(scope: any) {
+        const block = scope.block;
+        if (!block) return;
+        
+        const workspace = block.workspace;
+        Blockly.Events.setGroup(true);
+        try {
+          const xml = Blockly.Xml.blockToDom(block) as Element;
+          const newBlock = Blockly.Xml.domToBlock(xml, workspace) as any;
+          
+          // Position it exactly where the original is
+          const xy = (block as any).getRelativeToSurfaceXY();
+          newBlock.moveBy(xy.x, xy.y);
+          
+          // In standard Blockly, to make it follow the mouse like Scratch:
+          // We need to trigger a drag. This is best done by selecting it 
+          // and letting the user move it, but Scratch actually "grabs" it.
+          if (newBlock.select) newBlock.select();
+          
+          // For a true Scratch feel, we'd need to hook into the gesture system
+          // but simply selecting and placing it is the closest standard behavior.
+          // We'll add a small offset so it's visible if not immediately moved.
+          newBlock.moveBy(20, 20);
+        } finally {
+          Blockly.Events.setGroup(false);
+        }
+      },
+      scopeType: Blockly.ContextMenuRegistry.ScopeType.BLOCK,
+      id: 'blockDuplicate',
+      weight: 1,
+    });
+
+    const customTheme = Blockly.Theme.defineTheme('customTheme', {
+      'name': 'customTheme',
+      'base': Blockly.Themes.Zelos,
+      'componentStyles': {
+        'workspaceBackgroundColour': '#1e1e1e',
+        'toolboxBackgroundColour': '#333',
+        'toolboxForegroundColour': '#fff',
+        'flyoutBackgroundColour': '#252526',
+        'flyoutForegroundColour': '#fff',
+        'insertionMarkerColour': '#fff',
+        'insertionMarkerOpacity': 0.3,
+        'scrollbarColour': '#797979',
+        'scrollbarOpacity': 0.4,
+        'cursorColour': '#d0d0d0',
+      },
+    });
+
+    workspace.current = Blockly.inject(blocklyDiv.current, {
+      toolbox: toolbox,
+      trashcan: false,
+      zoom: {
+        controls: false,
+        wheel: true,
+        startScale: 0.65,
+        maxScale: 2,
+        minScale: 0.3,
+        scaleSpeed: 1.2,
+      },
+      move: {
+        scrollbars: {
+          vertical: true,
+          horizontal: true,
+        },
+        drag: true,
+        wheel: true,
+      },
+      grid: {
+        spacing: 25,
+        length: 5,
+        colour: '#2a2a2a',
+        snap: true,
+      },
+      renderer: 'zelos',
+      theme: customTheme,
+    });
+
+    // Code generation logic
+    const updateCode = () => {
+      if (workspace.current) {
+        const code = luaGenerator.workspaceToCode(workspace.current);
+        setGeneratedCode(code);
+      }
+    };
+
+    // Extract all blocks for search
+    const extractedBlocks: { type: string, name: string, category: string, blockDef: any }[] = [];
+    
+    // Disable events while creating temporary blocks
+    Blockly.Events.disable();
+    try {
+      toolbox.contents.forEach((cat: any) => {
+        if (cat.kind === 'category' && cat.contents) {
+          cat.contents.forEach((item: any) => {
+            if (item.kind === 'block') {
+              let blockName = item.type.replace(/_/g, ' ');
+              try {
+                if (workspace.current) {
+                  const tempBlock = workspace.current.newBlock(item.type);
+                  if (tempBlock) {
+                    let text = '';
+                    tempBlock.inputList.forEach((input: any) => {
+                      input.fieldRow.forEach((field: any) => {
+                        const fieldText = field.getText();
+                        if (fieldText) text += fieldText + ' ';
+                      });
+                      if (input.type === 1 /* Blockly.INPUT_VALUE */) {
+                        text += '[' + (input.name || ' ') + '] ';
+                      }
+                    });
+                    text = text.trim();
+                    
+                    if (text.length > 0) {
+                      blockName = text;
+                    } else {
+                      const fallbackText = tempBlock.toString();
+                      if (fallbackText && fallbackText.trim().length > 0) {
+                        blockName = fallbackText.replace(/\?/g, '[ ]').trim();
+                      }
+                    }
+                    tempBlock.dispose(false);
+                  }
+                }
+              } catch (e) {
+                // Fallback to capitalized type name
+                blockName = blockName.charAt(0).toUpperCase() + blockName.slice(1);
+              }
+
+              extractedBlocks.push({
+                type: item.type,
+                name: blockName,
+                category: cat.name,
+                blockDef: item
+              });
+            }
+          });
+        }
+      });
+    } finally {
+      Blockly.Events.enable();
+    }
+    
+    setAllBlocks(extractedBlocks);
+
+    const handleSvgClick = (e: MouseEvent) => {
+      if (!workspace.current) return;
+      const target = e.target as SVGElement;
+      const varLabel = target.closest('.scratch-var-label');
+      
+      if (varLabel) {
+        const text = varLabel.textContent || "";
+        
+        Blockly.Events.setGroup(true);
+        try {
+          const newBlock = workspace.current.newBlock('var_reporter');
+          if (newBlock) {
+            // Clean text: remove "var. " prefix and any leading/trailing whitespace
+            const cleanText = text.replace('var. ', '').trim();
+            newBlock.setFieldValue(cleanText, 'NAME');
+            
+            // Set color based on the text
+            if (text.includes('_count') || text.includes('_child') || text.includes('_descendant')) {
+              newBlock.setColour('#ff66cc'); // Pink color for these special vars
+            }
+            newBlock.initSvg();
+            newBlock.render();
+            
+            // Position it near the mouse
+            const svg = workspace.current.getParentSvg();
+            const point = svg.createSVGPoint();
+            point.x = e.clientX;
+            point.y = e.clientY;
+            
+            // Get screen CTM and inverse it to get workspace coordinates
+            const ctm = workspace.current.getCanvas().getScreenCTM();
+            if (ctm) {
+              const workspacePoint = point.matrixTransform(ctm.inverse());
+              newBlock.moveBy(workspacePoint.x + 20, workspacePoint.y + 20);
+            }
+            newBlock.select();
+          }
+        } finally {
+          Blockly.Events.setGroup(false);
+        }
+      }
+    };
+
+    const svg = workspace.current.getParentSvg();
+    svg.addEventListener('mousedown', handleSvgClick, true);
+
+    workspace.current.addChangeListener((e: any) => {
+      // Update defined variables
+      if (e.type === Blockly.Events.BLOCK_CREATE || 
+          e.type === Blockly.Events.BLOCK_DELETE || 
+          e.type === Blockly.Events.BLOCK_CHANGE) {
+        const blocks = workspace.current!.getAllBlocks(false);
+        const vars = blocks
+          .filter(b => b.type === 'variables_create')
+          .map(b => b.getFieldValue('VAR'))
+          .filter((v, i, a) => v && a.indexOf(v) === i);
+        setDefinedVariables(vars);
+      }
+
+      if (e.isUiEvent) return;
+      updateCode();
+    });
+
+    // Initial load from localStorage
+    const savedXml = localStorage.getItem('blocklua_workspace');
+    if (savedXml) {
+      const xml = Blockly.utils.xml.textToDom(savedXml);
+      Blockly.Xml.domToWorkspace(xml, workspace.current!);
+    }
+
+    const handleResize = () => {
+      if (workspace.current) {
+        Blockly.svgResize(workspace.current);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (svg) {
+        svg.removeEventListener('mousedown', handleSvgClick, true);
+      }
+      if (workspace.current) {
+        workspace.current.dispose();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (workspace.current && view === 'blocks') {
+      // Try to scale the flyout workspace if it exists
+      try {
+        const toolbox = workspace.current.getToolbox();
+        if (toolbox && typeof (toolbox as any).getFlyout === 'function') {
+          const flyout = (toolbox as any).getFlyout();
+          if (flyout && typeof flyout.getWorkspace === 'function') {
+            flyout.getWorkspace().setScale(1);
+          }
+        }
+      } catch (e) {
+        console.error('Could not scale flyout:', e);
+      }
+
+      // Force Blockly to recalculate its dimensions after a short delay
+      // Only do this when the view is 'blocks' to avoid resetting state while hidden
+      setTimeout(() => {
+        if (workspace.current && view === 'blocks') {
+          Blockly.svgResize(workspace.current);
+        }
+      }, 50);
+    }
+  }, [view]);
+
+  const downloadCode = () => {
+    const blob = new Blob([generatedCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'script.lua';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const clearWorkspace = () => {
+    setShowClearModal(true);
+  };
+
+  const addBlockToWorkspace = (blockDef: any) => {
+    if (!workspace.current) return;
+    
+    // Convert screen coordinates to workspace coordinates
+    const injectionDiv = workspace.current.getInjectionDiv();
+    const rect = injectionDiv.getBoundingClientRect();
+    
+    // Calculate position relative to the workspace SVG
+    const svg = workspace.current.getParentSvg();
+    const point = svg.createSVGPoint();
+    point.x = searchPanel.x;
+    point.y = searchPanel.y;
+    const workspacePoint = point.matrixTransform(workspace.current.getCanvas().getScreenCTM()?.inverse());
+
+    try {
+      // Create a clean copy of the block definition
+      const cleanDef = JSON.parse(JSON.stringify(blockDef));
+      // Remove 'kind' as it's not part of the serialization format
+      delete cleanDef.kind;
+      
+      const block = Blockly.serialization.blocks.append(cleanDef, workspace.current) as Blockly.BlockSvg;
+      if (block) {
+        block.initSvg();
+        block.render();
+        block.moveBy(workspacePoint.x, workspacePoint.y);
+        block.select();
+      }
+    } catch (e) {
+      console.error("Failed to append block from definition, falling back to newBlock", e);
+      // Fallback in case serialization fails
+      const block = workspace.current.newBlock(blockDef.type) as Blockly.BlockSvg;
+      block.initSvg();
+      block.render();
+      block.moveBy(workspacePoint.x, workspacePoint.y);
+      block.select();
+    }
+    
+    setSearchPanel(prev => ({ ...prev, show: false }));
+  };
+
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      if (!workspace.current) return;
+
+      // Quick Search feature (Shift + Left Click)
+      if (e.shiftKey && e.button === 0) {
+        // Check if click is inside blockly area
+        const blocklyArea = blocklyDiv.current;
+        if (blocklyArea && blocklyArea.contains(e.target as Node)) {
+          e.preventDefault();
+          e.stopPropagation();
+          setSearchPanel({ show: true, x: e.clientX, y: e.clientY });
+          setSearchQuery('');
+          setTimeout(() => searchInputRef.current?.focus(), 50);
+        }
+      }
+    };
+
+    window.addEventListener('mousedown', handleGlobalClick, true);
+    return () => window.removeEventListener('mousedown', handleGlobalClick, true);
+  }, []);
+
+  const openSearchAtCenter = () => {
+    setSearchPanel({ 
+      show: true, 
+      x: window.innerWidth / 2 - 160, // Center horizontally (width is 320px)
+      y: window.innerHeight / 2 - 200  // Center vertically
+    });
+    setSearchQuery('');
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  };
+
+  const filteredBlocks = allBlocks.filter(block => 
+    (block.name && block.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (block.type && block.type.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (block.category && block.category.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const confirmClear = () => {
+    if (workspace.current) {
+      workspace.current.clear();
+    }
+    setShowClearModal(false);
+  };
+
+  return (
+    <div 
+      className={`flex flex-col h-screen w-screen bg-[#1e1e1e] overflow-hidden font-sans text-gray-200 no-select ${enableEffects ? 'effects-enabled' : ''}`}
+    >
+      <AnimatePresence>
+        {showTutorial && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[5000] origin-top-left"
+            onClick={nextTutorialStep}
+          >
+            <motion.div 
+              key={tutorialStep}
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className={`absolute bg-[#1a1a1a] border border-[#4c97ff]/50 rounded-2xl p-6 shadow-2xl shadow-[#4c97ff]/20 max-w-sm pointer-events-auto
+                ${tutorialSteps[tutorialStep].position === 'center' ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}
+                ${tutorialSteps[tutorialStep].position === 'left' ? 'top-1/2 left-[320px] -translate-y-1/2' : ''}
+                ${tutorialSteps[tutorialStep].position === 'top' ? 'top-[80px] left-1/2 -translate-x-1/2' : ''}
+                ${tutorialSteps[tutorialStep].position === 'top-right' ? 'top-[80px] right-[20px]' : ''}
+              `}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-[#4c97ff] rounded-xl flex items-center justify-center">
+                  <Info className="text-white" size={18} />
+                </div>
+                <h3 className="text-lg font-black text-white">{tutorialSteps[tutorialStep].title}</h3>
+              </div>
+              
+              <div className="text-gray-300 text-sm leading-relaxed mb-6 min-h-[60px]">
+                {/* Typewriter effect for text */}
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  {tutorialSteps[tutorialStep].text}
+                </motion.span>
+              </div>
+
+              <div className="flex items-center justify-between mt-4 border-t border-white/10 pt-4">
+                <div className="flex gap-1">
+                  {tutorialSteps.map((_, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`h-1.5 rounded-full transition-all ${idx === tutorialStep ? 'w-6 bg-[#4c97ff]' : 'w-1.5 bg-gray-600'}`}
+                    />
+                  ))}
+                </div>
+                <button 
+                  onClick={nextTutorialStep}
+                  className="px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition-colors"
+                >
+                  {tutorialStep === tutorialSteps.length - 1 ? (currentLang === 'vi' ? 'Bắt đầu' : 'Start') : (currentLang === 'vi' ? 'Tiếp tục' : 'Next')}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {(showMenu || showSettings) && (
+          <div 
+            className="fixed inset-0 z-[90]" 
+            onClick={() => {
+              setShowMenu(false);
+              setShowSettings(false);
+            }}
+          />
+        )}
+        {selectorTarget && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm"
+            onClick={() => setSelectorTarget(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <motion.div 
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="h-12 bg-black flex items-center px-4 justify-between z-[100] border-b border-white/5 shadow-xl shrink-0"
+      >
+        <div className="flex items-center gap-6">
+          <div className="relative">
+            <div 
+              onClick={() => setShowMenu(!showMenu)}
+              className="flex items-center gap-2 group cursor-pointer"
+            >
+              <div className="w-6 h-6 bg-gradient-to-br from-[#4c97ff] to-[#0055ff] rounded-md flex items-center justify-center shadow-lg shadow-blue-500/20 transition-transform group-hover:rotate-12">
+                <Cpu className="text-white" size={14} />
+              </div>
+              <div>
+                <div className="text-white font-black text-lg tracking-tighter leading-none">BLOCKLUA</div>
+                <div className="text-[9px] text-[#4c97ff] font-bold tracking-widest uppercase mt-0.5">PRO EDITION</div>
+              </div>
+            </div>
+
+            <AnimatePresence>
+              {showMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute top-full left-0 mt-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[120] overflow-hidden py-2 origin-top-left"
+                >
+                    <button 
+                      onClick={() => {
+                        setShowGuide(true);
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
+                    >
+                      <BookOpen size={18} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Hướng Dẫn' : 'Guide'}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setShowInfo(true);
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
+                    >
+                      <Info size={18} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Thông Tin' : 'Information'}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setShowSettings(true);
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
+                    >
+                      <Settings size={18} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Cài Đặt' : 'Settings'}
+                    </button>
+                  </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {showSettings && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -10, scale: 0.95 }}
+                  className="absolute top-full left-0 mt-2 w-64 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[120] overflow-hidden py-2 origin-top-left"
+                >
+                    <div className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-white/5 mb-2">
+                      {currentLang === 'vi' ? 'Cấu Hình Hệ Thống' : 'System Configuration'}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setEnableEffects(!enableEffects);
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Sparkles size={18} className={enableEffects ? "text-[#4c97ff]" : "text-gray-500"} />
+                        {currentLang === 'vi' ? 'Hiệu Ứng' : 'Visual Effects'}
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${enableEffects ? 'bg-[#4c97ff]' : 'bg-gray-700'}`}>
+                        <div className={`absolute top-1 w-2 h-2 bg-white rounded-full transition-all ${enableEffects ? 'right-1' : 'left-1'}`} />
+                      </div>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setShowSyncModal(true);
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
+                    >
+                      <RefreshCw size={18} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Đồng bộ với Roblox Studio' : 'Sync with Roblox Studio'}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.json';
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                              try {
+                                const json = JSON.parse(e.target?.result as string);
+                                setGameStructure(json);
+                                alert('Game structure imported successfully!');
+                              } catch (err) {
+                                alert('Error parsing JSON file.');
+                              }
+                            };
+                            reader.readAsText(file);
+                          }
+                        };
+                        input.click();
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
+                    >
+                      <Layers size={18} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Nhập Cấu Trúc Game' : 'Import Game Structure'}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setCurrentLang(currentLang === 'vi' ? 'en' : 'vi');
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Globe size={18} className="text-[#4c97ff]" />
+                        {currentLang === 'vi' ? 'Ngôn Ngữ' : 'Language'}
+                      </div>
+                      <span className="text-[10px] font-black text-[#4c97ff]">{currentLang === 'vi' ? 'TIẾNG VIỆT' : 'ENGLISH'}</span>
+                    </button>
+                    <div className="px-4 py-3 border-t border-white/5">
+                      <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">
+                        v1.0.0
+                      </div>
+                    </div>
+                  </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5">
+            <button 
+              onClick={() => setView('blocks')}
+              className={`px-6 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${view === 'blocks' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <Layers size={14} />
+              BLOCKS
+            </button>
+            <button 
+              onClick={() => setView('codes')}
+              className={`px-6 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${view === 'codes' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <Code2 size={14} />
+              CODES
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 mr-4 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
+            <div className={`w-2 h-2 bg-[#4c97ff] rounded-full ${enableEffects ? 'animate-pulse' : ''}`} />
+            <span className="text-[10px] font-bold text-[#4c97ff] uppercase tracking-widest">System Active</span>
+          </div>
+          
+          <button 
+            onClick={saveWorkspace}
+            className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest flex items-center gap-2 transition-all border border-white/5"
+          >
+            <Save size={14} />
+            SAVE
+          </button>
+          <button 
+            onClick={loadWorkspace}
+            className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest flex items-center gap-2 transition-all border border-white/5"
+          >
+            <BookOpen size={14} />
+            LOAD
+          </button>
+          <button 
+            onClick={downloadCode}
+            className="bg-gradient-to-r from-[#4c97ff] to-[#0055ff] hover:from-[#0055ff] hover:to-[#0033aa] text-white px-6 py-1.5 rounded-xl text-[10px] font-black tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-blue-500/20 transform hover:scale-105 active:scale-95"
+          >
+            <Play size={14} />
+            EXPORT
+          </button>
+        </div>
+      </motion.div>
+
+      <div className="flex-1 flex relative overflow-hidden">
+        <div className="flex-1 relative overflow-hidden">
+        <AnimatePresence>
+          {showInfo && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 origin-top-left w-full h-full"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#2b2b2b] border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl"
+              >
+                <div className="w-16 h-16 bg-[#4c97ff]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Info className="text-[#4c97ff]" size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">
+                  {currentLang === 'vi' ? 'THÔNG TIN' : 'INFORMATION'}
+                </h3>
+                <div className="text-gray-400 mb-8 space-y-4">
+                  <p>
+                    {currentLang === 'vi' 
+                      ? 'BlockLua là một công cụ lập trình trực quan mạnh mẽ cho Roblox, giúp bạn tạo ra các đoạn mã Luau một cách dễ dàng thông qua các khối lệnh.'
+                      : 'BlockLua is a powerful visual programming tool for Roblox, helping you create Luau scripts easily through command blocks.'}
+                  </p>
+                  
+                  <div className="pt-4 border-t border-white/5">
+                    <p className="text-xs font-bold text-[#ff4c4c] uppercase tracking-widest mb-2">
+                      {currentLang === 'vi' ? 'CÁC LỖI ĐANG KHẮC PHỤC' : 'KNOWN ISSUES'}
+                    </p>
+                    <ul className="text-[11px] list-disc list-inside space-y-1 opacity-80">
+                      <li>{currentLang === 'vi' ? 'Lỗi hiển thị màu chữ trong một số ô chọn.' : 'Text color display error in some dropdowns.'}</li>
+                      <li>{currentLang === 'vi' ? 'Một số khối lệnh nâng cao chưa hỗ trợ đầy đủ Luau.' : 'Some advanced blocks lack full Luau support.'}</li>
+                      <li>{currentLang === 'vi' ? 'Lỗi đồng bộ hóa Workspace khi bộ nhớ đầy.' : 'Workspace sync error when memory is full.'}</li>
+                    </ul>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/5 flex justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Version</p>
+                      <p className="text-white font-mono text-xs">v1.2.0 Stable</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Developer</p>
+                      <p className="text-white font-mono text-xs">BlockLua Team</p>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowInfo(false)}
+                  className="w-full py-3 rounded-2xl bg-[#4c97ff] hover:bg-[#3d86f0] text-white font-black transition-all"
+                >
+                  {currentLang === 'vi' ? 'ĐÓNG' : 'CLOSE'}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showGuide && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 origin-top-left w-full h-full"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#2b2b2b] border border-white/10 rounded-3xl p-8 max-w-2xl w-full shadow-2xl max-h-[80vh] overflow-y-auto"
+              >
+                <div className="w-16 h-16 bg-[#0fbd8c]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <BookOpen className="text-[#0fbd8c]" size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-white mb-4 tracking-tight">
+                  {currentLang === 'vi' ? 'HƯỚNG DẪN SỬ DỤNG' : 'USER GUIDE'}
+                </h3>
+                <div className="text-gray-400 mb-8 space-y-6">
+                  <section>
+                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-[#4c97ff] rounded-full" />
+                      {currentLang === 'vi' ? 'Kéo và Thả Khối' : 'Drag and Drop Blocks'}
+                    </h4>
+                    <p>{currentLang === 'vi' 
+                      ? 'Chọn các khối từ danh mục bên trái và kéo chúng vào không gian làm việc. Các khối sẽ tự động khớp nối với nhau.'
+                      : 'Select blocks from the categories on the left and drag them into the workspace. Blocks will automatically snap together.'}</p>
+                  </section>
+                  <section>
+                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-[#4c97ff] rounded-full" />
+                      {currentLang === 'vi' ? 'Xem Mã Nguồn' : 'View Source Code'}
+                    </h4>
+                    <p>{currentLang === 'vi' 
+                      ? 'Nhấn vào nút "CODES" ở thanh trên cùng để xem mã Luau được tạo ra từ các khối của bạn.'
+                      : 'Click the "CODES" button in the top bar to view the Luau code generated from your blocks.'}</p>
+                  </section>
+                  <section>
+                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-[#4c97ff] rounded-full" />
+                      {currentLang === 'vi' ? 'Xuất Mã' : 'Export Code'}
+                    </h4>
+                    <p>{currentLang === 'vi' 
+                      ? 'Sử dụng nút "EXPORT" để tải xuống tệp mã nguồn hoặc sao chép mã trực tiếp vào Roblox Studio.'
+                      : 'Use the "EXPORT" button to download the source code file or copy the code directly into Roblox Studio.'}</p>
+                  </section>
+                </div>
+                <button 
+                  onClick={() => setShowGuide(false)}
+                  className="w-full py-3 rounded-2xl bg-[#0fbd8c] hover:bg-[#0da67b] text-white font-black transition-all"
+                >
+                  {currentLang === 'vi' ? 'TÔI ĐÃ HIỂU' : 'I UNDERSTAND'}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showClearModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 origin-top-left w-full h-full"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#2b2b2b] border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl"
+              >
+                <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Trash2 className="text-red-500" size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">CLEAR WORKSPACE?</h3>
+                <p className="text-gray-400 mb-8 leading-relaxed">
+                  This will permanently delete all blocks in your current workspace. This action cannot be undone.
+                </p>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setShowClearModal(false)}
+                    className="flex-1 py-3 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 transition-all font-bold"
+                  >
+                    CANCEL
+                  </button>
+                  <button 
+                    onClick={confirmClear}
+                    className="flex-1 py-3 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-black shadow-xl shadow-red-500/20 transition-all transform hover:scale-105 active:scale-95"
+                  >
+                    CLEAR ALL
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showSyncModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 origin-top-left w-full h-full"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#2b2b2b] border border-white/10 rounded-3xl p-8 max-w-3xl w-full shadow-2xl relative"
+              >
+                <button 
+                  onClick={() => setShowSyncModal(false)} 
+                  className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+                <div className="w-16 h-16 bg-[#4c97ff]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <RefreshCw className="text-[#4c97ff]" size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">
+                  {currentLang === 'vi' ? 'ĐỒNG BỘ VỚI ROBLOX STUDIO' : 'SYNC WITH ROBLOX STUDIO'}
+                </h3>
+                <div className="text-gray-400 mb-6 leading-relaxed space-y-2 text-sm">
+                  {currentLang === 'vi' ? (
+                    <>
+                      <p>Để đồng bộ liên tục mà không cần dùng Command Bar, hãy tạo một <strong>Plugin</strong>:</p>
+                      <ol className="list-decimal pl-5 space-y-1 text-gray-300">
+                        <li>Tạo một <strong>Script</strong> (ở đâu cũng được, ví dụ ServerStorage).</li>
+                        <li>Dán đoạn code bên dưới vào Script đó.</li>
+                        <li>Chuột phải vào Script, chọn <strong>Save as Local Plugin...</strong></li>
+                        <li>Vào tab <strong>Plugins</strong> trên Roblox Studio, bạn sẽ thấy nút <strong>Sync Explorer</strong> để nhấn đồng bộ bất cứ lúc nào!</li>
+                      </ol>
+                    </>
+                  ) : (
+                    <>
+                      <p>To sync easily without the Command Bar, create a <strong>Local Plugin</strong>:</p>
+                      <ol className="list-decimal pl-5 space-y-1 text-gray-300">
+                        <li>Create a <strong>Script</strong> (e.g., in ServerStorage).</li>
+                        <li>Paste the code below into it.</li>
+                        <li>Right-click the Script and select <strong>Save as Local Plugin...</strong></li>
+                        <li>Go to the <strong>Plugins</strong> tab in Roblox Studio and click the new <strong>Sync Explorer</strong> button anytime!</li>
+                      </ol>
+                    </>
+                  )}
+                </div>
+                <div className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 relative group mb-2">
+                  <pre className="text-xs text-gray-300 font-mono overflow-y-auto whitespace-pre-wrap max-h-64 custom-scrollbar">
+{`local HttpService = game:GetService("HttpService")
+local URL = "${window.location.origin.replace('ais-dev-', 'ais-pre-')}/api/sync"
+
+local toolbar = plugin:CreateToolbar("BlockLua")
+local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
+
+local function serializeInstance(instance, path)
+    local currentPath = path == "" and instance.Name or (path .. "." .. instance.Name)
+    local data = {
+        id = currentPath,
+        Name = instance.Name,
+        ClassName = instance.ClassName,
+        expanded = false,
+        Properties = {},
+        Children = {}
+    }
+    for _, child in ipairs(instance:GetChildren()) do
+        table.insert(data.Children, serializeInstance(child, currentPath))
+    end
+    return data
+end
+
+local function sync()
+    print("Syncing with BlockLua...")
+    local root = {
+        id = "game",
+        Name = "game",
+        ClassName = "DataModel",
+        expanded = true,
+        Properties = {},
+        Children = {}
+    }
+
+    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "StarterGui", "StarterPlayer", "Lighting", "SoundService"}
+    for _, serviceName in ipairs(services) do
+        local success, service = pcall(function() return game:GetService(serviceName) end)
+        if success and service then
+            table.insert(root.Children, serializeInstance(service, "game"))
+        end
+    end
+
+    local success, response = pcall(function()
+        return HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)
+    end)
+
+    if success then
+        print("Successfully synced with BlockLua!")
+    else
+        warn("Failed to sync: " .. tostring(response))
+    end
+end
+
+syncButton.Click:Connect(sync)
+sync() -- Initial sync when plugin loads`}
+                  </pre>
+                  <button 
+                    onClick={() => {
+                      const publicUrl = window.location.origin.replace('ais-dev-', 'ais-pre-');
+                      const code = `local HttpService = game:GetService("HttpService")\nlocal URL = "${publicUrl}/api/sync"\n\nlocal toolbar = plugin:CreateToolbar("BlockLua")\nlocal syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")\n\nlocal function serializeInstance(instance, path)\n    local currentPath = path == "" and instance.Name or (path .. "." .. instance.Name)\n    local data = {\n        id = currentPath,\n        Name = instance.Name,\n        ClassName = instance.ClassName,\n        expanded = false,\n        Properties = {},\n        Children = {}\n    }\n    for _, child in ipairs(instance:GetChildren()) do\n        table.insert(data.Children, serializeInstance(child, currentPath))\n    end\n    return data\nend\n\nlocal function sync()\n    print("Syncing with BlockLua...")\n    local root = {\n        id = "game",\n        Name = "game",\n        ClassName = "DataModel",\n        expanded = true,\n        Properties = {},\n        Children = {}\n    }\n\n    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "StarterGui", "StarterPlayer", "Lighting", "SoundService"}\n    for _, serviceName in ipairs(services) do\n        local success, service = pcall(function() return game:GetService(serviceName) end)\n        if success and service then\n            table.insert(root.Children, serializeInstance(service, "game"))\n        end\n    end\n\n    local success, response = pcall(function()\n        return HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)\n    end)\n\n    if success then\n        print("Successfully synced with BlockLua!")\n    else\n        warn("Failed to sync: " .. tostring(response))\n    end\nend\n\nsyncButton.Click:Connect(sync)\nsync()`;
+                      navigator.clipboard.writeText(code);
+                      alert(currentLang === 'vi' ? 'Đã sao chép!' : 'Copied!');
+                    }}
+                    className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all"
+                    title="Copy Code"
+                  >
+                    <Copy size={16} />
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 italic">
+                  * {currentLang === 'vi' ? 'Lưu ý: Bạn cần bật HTTP Requests trong Game Settings > Security.' : 'Note: You must enable HTTP Requests in Game Settings > Security.'}
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {searchPanel.show && (
+            <div 
+              className="fixed z-[10000] bg-[#252526] border border-white/10 rounded-xl shadow-2xl w-80 overflow-hidden search-panel"
+              style={{ left: searchPanel.x, top: searchPanel.y }}
+            >
+              <div className="p-3 border-b border-white/5 flex items-center gap-3 bg-[#2d2d2d]">
+                <Search size={18} className="text-[#4c97ff]" />
+                <input 
+                  ref={searchInputRef}
+                  type="text" 
+                  className="bg-transparent border-none outline-none text-sm text-gray-200 w-full placeholder:text-gray-500"
+                  placeholder={currentLang === 'vi' ? "Tìm kiếm khối lệnh..." : "Search blocks..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setSearchPanel(prev => ({ ...prev, show: false }));
+                    if (e.key === 'Enter' && filteredBlocks.length > 0) {
+                      addBlockToWorkspace(filteredBlocks[0].blockDef);
+                    }
+                  }}
+                />
+              </div>
+              <div className="max-h-80 overflow-y-auto custom-scrollbar bg-[#1e1e1e]">
+                {filteredBlocks.map((block, idx) => {
+                  const categoryColor = CATEGORIES.find(c => c.name === block.category)?.color || '#4c97ff';
+                  return (
+                    <div 
+                      key={idx}
+                      className="px-4 py-3 hover:bg-white/5 cursor-pointer flex flex-col gap-2 border-b border-white/5 last:border-none transition-colors group"
+                      onClick={() => addBlockToWorkspace(block.blockDef)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div 
+                          className="relative px-3 py-1.5 rounded text-[11px] font-bold text-white shadow-sm border-b-2 border-black/20 flex items-center max-w-[85%]"
+                          style={{ backgroundColor: categoryColor }}
+                        >
+                          <div className="absolute top-0 left-2 w-3 h-1 bg-black/10 rounded-b-sm"></div>
+                          <span className="truncate">{block.name}</span>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-600 group-hover:text-white transition-all transform group-hover:translate-x-1 flex-shrink-0" />
+                      </div>
+                      <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">{block.category}</span>
+                    </div>
+                  );
+                })}
+                {filteredBlocks.length === 0 && (
+                  <div className="p-8 text-center flex flex-col items-center gap-3">
+                    <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center">
+                      <Search size={20} className="text-gray-600" />
+                    </div>
+                    <div className="text-gray-500 text-xs font-bold uppercase tracking-widest">
+                      {currentLang === 'vi' ? "Không tìm thấy khối lệnh" : "No blocks found"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <div 
+          className={`absolute inset-0 overflow-hidden transition-opacity duration-300 ${view === 'blocks' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}
+        >
+          <div 
+            ref={blocklyDiv} 
+            className="absolute top-0 left-0 w-full h-full" 
+          />
+          
+          <div className="absolute bottom-6 right-6 z-50 flex gap-2">
+            <motion.button 
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={clearWorkspace}
+              className="w-10 h-10 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-2xl flex items-center justify-center transition-colors group origin-bottom-right"
+              title="Clear Workspace"
+            >
+              <Trash2 size={18} className="group-hover:animate-bounce" />
+            </motion.button>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {view === 'codes' && (
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="absolute top-0 left-0 bg-[#1e1e1e] z-40 flex flex-col origin-top-left w-full h-full"
+            >
+              <div className="h-12 bg-[#252525] border-b border-white/5 flex items-center px-6 justify-between">
+                <div className="flex items-center gap-2">
+                  <Code2 className="text-[#4c97ff]" size={18} />
+                  <span className="text-xs font-black text-gray-400 tracking-widest uppercase">Generated Luau Source</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-[10px] text-gray-600 font-mono">ENCODING: UTF-8</div>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedCode);
+                      alert('Code copied to clipboard!');
+                    }}
+                    className="text-[10px] font-black text-[#4c97ff] hover:text-white transition-colors uppercase tracking-widest"
+                  >
+                    Copy Code
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto bg-[#1e1e1e]">
+                <div 
+                  className="p-6 font-mono text-sm leading-relaxed relative select-text min-h-full"
+                >
+                  {/* Line Numbers */}
+                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-black/10 border-r border-white/5 flex flex-col items-center py-6 text-gray-700 select-none">
+                    {generatedCode.split('\n').map((_, i) => (
+                      <div key={i} className="h-[1.5em]">{i + 1}</div>
+                    ))}
+                  </div>
+                  <pre className="pl-10 text-gray-300 whitespace-pre-wrap">
+                    {generatedCode || '-- No code generated yet. Add some blocks!'}
+                  </pre>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Explorer Sidebar */}
+      <div 
+        style={{ width: sidebarWidth }}
+        className={`relative bg-[#1a1a1a] border-l border-white/5 flex flex-col transition-shadow ${selectorTarget ? 'z-[120] ring-2 ring-[#4c97ff] ring-inset shadow-[0_0_50px_rgba(76,151,255,0.2)]' : 'z-20'}`}
+      >
+        {/* Resize Handle */}
+        <div 
+          onMouseDown={startResizing}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#4c97ff]/30 transition-colors z-30"
+        />
+
+        <div className="h-10 bg-[#252525] border-b border-white/5 flex items-center px-4 justify-between">
+          <div className="flex items-center gap-2">
+            <Layers className="text-[#4c97ff]" size={16} />
+            <span className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Explorer</span>
+          </div>
+          {selectorTarget && (
+            <div className="flex items-center gap-1 px-2 py-0.5 bg-[#4c97ff]/20 rounded text-[9px] font-bold text-[#4c97ff] animate-pulse">
+              SELECTING...
+            </div>
+          )}
+        </div>
+        <div className="flex-1 overflow-auto p-1 custom-scrollbar">
+          <ExplorerTree 
+            instance={explorer} 
+            onSelect={(instance, path) => handleInstanceSelect(path)}
+            onToggleExpand={toggleExpand}
+            onAddChild={(id) => setShowInsertObjectFor(id)}
+            selectedId={selectedInstancePath}
+          />
+        </div>
+        {selectorTarget && (
+          <div className="p-3 bg-[#4c97ff]/10 border-t border-[#4c97ff]/20">
+            <p className="text-[10px] text-gray-400 mb-2">Select an instance from the tree above to update the block.</p>
+            <button 
+              onClick={() => setSelectorTarget(null)}
+              className="w-full py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold rounded transition-colors"
+            >
+              CANCEL SELECTION
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Insert Object Menu Modal */}
+      <AnimatePresence>
+        {showInsertObjectFor && (
+          <InsertObjectMenu 
+            getIcon={getIcon}
+            onClose={() => setShowInsertObjectFor(null)}
+            onAdd={(className) => {
+              addInstance(showInsertObjectFor, className, className);
+              setShowInsertObjectFor(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+
+      <style>{`
+        /* Hide Blockly's default UI elements we don't want */
+        .blocklyTrash { display: none !important; }
+        .blocklyZoom { display: none !important; }
+        
+        /* Scale the HTML toolbox */
+        .blocklyToolboxDiv {
+          /* Toolbox base styles */
+        }
+        
+        .blocklyFlyoutBackground {
+          fill: #121212 !important;
+          fill-opacity: 0.6 !important;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+        /* Aggressive Toolbox Overrides */
+        .blocklyToolboxDiv, 
+        .blocklyToolboxDiv *,
+        [class*="blocklyToolbox"],
+        [id*="blocklyToolbox"] {
+          background-color: #ffffff !important;
+          color: #000000 !important;
+          border-left: none !important;
+          border-right: none !important;
+        }
+
+        .blocklyTreeRow, 
+        .blocklyTreeRowContentContainer, 
+        .scratch-category-row,
+        [class*="blocklyTreeRow"] {
+          height: 28px !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          display: flex !important;
+          flex-direction: row !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          background: transparent !important;
+          border-left: none !important;
+          border: none !important;
+          outline: none !important;
+        }
+
+        /* Hide all potential vertical bars */
+        .blocklyTreeRow:before,
+        .blocklyTreeRow:after,
+        .blocklyTreeSeparator,
+        .blocklyTreeIcon,
+        [class*="blocklyTreeRow"]:before,
+        [class*="blocklyTreeRow"]:after {
+          display: none !important;
+          width: 0 !important;
+          border: none !important;
+        }
+
+        .blocklyTreeLabel, 
+        .scratch-category-label,
+        [class*="blocklyTreeLabel"],
+        .blocklyTreeRow span,
+        .blocklyTreeRow div {
+          font-family: "Inter", sans-serif !important;
+          font-size: 11px !important;
+          font-weight: 600 !important; /* Reduced from 800 */
+          color: #000000 !important;
+          opacity: 1 !important;
+          margin-left: 10px !important;
+          /* Subtle outline instead of heavy stroke */
+          text-shadow: 0.2px 0.2px 0px #000;
+        }
+
+        .blocklyTreeSelected {
+          background-color: rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .blocklyTreeSelected .blocklyTreeRow::after {
+          content: "★";
+          color: #fbbf24;
+          margin-left: auto;
+          margin-right: 12px;
+          font-size: 12px;
+          animation: star-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes star-pop {
+          0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+          100% { transform: scale(1) rotate(0); opacity: 1; }
+        }
+
+        @keyframes flyout-animate-in {
+          0% { opacity: 0; translate: -15px 0; }
+          100% { opacity: 1; translate: 0 0; }
+        }
+
+        @keyframes flyout-animate-out {
+          0% { opacity: 1; translate: 0 0; }
+          100% { opacity: 0; translate: -15px 0; }
+        }
+
+        .flyout-animate-in {
+          animation: flyout-animate-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+        }
+
+        .flyout-animate-out {
+          animation: flyout-animate-out 0.15s ease-in forwards !important;
+        }
+
+        .scratch-category-icon {
+          width: 18px !important;
+          height: 18px !important;
+          border-radius: 3px !important;
+          margin-left: 12px !important;
+          display: block !important;
+          flex-shrink: 0 !important;
+          border: 1px solid rgba(0,0,0,0.1) !important;
+        }
+        .blocklyMainBackground {
+          stroke: none !important;
+          fill: #0a0a0a !important;
+        }
+        .blocklyScrollbarHandle {
+          fill: rgba(255,255,255,0.1) !important;
+        }
+        .blocklyToolboxCategory {
+          padding: 4px 0 !important;
+          border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+        }
+
+        /* Effects Enabled Styles */
+        .effects-enabled .scratch-category-row {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          position: relative;
+        }
+
+        .effects-enabled .scratch-category-row:hover {
+          background-color: rgba(0, 0, 0, 0.03) !important;
+          transform: translateX(4px) scale(1.02);
+          z-index: 10;
+          box-shadow: 4px 0 15px rgba(0,0,0,0.05);
+        }
+
+        .effects-enabled .blocklyFlyout {
+          transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease !important;
+        }
+
+        /* Toolbox Flyout Animation */
+        .blocklyFlyout {
+          animation: flyoutIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transform-origin: left top;
+        }
+
+        @keyframes flyoutIn {
+          from { transform: translateX(-20px) scale(1); opacity: 0; }
+          to { transform: translateX(0) scale(1); opacity: 1; }
+        }
+
+        .effects-enabled .blocklyFlyoutBackground {
+          transition: fill 0.3s ease !important;
+        }
+
+        .effects-enabled .blocklyTreeSelected {
+          background-color: rgba(0, 0, 0, 0.08) !important;
+          transform: translateX(6px) scale(1.04);
+          box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+        }
+
+        /* Horizontal dividers for categories */
+        .blocklyToolboxCategory:not(:last-child) {
+          margin-bottom: 2px;
+          position: relative;
+        }
+
+        .blocklyToolboxCategory:not(:last-child):after {
+          content: '';
+          position: absolute;
+          bottom: -1px;
+          left: 10%;
+          right: 10%;
+          height: 1px;
+          background: rgba(0,0,0,0.03);
+        }
+
+        .effects-enabled .blocklyToolboxCategory:not(:last-child):after {
+          background: linear-gradient(to right, transparent, rgba(0,0,0,0.06), transparent);
+        }
+
+        .effects-enabled .blocklyBlockCanvas {
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+        }
+
+        .effects-enabled .blocklySelected > .blocklyPath {
+          filter: drop-shadow(0 0 8px rgba(76, 151, 255, 0.4));
+        }
+
+        .effects-enabled .scratch-category-icon {
+          transition: all 0.3s ease !important;
+        }
+
+        .effects-enabled .scratch-category-row:hover .scratch-category-icon {
+          box-shadow: 0 0 10px currentColor;
+          transform: scale(1.1);
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        
+        .no-select {
+          user-select: none !important;
+          -webkit-user-select: none !important;
+        }
+        
+        .select-text {
+          user-select: text !important;
+          -webkit-user-select: text !important;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.1);
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(255,255,255,0.2);
+        }
+
+        /* Block Styling Overrides */
+        .blocklyText {
+          font-family: "Inter", sans-serif !important;
+          fill: #ffffff !important; /* Labels on the block stay white */
+        }
+        
+        /* FORCE black text inside the boxes (dropdowns/inputs) */
+        .blocklyEditableText .blocklyText,
+        .blocklyFieldDropdown .blocklyText,
+        .blocklyDropdownText,
+        .blocklyFieldText,
+        .blocklyEditableText text,
+        .blocklyFieldDropdown text,
+        .blocklyEditableText tspan,
+        .blocklyFieldDropdown tspan {
+          fill: #000000 !important;
+          color: #000000 !important;
+        }
+        
+        /* Category Label Styling */
+        .blocklyTreeLabel {
+          font-weight: 400 !important;
+          font-family: "Inter", sans-serif !important;
+          font-size: 14px !important;
+          color: #ffffff !important;
+        }
+        
+        /* Change the boxes to a Light Gray (darker than white, but light enough for black text) */
+        .blocklyFieldRect,
+        .blocklyEditableText rect,
+        .blocklyFieldDropdown rect {
+          fill: #e0e0e0 !important; /* Light gray background */
+          fill-opacity: 1 !important;
+          stroke: #4c97ff !important;
+          stroke-width: 1px !important;
+          rx: 4px !important;
+          ry: 4px !important;
+        }
+        
+        /* Dropdown arrow fix - black arrow on light gray box */
+        .blocklyDropdownIcon {
+          fill: #000000 !important;
+        }
+
+        /* Input field when editing */
+        .blocklyHtmlInput {
+          user-select: text !important;
+          -webkit-user-select: text !important;
+          color: #000000 !important;
+          background-color: #ffffff !important;
+          font-family: sans-serif !important;
+          border: 1px solid #4c97ff !important;
+        }
+        /* Hide scrollbars for flyout */
+        .blocklyFlyoutScrollbar {
+          display: none !important;
+        }
+        
+        /* Label styling inside flyout */
+        .blocklyFlyoutLabelText {
+          fill: #ffffff !important;
+          font-family: "Inter", sans-serif !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+        }
+
+        /* Faded text for placeholder blocks */
+        .faded-placeholder-text {
+          fill-opacity: 0.4 !important;
+          font-style: italic !important;
+        }
+
+        /* Var label styling */
+        .scratch-var-label {
+          fill: #ffffff !important;
+          font-weight: bold !important;
+          cursor: pointer !important;
+          background-color: rgba(255,255,255,0.2) !important;
+        }
+        
+        .scratch-var-label:hover {
+          fill: #ffff00 !important;
+        }
+
+        /* Fix Dropdown and Menu text color */
+        .blocklyDropdownText,
+        .blocklyMenu,
+        .blocklyMenuItem,
+        .blocklyMenuItemContent,
+        .goog-menu,
+        .goog-menuitem,
+        .goog-menuitem-content,
+        .blocklyDropdownMenuText {
+          color: #000000 !important;
+          fill: #000000 !important;
+          font-family: "Inter", sans-serif !important;
+          font-size: 14px !important;
+        }
+        
+        /* Ensure the dropdown background is white or light */
+        .blocklyWidgetDiv .goog-menu,
+        .blocklyDropDownDiv {
+          background-color: #ffffff !important;
+          border: 1px solid #ccc !important;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+          color: #000000 !important;
+        }
+
+        /* Styling for the dropdown field on the block itself */
+        .blocklyFieldRect {
+          fill: #ffffff !important;
+          fill-opacity: 1 !important;
+          stroke: #4c97ff !important;
+          stroke-width: 2px !important;
+          rx: 4px !important;
+          ry: 4px !important;
+        }
+        
+        /* Custom Category Colors */
+        ${CATEGORIES.map((cat) => `
+          .scratch-cat-${cat.name.toLowerCase().replace(/\s/g, '-')} .scratch-category-icon {
+            background-color: ${cat.color} !important;
+          }
+        `).join('\n')}
+      `}</style>
+    </div>
+  );
+}
