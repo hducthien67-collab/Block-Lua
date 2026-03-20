@@ -6000,8 +6000,8 @@ export default function App() {
                 <div className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 relative group mb-2">
                   <pre className="text-xs text-gray-300 font-mono overflow-y-auto whitespace-pre-wrap max-h-64 custom-scrollbar">
 {`local HttpService = game:GetService("HttpService")
-local URL = "${window.location.origin.replace('ais-dev-', 'ais-pre-')}/api/sync"
-local EXPORT_URL = "${window.location.origin.replace('ais-dev-', 'ais-pre-')}/api/export"
+local URL = "${window.location.origin}/api/sync"
+local EXPORT_URL = "${window.location.origin}/api/export"
 
 local toolbar = plugin:CreateToolbar("BlockLua")
 local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
@@ -6009,7 +6009,7 @@ local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studi
 local function serializeInstance(instance, path)
     local currentPath = path == "" and instance.Name or (path .. "." .. instance.Name)
     local data = {
-        id = currentPath,
+        id = path == "game" and instance.Name:lower() or currentPath,
         Name = instance.Name,
         ClassName = instance.ClassName,
         expanded = false,
@@ -6017,7 +6017,7 @@ local function serializeInstance(instance, path)
         Children = {}
     }
     for _, child in ipairs(instance:GetChildren()) do
-        table.insert(data.Children, serializeInstance(child, currentPath))
+        table.insert(data.Children, serializeInstance(child, data.id))
     end
     return data
 end
@@ -6043,7 +6043,7 @@ local function sync()
         Children = {}
     }
 
-    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "StarterGui", "StarterPlayer", "Lighting", "SoundService"}
+    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterGui", "StarterPlayer", "Lighting", "SoundService", "Players", "Teams", "Chat", "LocalizationService", "TestService"}
     for _, serviceName in ipairs(services) do
         local success, service = pcall(function() return game:GetService(serviceName) end)
         if success and service then
@@ -6097,6 +6097,7 @@ local function pollScripts()
 end
 
 syncButton.Click:Connect(sync)
+sync() -- Initial sync
 
 task.spawn(function()
     while true do
@@ -6128,10 +6129,10 @@ end)`}
                   </pre>
                   <button 
                     onClick={() => {
-                      const publicUrl = window.location.origin.replace('ais-dev-', 'ais-pre-');
+                      const publicUrl = window.location.origin;
                       const code = `local HttpService = game:GetService("HttpService")
-local URL = "${publicUrl}/api/sync"
-local EXPORT_URL = "${publicUrl}/api/export"
+local URL = "\${publicUrl}/api/sync"
+local EXPORT_URL = "\${publicUrl}/api/export"
 
 local toolbar = plugin:CreateToolbar("BlockLua")
 local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
@@ -6139,7 +6140,7 @@ local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studi
 local function serializeInstance(instance, path)
     local currentPath = path == "" and instance.Name or (path .. "." .. instance.Name)
     local data = {
-        id = currentPath,
+        id = path == "game" and instance.Name:lower() or currentPath,
         Name = instance.Name,
         ClassName = instance.ClassName,
         expanded = false,
@@ -6147,7 +6148,7 @@ local function serializeInstance(instance, path)
         Children = {}
     }
     for _, child in ipairs(instance:GetChildren()) do
-        table.insert(data.Children, serializeInstance(child, currentPath))
+        table.insert(data.Children, serializeInstance(child, data.id))
     end
     return data
 end
@@ -6173,7 +6174,7 @@ local function sync()
         Children = {}
     }
 
-    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "StarterGui", "StarterPlayer", "Lighting", "SoundService"}
+    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterGui", "StarterPlayer", "Lighting", "SoundService", "Players", "Teams", "Chat", "LocalizationService", "TestService"}
     for _, serviceName in ipairs(services) do
         local success, service = pcall(function() return game:GetService(serviceName) end)
         if success and service then
@@ -6227,6 +6228,7 @@ local function pollScripts()
 end
 
 syncButton.Click:Connect(sync)
+sync() -- Initial sync
 
 task.spawn(function()
     while true do

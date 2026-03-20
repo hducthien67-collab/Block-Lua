@@ -200,7 +200,7 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
           {instance.Children
             .filter(child => {
               // Only show core services and their children
-              const allowedServices = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterplayer'];
+              const allowedServices = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterplayer', 'lighting', 'soundservice', 'startercharacterscripts', 'starterplayerscripts', 'players', 'teams', 'chat', 'localizationService', 'testservice'];
               if (instance.id === 'game') {
                 return allowedServices.includes(child.id.toLowerCase());
               }
