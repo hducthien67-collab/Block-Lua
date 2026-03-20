@@ -46,84 +46,22 @@ const INITIAL_STRUCTURE: RobloxInstance = {
   expanded: true,
   Properties: {},
   Children: [
-    { 
-      id: 'workspace', 
-      Name: 'Workspace', 
-      ClassName: 'Workspace', 
-      expanded: true, 
-      Properties: { ...DEFAULT_PROPERTIES.Workspace },
-      Children: [
-        { id: 'camera', Name: 'Camera', ClassName: 'Camera', Children: [], Properties: {} },
-        { id: 'terrain', Name: 'Terrain', ClassName: 'Terrain', Children: [], Properties: {} },
-        { id: 'spawnlocation', Name: 'SpawnLocation', ClassName: 'SpawnLocation', Children: [], Properties: {} },
-        {
-          id: 'baseplate',
-          Name: 'Baseplate',
-          ClassName: 'Part',
-          Children: [],
-          Properties: {
-            ...DEFAULT_PROPERTIES.Part,
-            Size: { x: 200, y: 1, z: 200 },
-            Position: { x: 0, y: -0.5, z: 0 },
-            Anchored: true,
-            Color: '#3a3a3a',
-            Material: 'SmoothPlastic'
-          }
-        }
-      ]
-    },
+    { id: 'workspace', Name: 'Workspace', ClassName: 'Workspace', expanded: true, Properties: { ...DEFAULT_PROPERTIES.Workspace }, Children: [] },
     { id: 'players', Name: 'Players', ClassName: 'Players', Children: [], Properties: {} },
-    { id: 'lighting', Name: 'Lighting', ClassName: 'Lighting', Children: [
-        { id: 'sky', Name: 'Sky', ClassName: 'Sky', Children: [], Properties: {} },
-        { id: 'atmosphere', Name: 'Atmosphere', ClassName: 'Atmosphere', Children: [], Properties: {} },
-      ], Properties: { ...DEFAULT_PROPERTIES.Lighting } },
+    { id: 'lighting', Name: 'Lighting', ClassName: 'Lighting', Children: [], Properties: { ...DEFAULT_PROPERTIES.Lighting } },
     { id: 'materialservice', Name: 'MaterialService', ClassName: 'MaterialService', Children: [], Properties: {} },
-    { 
-      id: 'networkclient', 
-      Name: 'NetworkClient', 
-      ClassName: 'NetworkClient', 
-      Children: [
-        { id: 'clientreplicator', Name: 'ClientReplicator', ClassName: 'ClientReplicator', Children: [], Properties: {} },
-      ], 
-      Properties: {} 
-    },
+    { id: 'networkclient', Name: 'NetworkClient', ClassName: 'NetworkClient', Children: [], Properties: {} },
     { id: 'replicatedfirst', Name: 'ReplicatedFirst', ClassName: 'ReplicatedFirst', Children: [], Properties: {} },
-    { 
-      id: 'replicatedstorage', 
-      Name: 'ReplicatedStorage', 
-      ClassName: 'ReplicatedStorage', 
-      Children: [
-        { id: 'lastbloxupdate', Name: 'lastBloxUpdate', ClassName: 'StringValue', Children: [], Properties: {} },
-        { id: 'folder', Name: 'Folder', ClassName: 'Folder', Children: [], Properties: {} },
-      ], 
-      Properties: {} 
-    },
+    { id: 'replicatedstorage', Name: 'ReplicatedStorage', ClassName: 'ReplicatedStorage', Children: [], Properties: {} },
     { id: 'serverscriptservice', Name: 'ServerScriptService', ClassName: 'ServerScriptService', Children: [], Properties: {} },
     { id: 'serverstorage', Name: 'ServerStorage', ClassName: 'ServerStorage', Children: [], Properties: {} },
     { id: 'startergui', Name: 'StarterGui', ClassName: 'StarterGui', Children: [], Properties: {} },
     { id: 'starterpack', Name: 'StarterPack', ClassName: 'StarterPack', Children: [], Properties: {} },
-    { 
-      id: 'starterplayer', 
-      Name: 'StarterPlayer', 
-      ClassName: 'StarterPlayer', 
-      Children: [
-        { id: 'startercharacterscripts', Name: 'StarterCharacterScripts', ClassName: 'StarterCharacterScripts', Children: [], Properties: {} },
-        { id: 'starterplayerscripts', Name: 'StarterPlayerScripts', ClassName: 'StarterPlayerScripts', Children: [], Properties: {} },
-      ], 
-      Properties: {} 
-    },
+    { id: 'starterplayer', Name: 'StarterPlayer', ClassName: 'StarterPlayer', Children: [], Properties: {} },
     { id: 'teams', Name: 'Teams', ClassName: 'Teams', Children: [], Properties: {} },
     { id: 'soundservice', Name: 'SoundService', ClassName: 'SoundService', Children: [], Properties: {} },
-    { id: 'textchatservice', Name: 'TextChatService', ClassName: 'TextChatService', Children: [
-        { id: 'chatwindowconfiguration', Name: 'ChatWindowConfiguration', ClassName: 'ChatWindowConfiguration', Children: [], Properties: {} },
-        { id: 'chatinputbarconfiguration', Name: 'ChatInputBarConfiguration', ClassName: 'ChatInputBarConfiguration', Children: [], Properties: {} },
-        { id: 'channeltabsconfiguration', Name: 'ChannelTabsConfiguration', ClassName: 'ChannelTabsConfiguration', Children: [], Properties: {} },
-        { id: 'bubblechatconfiguration', Name: 'BubbleChatConfiguration', ClassName: 'BubbleChatConfiguration', Children: [], Properties: {} },
-      ], Properties: {} 
-    },
-    { id: 'localizationservice', Name: 'LocalizationService', ClassName: 'LocalizationService', Children: [
-        { id: 'localizationtable', Name: 'LocalizationTable', ClassName: 'LocalizationTable', Children: [], Properties: {} },
-    ], Properties: {} },
+    { id: 'textchatservice', Name: 'TextChatService', ClassName: 'TextChatService', Children: [], Properties: {} },
+    { id: 'localizationservice', Name: 'LocalizationService', ClassName: 'LocalizationService', Children: [], Properties: {} },
     { id: 'testservice', Name: 'TestService', ClassName: 'TestService', Children: [], Properties: {} },
     { id: 'physicsservice', Name: 'PhysicsService', ClassName: 'PhysicsService', Children: [], Properties: {} },
     { id: 'collectionservice', Name: 'CollectionService', ClassName: 'CollectionService', Children: [], Properties: {} },
@@ -193,7 +131,7 @@ export const useExplorer = () => {
             if (child.id === id) {
               const metadata = ROBLOX_CLASSES.find(c => c.name === child.ClassName);
               if (metadata && metadata.category === 'Services') return false;
-              if (['game', 'workspace', 'replicatedstorage', 'serverscriptservice', 'startergui', 'starterplayer', 'lighting', 'soundservice', 'textchatservice', 'chatwindowconfiguration', 'chatinputbarconfiguration', 'channeltabsconfiguration', 'bubblechatconfiguration', 'startercharacterscripts', 'starterplayerscripts', 'localizationservice', 'localizationtable', 'testservice', 'physicsservice', 'collectionservice', 'runservice', 'httpservice', 'tweenservice'].includes(child.id.toLowerCase())) return false;
+              if (['game', 'workspace', 'players', 'lighting', 'materialservice', 'networkclient', 'replicatedfirst', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterpack', 'starterplayer', 'teams', 'soundservice', 'textchatservice', 'chatwindowconfiguration', 'chatinputbarconfiguration', 'channeltabsconfiguration', 'bubblechatconfiguration', 'startercharacterscripts', 'starterplayerscripts', 'localizationservice', 'localizationtable', 'testservice', 'physicsservice', 'collectionservice', 'runservice', 'httpservice', 'tweenservice'].includes(child.id.toLowerCase())) return false;
             }
             return true;
           })

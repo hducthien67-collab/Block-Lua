@@ -96,7 +96,7 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
   const fullPath = currentPath ? `${currentPath}.${instance.Name}` : instance.Name;
   const isSelected = selectedId === instance.id;
 
-  const isProtected = ['game', 'workspace', 'replicatedstorage', 'serverscriptservice', 'startergui', 'starterplayer', 'lighting', 'soundservice'].includes(instance.id.toLowerCase());
+  const isProtected = ['game', 'workspace', 'players', 'lighting', 'materialservice', 'networkclient', 'replicatedfirst', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterpack', 'starterplayer', 'teams', 'soundservice', 'textchatservice', 'localizationservice', 'testservice', 'physicsservice', 'collectionservice', 'runservice', 'httpservice', 'tweenservice'].includes(instance.id.toLowerCase());
 
   const handleRenameSubmit = () => {
     if (newName.trim() && newName !== instance.Name) {
