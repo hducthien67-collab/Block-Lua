@@ -253,7 +253,7 @@ export default function App() {
       } catch (err) {
         // Ignore fetch errors
       }
-    }, 2000);
+    }, 3000);
     return () => clearInterval(interval);
   }, [setExplorer]);
 

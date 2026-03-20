@@ -93,10 +93,13 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
 
   const isExpanded = instance.expanded;
   const hasChildren = instance.Children.length > 0;
-  const fullPath = currentPath ? `${currentPath}.${instance.Name}` : instance.Name;
   const isSelected = selectedId === instance.id;
 
-  const isProtected = ['game', 'workspace', 'players', 'lighting', 'materialservice', 'networkclient', 'replicatedfirst', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterpack', 'starterplayer', 'teams', 'soundservice', 'textchatservice', 'localizationservice', 'testservice', 'physicsservice', 'collectionservice', 'runservice', 'httpservice', 'tweenservice'].includes(instance.id.toLowerCase());
+  const isProtected = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterplayer', 'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'].includes(instance.id.toLowerCase());
+  const isService = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterplayer', 'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'].includes(instance.id.toLowerCase());
+
+  // Concise path: game.Workspace.Part -> Workspace.Part
+  const fullPath = currentPath ? (currentPath === 'game' ? instance.Name : `${currentPath}.${instance.Name}`) : instance.Name;
 
   const handleRenameSubmit = () => {
     if (newName.trim() && newName !== instance.Name) {
@@ -153,7 +156,7 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
         )}
 
         {!isRenaming && (
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+          <div className="flex items-center gap-0.5 opacity-100">
             <button 
               className="p-0.5 hover:bg-[#555] rounded"
               title="Add Child"
@@ -194,7 +197,16 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
       
       {isExpanded && hasChildren && (
         <div className="ml-4 border-l border-[#333]">
-          {instance.Children.map(child => (
+          {instance.Children
+            .filter(child => {
+              // Only show core services and their children
+              const allowedServices = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterplayer'];
+              if (instance.id === 'game') {
+                return allowedServices.includes(child.id.toLowerCase());
+              }
+              return true;
+            })
+            .map(child => (
             <ExplorerTree 
               key={child.id} 
               instance={child} 
