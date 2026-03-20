@@ -6022,6 +6022,16 @@ local function serializeInstance(instance, path)
     return data
 end
 
+local function getAllInstanceIds()
+    local ids = {}
+    for _, descendant in pairs(game:GetDescendants()) do
+        ids[descendant:GetFullName()] = true
+    end
+    return ids
+end
+
+local lastInstanceIds = getAllInstanceIds()
+
 local function sync()
     print("Syncing with BlockLua...")
     local root = {
@@ -6087,12 +6097,32 @@ local function pollScripts()
 end
 
 syncButton.Click:Connect(sync)
-sync()
 
 task.spawn(function()
     while true do
-        pollScripts()
         task.wait(5)
+        local currentInstanceIds = getAllInstanceIds()
+        local hasChanged = false
+        for id, _ in pairs(currentInstanceIds) do
+            if not lastInstanceIds[id] then
+                hasChanged = true
+                break
+            end
+        end
+        if not hasChanged then
+            for id, _ in pairs(lastInstanceIds) do
+                if not currentInstanceIds[id] then
+                    hasChanged = true
+                    break
+                end
+            end
+        end
+        
+        if hasChanged then
+            lastInstanceIds = currentInstanceIds
+            sync()
+        end
+        pollScripts()
     end
 end)`}
                   </pre>
@@ -6122,6 +6152,16 @@ local function serializeInstance(instance, path)
     return data
 end
 
+local function getAllInstanceIds()
+    local ids = {}
+    for _, descendant in pairs(game:GetDescendants()) do
+        ids[descendant:GetFullName()] = true
+    end
+    return ids
+end
+
+local lastInstanceIds = getAllInstanceIds()
+
 local function sync()
     print("Syncing with BlockLua...")
     local root = {
@@ -6187,12 +6227,32 @@ local function pollScripts()
 end
 
 syncButton.Click:Connect(sync)
-sync()
 
 task.spawn(function()
     while true do
-        pollScripts()
         task.wait(5)
+        local currentInstanceIds = getAllInstanceIds()
+        local hasChanged = false
+        for id, _ in pairs(currentInstanceIds) do
+            if not lastInstanceIds[id] then
+                hasChanged = true
+                break
+            end
+        end
+        if not hasChanged then
+            for id, _ in pairs(lastInstanceIds) do
+                if not currentInstanceIds[id] then
+                    hasChanged = true
+                    break
+                end
+            end
+        end
+        
+        if hasChanged then
+            lastInstanceIds = currentInstanceIds
+            sync()
+        end
+        pollScripts()
     end
 end)`;
                       navigator.clipboard.writeText(code);
