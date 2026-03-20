@@ -307,6 +307,20 @@ export const ExplorerPanel: React.FC<{
                       <Plus className="w-3 h-3" />
                       <span className="text-[11px]">Add New</span>
                     </button>
+                    <button 
+                      className="flex items-center justify-center gap-2 p-2 bg-[#363636] hover:bg-[#404040] rounded border border-gray-600 text-gray-400 hover:text-gray-200"
+                      onClick={() => onAddInstance(selectedInstance.instance.id, 'Script', 'Script')}
+                    >
+                      <FileCode className="w-3 h-3" />
+                      <span className="text-[11px]">Script</span>
+                    </button>
+                    <button 
+                      className="flex items-center justify-center gap-2 p-2 bg-[#363636] hover:bg-[#404040] rounded border border-gray-600 text-gray-400 hover:text-gray-200"
+                      onClick={() => onAddInstance(selectedInstance.instance.id, 'LocalScript', 'LocalScript')}
+                    >
+                      <FileCode className="w-3 h-3 text-red-400" />
+                      <span className="text-[11px]">LocalScript</span>
+                    </button>
                   </div>
 
                   {/* Properties Preview */}

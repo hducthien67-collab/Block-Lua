@@ -49,6 +49,7 @@ const INITIAL_STRUCTURE: RobloxInstance = {
     { id: 'workspace', Name: 'Workspace', ClassName: 'Workspace', expanded: true, Properties: { ...DEFAULT_PROPERTIES.Workspace }, Children: [
         { id: 'camera', Name: 'Camera', ClassName: 'Camera', Children: [], Properties: {} },
         { id: 'terrain', Name: 'Terrain', ClassName: 'Terrain', Children: [], Properties: {} },
+        { id: 'part-1', Name: 'Part', ClassName: 'Part', Children: [], Properties: { ...DEFAULT_PROPERTIES.Part } },
     ] },
     { id: 'players', Name: 'Players', ClassName: 'Players', Children: [], Properties: {} },
     { id: 'lighting', Name: 'Lighting', ClassName: 'Lighting', Children: [
@@ -62,6 +63,8 @@ const INITIAL_STRUCTURE: RobloxInstance = {
     { id: 'replicatedfirst', Name: 'ReplicatedFirst', ClassName: 'ReplicatedFirst', Children: [], Properties: {} },
     { id: 'replicatedstorage', Name: 'ReplicatedStorage', ClassName: 'ReplicatedStorage', Children: [
         { id: 'lastbloxupdate', Name: 'lastBloxUpdate', ClassName: 'StringValue', Children: [], Properties: {} },
+        { id: 'folder-1', Name: 'Folder', ClassName: 'Folder', Children: [], Properties: {} },
+        { id: 'script-1', Name: 'Script', ClassName: 'Script', Children: [], Properties: { ...DEFAULT_PROPERTIES.Script } },
     ], Properties: {} },
     { id: 'serverscriptservice', Name: 'ServerScriptService', ClassName: 'ServerScriptService', Children: [], Properties: {} },
     { id: 'serverstorage', Name: 'ServerStorage', ClassName: 'ServerStorage', Children: [], Properties: {} },
