@@ -6000,8 +6000,9 @@ export default function App() {
                 <div className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 relative group mb-2">
                   <pre className="text-xs text-gray-300 font-mono overflow-y-auto whitespace-pre-wrap max-h-64 custom-scrollbar">
 {`local HttpService = game:GetService("HttpService")
-local URL = "${window.location.origin}/api/sync"
-local EXPORT_URL = "${window.location.origin}/api/export"
+local BASE_URL = "${(window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-')}"
+local URL = BASE_URL .. "/api/sync"
+local EXPORT_URL = BASE_URL .. "/api/export"
 
 local toolbar = plugin:CreateToolbar("BlockLua")
 local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
@@ -6102,10 +6103,15 @@ sync() -- Initial sync on load
                   </pre>
                   <button 
                     onClick={() => {
-                      const publicUrl = window.location.origin;
+                      let origin = window.location.origin;
+                      if (!origin || origin === 'null') {
+                        origin = window.location.href.split('/').slice(0, 3).join('/');
+                      }
+                      const publicUrl = origin.replace('ais-dev-', 'ais-pre-');
                       const code = `local HttpService = game:GetService("HttpService")
-local URL = "\${publicUrl}/api/sync"
-local EXPORT_URL = "\${publicUrl}/api/export"
+local BASE_URL = "${publicUrl}"
+local URL = BASE_URL .. "/api/sync"
+local EXPORT_URL = BASE_URL .. "/api/export"
 
 local toolbar = plugin:CreateToolbar("BlockLua")
 local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
