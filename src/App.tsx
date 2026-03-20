@@ -6022,16 +6022,6 @@ local function serializeInstance(instance, path)
     return data
 end
 
-local function getAllInstanceIds()
-    local ids = {}
-    for _, descendant in pairs(game:GetDescendants()) do
-        ids[descendant:GetFullName()] = true
-    end
-    return ids
-end
-
-local lastInstanceIds = getAllInstanceIds()
-
 local function sync()
     print("Syncing with BlockLua...")
     local root = {
@@ -6063,6 +6053,7 @@ local function sync()
 end
 
 local function pollScripts()
+    print("Checking for script updates...")
     local success, response = pcall(function()
         return HttpService:GetAsync(EXPORT_URL)
     end)
@@ -6092,40 +6083,22 @@ local function pollScripts()
             newScript.Source = scriptData.code
             newScript.Parent = parent
             print("Created " .. scriptData.type .. " in " .. parent.Name)
+        else
+            print("No new scripts to sync.")
         end
+    else
+        warn("Failed to poll scripts: " .. tostring(response))
     end
 end
 
-syncButton.Click:Connect(sync)
-sync() -- Initial sync
+syncButton.Click:Connect(function()
+    sync()
+    pollScripts()
+end)
 
-task.spawn(function()
-    while true do
-        task.wait(5)
-        local currentInstanceIds = getAllInstanceIds()
-        local hasChanged = false
-        for id, _ in pairs(currentInstanceIds) do
-            if not lastInstanceIds[id] then
-                hasChanged = true
-                break
-            end
-        end
-        if not hasChanged then
-            for id, _ in pairs(lastInstanceIds) do
-                if not currentInstanceIds[id] then
-                    hasChanged = true
-                    break
-                end
-            end
-        end
-        
-        if hasChanged then
-            lastInstanceIds = currentInstanceIds
-            sync()
-        end
-        pollScripts()
-    end
-end)`}
+print("BlockLua Sync Plugin Loaded. Click the 'Sync Explorer' button in the toolbar to sync.")
+sync() -- Initial sync on load
+`}
                   </pre>
                   <button 
                     onClick={() => {
@@ -6153,16 +6126,6 @@ local function serializeInstance(instance, path)
     return data
 end
 
-local function getAllInstanceIds()
-    local ids = {}
-    for _, descendant in pairs(game:GetDescendants()) do
-        ids[descendant:GetFullName()] = true
-    end
-    return ids
-end
-
-local lastInstanceIds = getAllInstanceIds()
-
 local function sync()
     print("Syncing with BlockLua...")
     local root = {
@@ -6194,6 +6157,7 @@ local function sync()
 end
 
 local function pollScripts()
+    print("Checking for script updates...")
     local success, response = pcall(function()
         return HttpService:GetAsync(EXPORT_URL)
     end)
@@ -6223,40 +6187,21 @@ local function pollScripts()
             newScript.Source = scriptData.code
             newScript.Parent = parent
             print("Created " .. scriptData.type .. " in " .. parent.Name)
+        else
+            print("No new scripts to sync.")
         end
+    else
+        warn("Failed to poll scripts: " .. tostring(response))
     end
 end
 
-syncButton.Click:Connect(sync)
-sync() -- Initial sync
+syncButton.Click:Connect(function()
+    sync()
+    pollScripts()
+end)
 
-task.spawn(function()
-    while true do
-        task.wait(5)
-        local currentInstanceIds = getAllInstanceIds()
-        local hasChanged = false
-        for id, _ in pairs(currentInstanceIds) do
-            if not lastInstanceIds[id] then
-                hasChanged = true
-                break
-            end
-        end
-        if not hasChanged then
-            for id, _ in pairs(lastInstanceIds) do
-                if not currentInstanceIds[id] then
-                    hasChanged = true
-                    break
-                end
-            end
-        end
-        
-        if hasChanged then
-            lastInstanceIds = currentInstanceIds
-            sync()
-        end
-        pollScripts()
-    end
-end)`;
+print("BlockLua Sync Plugin Loaded. Click the 'Sync Explorer' button in the toolbar to sync.")
+sync() -- Initial sync on load`;
                       navigator.clipboard.writeText(code);
                       alert(currentLang === 'vi' ? 'Đã sao chép!' : 'Copied!');
                     }}
