@@ -121,7 +121,9 @@ const INITIAL_STRUCTURE: RobloxInstance = {
         { id: 'bubblechatconfiguration', Name: 'BubbleChatConfiguration', ClassName: 'BubbleChatConfiguration', Children: [], Properties: {} },
       ], Properties: {} 
     },
-    { id: 'localizationservice', Name: 'LocalizationService', ClassName: 'LocalizationService', Children: [], Properties: {} },
+    { id: 'localizationservice', Name: 'LocalizationService', ClassName: 'LocalizationService', Children: [
+        { id: 'localizationtable', Name: 'LocalizationTable', ClassName: 'LocalizationTable', Children: [], Properties: {} },
+    ], Properties: {} },
     { id: 'testservice', Name: 'TestService', ClassName: 'TestService', Children: [], Properties: {} },
     { id: 'physicsservice', Name: 'PhysicsService', ClassName: 'PhysicsService', Children: [], Properties: {} },
     { id: 'collectionservice', Name: 'CollectionService', ClassName: 'CollectionService', Children: [], Properties: {} },
@@ -191,7 +193,7 @@ export const useExplorer = () => {
             if (child.id === id) {
               const metadata = ROBLOX_CLASSES.find(c => c.name === child.ClassName);
               if (metadata && metadata.category === 'Services') return false;
-              if (['game', 'workspace', 'replicatedstorage', 'serverscriptservice', 'startergui', 'starterplayer', 'lighting', 'soundservice', 'textchatservice', 'chatwindowconfiguration', 'chatinputbarconfiguration', 'channeltabsconfiguration', 'bubblechatconfiguration', 'startercharacterscripts', 'starterplayerscripts'].includes(child.id.toLowerCase())) return false;
+              if (['game', 'workspace', 'replicatedstorage', 'serverscriptservice', 'startergui', 'starterplayer', 'lighting', 'soundservice', 'textchatservice', 'chatwindowconfiguration', 'chatinputbarconfiguration', 'channeltabsconfiguration', 'bubblechatconfiguration', 'startercharacterscripts', 'starterplayerscripts', 'localizationservice', 'localizationtable', 'testservice', 'physicsservice', 'collectionservice', 'runservice', 'httpservice', 'tweenservice'].includes(child.id.toLowerCase())) return false;
             }
             return true;
           })
