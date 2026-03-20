@@ -10,6 +10,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   BookOpen, 
   CheckCircle2, 
+  CheckCircle,
+  AlertCircle,
   Code2, 
   Layers, 
   Play, 
@@ -27,7 +29,8 @@ import {
   Monitor,
   Search,
   RefreshCw,
-  Copy
+  Copy,
+  FileCode2
 } from 'lucide-react';
 import { useExplorer } from './explorer';
 import { ExplorerTree, getIcon } from './components/Explorer/Explorer';
@@ -45,7 +48,6 @@ const CATEGORIES = [
   { name: 'Sound', color: '#59c059' },
   { name: 'Values', color: '#4cbfe6' },
   { name: 'Variables', color: '#ff661a' },
-  { name: 'Variables 2', color: '#ff661a' },
   { name: 'Lists', color: '#cf142b' },
   { name: 'Loops', color: '#48a868' },
   { name: 'World', color: '#4c97ff' },
@@ -66,8 +68,9 @@ const CATEGORIES = [
 ];
 
 export default function App() {
-  const { explorer, setExplorer, toggleExpand, addInstance } = useExplorer();
+  const { explorer, setExplorer, toggleExpand, addInstance, updateInstanceProperty, deleteInstance } = useExplorer();
   const [selectedInstancePath, setSelectedInstancePath] = useState('game.Workspace');
+  const [selectedInstanceId, setSelectedInstanceId] = useState('workspace');
   const blocklyDiv = useRef<HTMLDivElement>(null);
   const workspace = useRef<Blockly.WorkspaceSvg | null>(null);
   const [view, setView] = useState<'blocks' | 'codes'>('blocks');
@@ -78,6 +81,38 @@ export default function App() {
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
   const [showGuide, setShowGuide] = useState<boolean>(false);
+
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleQuickExport = (type: 'Script' | 'LocalScript') => {
+    if (!generatedCode.trim()) {
+      showToast(currentLang === 'vi' ? 'Vui lòng thêm khối lệnh trước!' : 'Please add some blocks first!', 'error');
+      return;
+    }
+    
+    const scriptName = type === 'Script' ? 'Script' : 'LocalScript';
+    addInstance(selectedInstanceId, scriptName, scriptName, { Source: generatedCode });
+    
+    fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: type,
+        path: selectedInstancePath,
+        code: generatedCode
+      })
+    }).then(() => {
+       showToast(currentLang === 'vi' ? `Đã xuất ${type} tới ${selectedInstancePath}` : `Successfully exported ${type} to ${selectedInstancePath}`);
+    }).catch(err => {
+      console.error(err);
+      showToast(currentLang === 'vi' ? 'Lỗi khi xuất lệnh!' : 'Error exporting script!', 'error');
+    });
+  };
   const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
   const [definedVariables, setDefinedVariables] = useState<string[]>([]);
   const [showTutorial, setShowTutorial] = useState<boolean>(() => {
@@ -136,11 +171,54 @@ export default function App() {
   }, [sidebarWidth, view]);
 
   // Bridge for Blockly to open Explorer
+  const [easingStyleTarget, setEasingStyleTarget] = useState<string | null>(null);
+  const [easingDirectionTarget, setEasingDirectionTarget] = useState<string | null>(null);
+  const [clientKeyTarget, setClientKeyTarget] = useState<string | null>(null);
+
   useEffect(() => {
     (window as any).openInstanceSelector = (blockId: string) => {
       setSelectorTarget(blockId);
     };
+    (window as any).openEasingStyleSelector = (blockId: string) => {
+      setEasingStyleTarget(blockId);
+    };
+    (window as any).openEasingDirectionSelector = (blockId: string) => {
+      setEasingDirectionTarget(blockId);
+    };
+    (window as any).openClientKeySelector = (blockId: string) => {
+      setClientKeyTarget(blockId);
+    };
   }, []);
+
+  const handleEasingStyleSelect = (style: string) => {
+    if (easingStyleTarget && workspace.current) {
+      const block = workspace.current.getBlockById(easingStyleTarget);
+      if (block) {
+        block.setFieldValue(style, 'STYLE');
+      }
+      setEasingStyleTarget(null);
+    }
+  };
+
+  const handleEasingDirectionSelect = (direction: string) => {
+    if (easingDirectionTarget && workspace.current) {
+      const block = workspace.current.getBlockById(easingDirectionTarget);
+      if (block) {
+        block.setFieldValue(direction, 'DIRECTION');
+      }
+      setEasingDirectionTarget(null);
+    }
+  };
+
+  const handleClientKeySelect = (key: string) => {
+    if (clientKeyTarget && workspace.current) {
+      const block = workspace.current.getBlockById(clientKeyTarget);
+      if (block) {
+        block.setFieldValue(key, 'KEY_NAME');
+      }
+      setClientKeyTarget(null);
+    }
+  };
 
   // Poll for Roblox Studio sync
   useEffect(() => {
@@ -179,10 +257,37 @@ export default function App() {
     return () => clearInterval(interval);
   }, [setExplorer]);
 
-  const handleInstanceSelect = (path: string) => {
+  const [exportScriptType, setExportScriptType] = useState<'Script' | 'LocalScript' | null>(null);
+
+  const handleInstanceSelect = (path: string, instanceId: string) => {
     // Keep full path as requested by user (e.g., game.Workspace.Part)
     const displayPath = path;
     
+    if (selectorTarget === 'export') {
+      // Create script locally
+      const scriptName = exportScriptType === 'Script' ? 'Script' : 'LocalScript';
+      addInstance(instanceId, scriptName, scriptName, { Source: generatedCode });
+      
+      // Also sync to external if needed
+      fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: exportScriptType,
+          path: displayPath,
+          code: generatedCode
+        })
+      }).then(() => {
+        // alert(`Successfully exported ${exportScriptType} to ${displayPath}`);
+      }).catch(err => {
+        console.error(err);
+      });
+      
+      setSelectorTarget(null);
+      setExportScriptType(null);
+      return;
+    }
+
     if (selectorTarget && workspace.current) {
       const block = workspace.current.getBlockById(selectorTarget);
       if (block) {
@@ -191,6 +296,7 @@ export default function App() {
       setSelectorTarget(null);
     } else {
       setSelectedInstancePath(displayPath);
+      setSelectedInstanceId(instanceId);
     }
   };
 
@@ -310,6 +416,45 @@ export default function App() {
 
   useEffect(() => {
     if (!blocklyDiv.current) return;
+
+    // Custom field for clickable variable labels
+    class FieldClickableVarLabel extends Blockly.FieldLabel {
+      showEditor_() {
+        const workspace = this.getSourceBlock()?.workspace;
+        if (!workspace) return;
+        
+        const text = this.getText();
+        const cleanText = text.replace('var. ', '').trim();
+        
+        Blockly.Events.setGroup(true);
+        try {
+          const newBlock = workspace.newBlock('var_reporter');
+          if (newBlock) {
+            newBlock.setFieldValue(cleanText, 'NAME');
+            // Set color based on the text
+            if (text.includes('_count') || text.includes('_child') || text.includes('_descendant')) {
+              newBlock.setColour('#ff66cc');
+            }
+            (newBlock as any).initSvg();
+            (newBlock as any).render();
+            
+            // Position it near the source block
+            const sourceBlock = this.getSourceBlock();
+            const xy = (sourceBlock as any).getRelativeToSurfaceXY();
+            newBlock.moveBy(xy.x + 150, xy.y);
+            (newBlock as any).select();
+          }
+        } finally {
+          Blockly.Events.setGroup(false);
+        }
+      }
+    }
+    // Set it as editable so it responds to clicks
+    FieldClickableVarLabel.prototype.EDITABLE = true;
+
+    const createVarLabel = (name: string, _color: string) => {
+      return new FieldClickableVarLabel(name, "scratch-var-label");
+    };
 
     // Define custom blocks to match the image
     defineCustomBlocks();
@@ -667,7 +812,7 @@ export default function App() {
               .appendField(new Blockly.FieldTextInput("Part"), "CLASS")
               .appendField("in");
           this.appendValueInput("PARENT").setCheck(null);
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _instance", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _instance", "#4c97ff"), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour("#4c97ff");
@@ -679,7 +824,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("clone");
           this.appendValueInput("INSTANCE").setCheck(null);
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _clone", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _clone", "#4c97ff"), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour("#4c97ff");
@@ -752,7 +897,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("child added")
-              .appendField(new Blockly.FieldLabel("var. _child", "scratch-var-label"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _child", "#6600ff"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -765,7 +910,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("child removed")
-              .appendField(new Blockly.FieldLabel("var. _child", "scratch-var-label"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _child", "#6600ff"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -778,7 +923,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("descendant added")
-              .appendField(new Blockly.FieldLabel("var. _descendant", "scratch-var-label"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _descendant", "#6600ff"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -791,7 +936,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("descendant removing")
-              .appendField(new Blockly.FieldLabel("var. _descendant", "scratch-var-label"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _descendant", "#6600ff"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -982,7 +1127,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("touched by part")
-              .appendField(new Blockly.FieldLabel("var. _touched_part", "scratch-var-label"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _touched_part", "#4d4d4d"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -995,7 +1140,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("touched by character")
-              .appendField(new Blockly.FieldLabel("var. _touched_part", "scratch-var-label"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _touched_part", "#4d4d4d"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -1572,9 +1717,17 @@ export default function App() {
       const createVarReporter = (type: string, label: string) => {
         Blockly.Blocks[type] = {
           init: function() {
-            this.appendDummyInput().appendField(label);
+            let varName = label;
+            if (varName.startsWith('var. ')) {
+              varName = varName.substring(5);
+            } else if (varName.startsWith('var.')) {
+              varName = varName.substring(4);
+            }
+            this.appendDummyInput()
+                .appendField("var.")
+                .appendField(new Blockly.FieldTextInput(varName), "NAME");
             this.setOutput(true, null);
-            this.setColour("#ff661a");
+            this.setColour("#ff66cc"); // Match var_reporter color
           }
         };
       };
@@ -1675,19 +1828,11 @@ export default function App() {
         }
       };
 
-      // Helper to create the "var." clickable label
-      const createVarLabel = (name: string, color: string) => {
-        const field = new Blockly.FieldLabel(name, "scratch-var-label");
-        // We'll handle the click via the workspace listener or a custom field if needed
-        // For now, let's use a custom field to ensure it's clickable and looks like a block
-        return field;
-      };
-
       Blockly.Blocks['loops_repeat_lua'] = {
         init: function() {
           this.appendDummyInput()
               .appendField("repeat")
-              .appendField(new Blockly.FieldLabel("var. _count", "scratch-var-label"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _count", "#48a868"), "VAR_LABEL");
           this.appendDummyInput().appendField("from");
           this.appendValueInput("FROM").setCheck("Number");
           this.appendDummyInput().appendField("to");
@@ -1704,7 +1849,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("loop through children of");
           this.appendValueInput("INSTANCE").setCheck(null);
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _child", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _child", "#48a868"), "VAR_LABEL");
           this.appendStatementInput("DO");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -1717,7 +1862,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("loop through descendants of");
           this.appendValueInput("INSTANCE").setCheck(null);
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _descendant", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _descendant", "#48a868"), "VAR_LABEL");
           this.appendStatementInput("DO");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -1833,7 +1978,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("HUMANOID").setCheck(null);
           this.appendDummyInput().appendField("is climbing");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _climb_speed", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _climb_speed", "#ff3355"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -1879,7 +2024,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("get humanoid from model");
           this.appendValueInput("MODEL").setCheck(null);
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _humanoid", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _humanoid", "#ff3355"), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour("#ff3355");
@@ -1890,7 +2035,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("get model from humanoid");
           this.appendValueInput("HUMANOID").setCheck(null);
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _character_model", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _character_model", "#ff3355"), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour("#ff3355");
@@ -1912,7 +2057,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("HUMANOID").setCheck(null);
           this.appendDummyInput().appendField("Health changed");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _new_health", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _new_health", "#ff3355"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -1989,7 +2134,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("HUMANOID").setCheck(null);
           this.appendDummyInput().appendField("finished moving");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _reached_goal", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _reached_goal", "#ff3355"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2145,7 +2290,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput().appendField("input began");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _input", "#cf63cf"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2157,7 +2302,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput().appendField("input ended");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _input", "#cf63cf"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2170,7 +2315,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is left mouse button");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#cf63cf"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2183,7 +2328,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is middle mouse button");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#cf63cf"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2196,7 +2341,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is right mouse button");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#cf63cf"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2209,7 +2354,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is touch");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _touch_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _touch_input", "#cf63cf"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2292,7 +2437,7 @@ export default function App() {
       Blockly.Blocks['player_joined'] = {
         init: function() {
           this.appendDummyInput().appendField("player joined");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", "#0fbd8c"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2303,7 +2448,7 @@ export default function App() {
       Blockly.Blocks['player_leaving'] = {
         init: function() {
           this.appendDummyInput().appendField("player leaving");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", "#0fbd8c"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2326,7 +2471,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("add click detector to");
           this.appendValueInput("INSTANCE").setCheck(null);
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _click_detector", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _click_detector", "#ff8c1a"), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour("#ff8c1a");
@@ -2337,7 +2482,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("CLICK_DETECTOR").setCheck(null);
           this.appendDummyInput().appendField("clicked");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", "#ff8c1a"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2349,7 +2494,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("CLICK_DETECTOR").setCheck(null);
           this.appendDummyInput().appendField("hover enter");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", "#ff8c1a"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2361,7 +2506,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("CLICK_DETECTOR").setCheck(null);
           this.appendDummyInput().appendField("hover leave");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", "#ff8c1a"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2373,7 +2518,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("CLICK_DETECTOR").setCheck(null);
           this.appendDummyInput().appendField("right clicked");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", "#ff8c1a"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2410,8 +2555,8 @@ export default function App() {
       Blockly.Blocks['marketplace_product_bought'] = {
         init: function() {
           this.appendDummyInput().appendField("product bought");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _productId", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", "#4c97ff"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _productId", "#4c97ff"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2474,16 +2619,28 @@ export default function App() {
       };
       Blockly.Blocks['tween_info_create'] = {
         init: function() {
+          const styleField = new Blockly.FieldTextInput("Sine");
+          (styleField as any).showEditor_ = () => {
+            if ((window as any).openEasingStyleSelector) {
+              (window as any).openEasingStyleSelector(this.id);
+            }
+          };
+
+          const directionField = new Blockly.FieldTextInput("Out");
+          (directionField as any).showEditor_ = () => {
+            if ((window as any).openEasingDirectionSelector) {
+              (window as any).openEasingDirectionSelector(this.id);
+            }
+          };
+
           this.appendDummyInput().appendField("tween info: time");
           this.appendValueInput("TIME").setCheck("Number");
-          this.appendDummyInput().appendField("easing style");
-          this.appendValueInput("STYLE").setCheck(null);
-          this.appendDummyInput().appendField("easing direction");
-          this.appendDummyInput().appendField(new Blockly.FieldDropdown([
-            ["In", "In"],
-            ["Out", "Out"],
-            ["In/Out", "InOut"]
-          ]), "DIRECTION");
+          this.appendDummyInput()
+              .appendField("easing style")
+              .appendField(styleField, "STYLE");
+          this.appendDummyInput()
+              .appendField("easing direction")
+              .appendField(directionField, "DIRECTION");
           this.setOutput(true, null);
           this.setColour("#59c059");
           this.setInputsInline(true);
@@ -2522,7 +2679,7 @@ export default function App() {
       Blockly.Blocks['client_input_began'] = {
         init: function() {
           this.appendDummyInput().appendField("user input began");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _input", "#ffab19"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2533,7 +2690,7 @@ export default function App() {
       Blockly.Blocks['client_input_ended'] = {
         init: function() {
           this.appendDummyInput().appendField("user input ended");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _input", "#ffab19"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2546,7 +2703,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is keyboard");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _key_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _key_input", "#ffab19"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2559,7 +2716,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is left mouse button");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#ffab19"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2572,7 +2729,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is middle mouse button");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#ffab19"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2585,7 +2742,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is right mouse button");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _mouse_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#ffab19"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2598,7 +2755,7 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is touch");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _touch_input", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _touch_input", "#ffab19"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2608,38 +2765,18 @@ export default function App() {
       };
       Blockly.Blocks['client_key_is'] = {
         init: function() {
+          const keyField = new Blockly.FieldTextInput("Space");
+          (keyField as any).showEditor_ = () => {
+            if ((window as any).openClientKeySelector) {
+              (window as any).openClientKeySelector(this.id);
+            }
+          };
+
           this.appendDummyInput().appendField("if key");
           this.appendValueInput("KEY").setCheck(null);
-          this.appendDummyInput().appendField("is");
-          this.appendDummyInput().appendField(new Blockly.FieldDropdown([
-            ["Space", "Space"],
-            ["W", "W"],
-            ["A", "A"],
-            ["S", "S"],
-            ["D", "D"],
-            ["E", "E"],
-            ["Q", "Q"],
-            ["F", "F"],
-            ["G", "G"],
-            ["R", "R"],
-            ["T", "T"],
-            ["Y", "Y"],
-            ["U", "U"],
-            ["I", "I"],
-            ["O", "O"],
-            ["P", "P"],
-            ["H", "H"],
-            ["J", "J"],
-            ["K", "K"],
-            ["L", "L"],
-            ["Z", "Z"],
-            ["X", "X"],
-            ["C", "C"],
-            ["V", "V"],
-            ["B", "B"],
-            ["N", "N"],
-            ["M", "M"]
-          ]), "KEY_NAME");
+          this.appendDummyInput()
+              .appendField("is")
+              .appendField(keyField, "KEY_NAME");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2668,7 +2805,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("fired by server");
           this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _received_data", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _received_data", "#ffab19"), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2692,8 +2829,8 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("fired by client");
           this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL_PLAYER");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _data", "scratch-var-label"), "VAR_LABEL_DATA");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", "#40bf4a"), "VAR_LABEL_PLAYER");
+          this.appendDummyInput().appendField(createVarLabel("var. _data", "#40bf4a"), "VAR_LABEL_DATA");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -2799,7 +2936,7 @@ export default function App() {
           this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
           this.appendDummyInput().appendField("arguments:");
           this.appendDummyInput().appendField(new Blockly.FieldTextInput("val1, val2"), "ARGS");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _result", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _result", "#ff661a"), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour("#ff661a");
@@ -2877,7 +3014,7 @@ export default function App() {
           this.appendValueInput("DATASTORE").setCheck(null).appendField("datastore");
           this.appendValueInput("PLAYER").setCheck(null).appendField("player:");
           this.appendDummyInput().appendField("value:");
-          this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _value", "scratch-var-label"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _value", "#4c97ff"), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour("#4c97ff");
@@ -3065,33 +3202,28 @@ export default function App() {
         return [name, Order.ATOMIC];
       };
       luaGenerator.forBlock['var_reporter'] = function(block: any) {
-        const name = block.getFieldValue('NAME');
-        // Strip "var. " prefix if present
-        const cleanName = name.startsWith('var. ') ? name.substring(5) : name;
-        return [cleanName, Order.ATOMIC];
+        let name = block.getFieldValue('NAME');
+        if (name && name.startsWith('var. ')) {
+          name = name.substring(5);
+        } else if (name && name.startsWith('var.')) {
+          name = name.substring(4);
+        }
+        return [name, Order.ATOMIC];
       };
 
-      luaGenerator.forBlock['var_count'] = function() { return ['_count', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_child'] = function() { return ['_child', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_descendant'] = function() { return ['_descendant', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_instance'] = function() { return ['_instance', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_clone'] = function() { return ['_clone', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_touched_part'] = function() { return ['_touched_part', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_climb_speed'] = function() { return ['_climb_speed', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_humanoid'] = function() { return ['_humanoid', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_character_model'] = function() { return ['_character_model', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_new_health'] = function() { return ['_new_health', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_reached_goal'] = function() { return ['_reached_goal', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_input'] = function() { return ['_input', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_mouse_input'] = function() { return ['_mouse_input', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_touch_input'] = function() { return ['_touch_input', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_player'] = function() { return ['_player', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_click_detector'] = function() { return ['_click_detector', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_productid'] = function() { return ['_productid', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_key_input'] = function() { return ['_key_input', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_received_data'] = function() { return ['_received_data', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_data'] = function() { return ['_data', Order.ATOMIC]; };
-      luaGenerator.forBlock['var_value'] = function() { return ['_value', Order.ATOMIC]; };
+      const varReporterGenerator = function(block: any): [string, number] {
+        let varName = block.getFieldValue('NAME');
+        if (varName && varName.startsWith('var. ')) {
+          varName = varName.substring(5);
+        } else if (varName && varName.startsWith('var.')) {
+          varName = varName.substring(4);
+        }
+        return [varName, Order.ATOMIC];
+      };
+
+      ['var_count', 'var_child', 'var_descendant', 'var_instance', 'var_clone', 'var_touched_part', 'var_climb_speed', 'var_humanoid', 'var_character_model', 'var_new_health', 'var_reached_goal', 'var_input', 'var_mouse_input', 'var_touch_input', 'var_player', 'var_click_detector', 'var_productid', 'var_key_input', 'var_received_data', 'var_data', 'var_value'].forEach(type => {
+        luaGenerator.forBlock[type] = varReporterGenerator;
+      });
 
       // Lists
       luaGenerator.forBlock['lists_empty'] = function() {
@@ -3617,13 +3749,13 @@ export default function App() {
         const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
         return [player + '.UserId', Order.HIGH];
       };
-      luaGenerator.forBlock['player_added'] = function(block: any) {
+      luaGenerator.forBlock['player_joined'] = function(block: any) {
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'game.Players.PlayerAdded:Connect(function(player)\n' + branch + 'end)\n';
+        return 'game.Players.PlayerAdded:Connect(function(_player)\n' + branch + 'end)\n';
       };
-      luaGenerator.forBlock['player_removing'] = function(block: any) {
+      luaGenerator.forBlock['player_leaving'] = function(block: any) {
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'game.Players.PlayerRemoving:Connect(function(player)\n' + branch + 'end)\n';
+        return 'game.Players.PlayerRemoving:Connect(function(_player)\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['player_chat_added'] = function(block: any) {
         const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
@@ -3703,7 +3835,7 @@ export default function App() {
       };
       luaGenerator.forBlock['tween_info_create'] = function(block: any) {
         const time = luaGenerator.valueToCode(block, 'TIME', Order.NONE) || '1';
-        const style = luaGenerator.valueToCode(block, 'STYLE', Order.NONE) || 'Enum.EasingStyle.Sine';
+        const style = block.getFieldValue('STYLE') || 'Sine';
         const dir = block.getFieldValue('DIRECTION');
         return ['TweenInfo.new(' + time + ', Enum.EasingStyle.' + style + ', Enum.EasingDirection.' + dir + ')', Order.HIGH];
       };
@@ -3746,6 +3878,12 @@ export default function App() {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
         return 'if ' + input + '.UserInputType == Enum.UserInputType.Touch then\n' + branch + 'end\n';
+      };
+      luaGenerator.forBlock['client_key_is'] = function(block: any) {
+        const input = luaGenerator.valueToCode(block, 'KEY', Order.NONE) || 'nil';
+        const keyName = block.getFieldValue('KEY_NAME') || 'Space';
+        const branch = luaGenerator.statementToCode(block, 'DO');
+        return 'if ' + input + '.KeyCode == Enum.KeyCode.' + keyName + ' then\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['client_local_player'] = function() {
         return ['game.Players.LocalPlayer', Order.ATOMIC];
@@ -4352,30 +4490,6 @@ export default function App() {
             },
             { kind: 'block', type: 'variables_get_custom' }
           ];
-        } else if (cat.name === 'Variables 2') {
-          blocks = [
-            { kind: 'block', type: 'var_count' },
-            { kind: 'block', type: 'var_child' },
-            { kind: 'block', type: 'var_descendant' },
-            { kind: 'block', type: 'var_instance' },
-            { kind: 'block', type: 'var_clone' },
-            { kind: 'block', type: 'var_touched_part' },
-            { kind: 'block', type: 'var_climb_speed' },
-            { kind: 'block', type: 'var_humanoid' },
-            { kind: 'block', type: 'var_character_model' },
-            { kind: 'block', type: 'var_new_health' },
-            { kind: 'block', type: 'var_reached_goal' },
-            { kind: 'block', type: 'var_input' },
-            { kind: 'block', type: 'var_mouse_input' },
-            { kind: 'block', type: 'var_touch_input' },
-            { kind: 'block', type: 'var_player' },
-            { kind: 'block', type: 'var_click_detector' },
-            { kind: 'block', type: 'var_productid' },
-            { kind: 'block', type: 'var_key_input' },
-            { kind: 'block', type: 'var_received_data' },
-            { kind: 'block', type: 'var_data' },
-            { kind: 'block', type: 'var_value' }
-          ];
         } else if (cat.name === 'Lists') {
           blocks = [
             { kind: 'block', type: 'lists_empty' },
@@ -4789,8 +4903,7 @@ export default function App() {
               kind: 'block', 
               type: 'tween_info_create',
               inputs: { 
-                TIME: { shadow: { type: 'placeholder_number' } },
-                STYLE: { shadow: { type: 'placeholder_string' } }
+                TIME: { shadow: { type: 'placeholder_number' } }
               }
             }
           ];
@@ -5179,7 +5292,13 @@ export default function App() {
     const updateCode = () => {
       if (workspace.current) {
         const code = luaGenerator.workspaceToCode(workspace.current);
-        setGeneratedCode(code);
+        
+        if (code.trim()) {
+          const header = `-- Generated by BlockLua\n`;
+          setGeneratedCode(header + code);
+        } else {
+          setGeneratedCode('');
+        }
       }
     };
 
@@ -5242,52 +5361,6 @@ export default function App() {
     
     setAllBlocks(extractedBlocks);
 
-    const handleSvgClick = (e: MouseEvent) => {
-      if (!workspace.current) return;
-      const target = e.target as SVGElement;
-      const varLabel = target.closest('.scratch-var-label');
-      
-      if (varLabel) {
-        const text = varLabel.textContent || "";
-        
-        Blockly.Events.setGroup(true);
-        try {
-          const newBlock = workspace.current.newBlock('var_reporter');
-          if (newBlock) {
-            // Clean text: remove "var. " prefix and any leading/trailing whitespace
-            const cleanText = text.replace('var. ', '').trim();
-            newBlock.setFieldValue(cleanText, 'NAME');
-            
-            // Set color based on the text
-            if (text.includes('_count') || text.includes('_child') || text.includes('_descendant')) {
-              newBlock.setColour('#ff66cc'); // Pink color for these special vars
-            }
-            newBlock.initSvg();
-            newBlock.render();
-            
-            // Position it near the mouse
-            const svg = workspace.current.getParentSvg();
-            const point = svg.createSVGPoint();
-            point.x = e.clientX;
-            point.y = e.clientY;
-            
-            // Get screen CTM and inverse it to get workspace coordinates
-            const ctm = workspace.current.getCanvas().getScreenCTM();
-            if (ctm) {
-              const workspacePoint = point.matrixTransform(ctm.inverse());
-              newBlock.moveBy(workspacePoint.x + 20, workspacePoint.y + 20);
-            }
-            newBlock.select();
-          }
-        } finally {
-          Blockly.Events.setGroup(false);
-        }
-      }
-    };
-
-    const svg = workspace.current.getParentSvg();
-    svg.addEventListener('mousedown', handleSvgClick, true);
-
     workspace.current.addChangeListener((e: any) => {
       // Update defined variables
       if (e.type === Blockly.Events.BLOCK_CREATE || 
@@ -5312,6 +5385,13 @@ export default function App() {
       Blockly.Xml.domToWorkspace(xml, workspace.current!);
     }
 
+    // Onboarding logic
+    const hasSeenGuide = localStorage.getItem('blocklua_has_seen_guide');
+    if (!hasSeenGuide) {
+      setShowGuide(true);
+      localStorage.setItem('blocklua_has_seen_guide', 'true');
+    }
+
     const handleResize = () => {
       if (workspace.current) {
         Blockly.svgResize(workspace.current);
@@ -5321,9 +5401,6 @@ export default function App() {
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (svg) {
-        svg.removeEventListener('mousedown', handleSvgClick, true);
-      }
       if (workspace.current) {
         workspace.current.dispose();
       }
@@ -5691,14 +5768,14 @@ export default function App() {
 
           <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5">
             <button 
-              onClick={() => setView('blocks')}
+              onClick={() => { setView('blocks'); }}
               className={`px-6 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${view === 'blocks' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
             >
               <Layers size={14} />
               BLOCKS
             </button>
             <button 
-              onClick={() => setView('codes')}
+              onClick={() => { setView('codes'); }}
               className={`px-6 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${view === 'codes' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
             >
               <Code2 size={14} />
@@ -5712,28 +5789,6 @@ export default function App() {
             <div className={`w-2 h-2 bg-[#4c97ff] rounded-full ${enableEffects ? 'animate-pulse' : ''}`} />
             <span className="text-[10px] font-bold text-[#4c97ff] uppercase tracking-widest">System Active</span>
           </div>
-          
-          <button 
-            onClick={saveWorkspace}
-            className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest flex items-center gap-2 transition-all border border-white/5"
-          >
-            <Save size={14} />
-            SAVE
-          </button>
-          <button 
-            onClick={loadWorkspace}
-            className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest flex items-center gap-2 transition-all border border-white/5"
-          >
-            <BookOpen size={14} />
-            LOAD
-          </button>
-          <button 
-            onClick={downloadCode}
-            className="bg-gradient-to-r from-[#4c97ff] to-[#0055ff] hover:from-[#0055ff] hover:to-[#0033aa] text-white px-6 py-1.5 rounded-xl text-[10px] font-black tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-blue-500/20 transform hover:scale-105 active:scale-95"
-          >
-            <Play size={14} />
-            EXPORT
-          </button>
         </div>
       </motion.div>
 
@@ -5946,6 +6001,7 @@ export default function App() {
                   <pre className="text-xs text-gray-300 font-mono overflow-y-auto whitespace-pre-wrap max-h-64 custom-scrollbar">
 {`local HttpService = game:GetService("HttpService")
 local URL = "${window.location.origin.replace('ais-dev-', 'ais-pre-')}/api/sync"
+local EXPORT_URL = "${window.location.origin.replace('ais-dev-', 'ais-pre-')}/api/export"
 
 local toolbar = plugin:CreateToolbar("BlockLua")
 local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
@@ -5996,13 +6052,149 @@ local function sync()
     end
 end
 
+local function pollScripts()
+    local success, response = pcall(function()
+        return HttpService:GetAsync(EXPORT_URL)
+    end)
+
+    if success then
+        local data = HttpService:JSONDecode(response)
+        if data and data.script then
+            local scriptData = data.script
+            print("Received script for " .. scriptData.path)
+            
+            local parent = game
+            local parts = string.split(scriptData.path, ".")
+            for i, part in ipairs(parts) do
+                if i > 1 then
+                    local nextParent = parent:FindFirstChild(part)
+                    if nextParent then
+                        parent = nextParent
+                    else
+                        warn("Could not find " .. part)
+                        break
+                    end
+                end
+            end
+            
+            local newScript = Instance.new(scriptData.type)
+            newScript.Name = scriptData.type
+            newScript.Source = scriptData.code
+            newScript.Parent = parent
+            print("Created " .. scriptData.type .. " in " .. parent.Name)
+        end
+    end
+end
+
 syncButton.Click:Connect(sync)
-sync() -- Initial sync when plugin loads`}
+sync()
+
+task.spawn(function()
+    while true do
+        pollScripts()
+        task.wait(5)
+    end
+end)`}
                   </pre>
                   <button 
                     onClick={() => {
                       const publicUrl = window.location.origin.replace('ais-dev-', 'ais-pre-');
-                      const code = `local HttpService = game:GetService("HttpService")\nlocal URL = "${publicUrl}/api/sync"\n\nlocal toolbar = plugin:CreateToolbar("BlockLua")\nlocal syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")\n\nlocal function serializeInstance(instance, path)\n    local currentPath = path == "" and instance.Name or (path .. "." .. instance.Name)\n    local data = {\n        id = currentPath,\n        Name = instance.Name,\n        ClassName = instance.ClassName,\n        expanded = false,\n        Properties = {},\n        Children = {}\n    }\n    for _, child in ipairs(instance:GetChildren()) do\n        table.insert(data.Children, serializeInstance(child, currentPath))\n    end\n    return data\nend\n\nlocal function sync()\n    print("Syncing with BlockLua...")\n    local root = {\n        id = "game",\n        Name = "game",\n        ClassName = "DataModel",\n        expanded = true,\n        Properties = {},\n        Children = {}\n    }\n\n    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "StarterGui", "StarterPlayer", "Lighting", "SoundService"}\n    for _, serviceName in ipairs(services) do\n        local success, service = pcall(function() return game:GetService(serviceName) end)\n        if success and service then\n            table.insert(root.Children, serializeInstance(service, "game"))\n        end\n    end\n\n    local success, response = pcall(function()\n        return HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)\n    end)\n\n    if success then\n        print("Successfully synced with BlockLua!")\n    else\n        warn("Failed to sync: " .. tostring(response))\n    end\nend\n\nsyncButton.Click:Connect(sync)\nsync()`;
+                      const code = `local HttpService = game:GetService("HttpService")
+local URL = "${publicUrl}/api/sync"
+local EXPORT_URL = "${publicUrl}/api/export"
+
+local toolbar = plugin:CreateToolbar("BlockLua")
+local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
+
+local function serializeInstance(instance, path)
+    local currentPath = path == "" and instance.Name or (path .. "." .. instance.Name)
+    local data = {
+        id = currentPath,
+        Name = instance.Name,
+        ClassName = instance.ClassName,
+        expanded = false,
+        Properties = {},
+        Children = {}
+    }
+    for _, child in ipairs(instance:GetChildren()) do
+        table.insert(data.Children, serializeInstance(child, currentPath))
+    end
+    return data
+end
+
+local function sync()
+    print("Syncing with BlockLua...")
+    local root = {
+        id = "game",
+        Name = "game",
+        ClassName = "DataModel",
+        expanded = true,
+        Properties = {},
+        Children = {}
+    }
+
+    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "StarterGui", "StarterPlayer", "Lighting", "SoundService"}
+    for _, serviceName in ipairs(services) do
+        local success, service = pcall(function() return game:GetService(serviceName) end)
+        if success and service then
+            table.insert(root.Children, serializeInstance(service, "game"))
+        end
+    end
+
+    local success, response = pcall(function()
+        return HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)
+    end)
+
+    if success then
+        print("Successfully synced with BlockLua!")
+    else
+        warn("Failed to sync: " .. tostring(response))
+    end
+end
+
+local function pollScripts()
+    local success, response = pcall(function()
+        return HttpService:GetAsync(EXPORT_URL)
+    end)
+
+    if success then
+        local data = HttpService:JSONDecode(response)
+        if data and data.script then
+            local scriptData = data.script
+            print("Received script for " .. scriptData.path)
+            
+            local parent = game
+            local parts = string.split(scriptData.path, ".")
+            for i, part in ipairs(parts) do
+                if i > 1 then
+                    local nextParent = parent:FindFirstChild(part)
+                    if nextParent then
+                        parent = nextParent
+                    else
+                        warn("Could not find " .. part)
+                        break
+                    end
+                end
+            end
+            
+            local newScript = Instance.new(scriptData.type)
+            newScript.Name = scriptData.type
+            newScript.Source = scriptData.code
+            newScript.Parent = parent
+            print("Created " .. scriptData.type .. " in " .. parent.Name)
+        end
+    end
+end
+
+syncButton.Click:Connect(sync)
+sync()
+
+task.spawn(function()
+    while true do
+        pollScripts()
+        task.wait(5)
+    end
+end)`;
                       navigator.clipboard.writeText(code);
                       alert(currentLang === 'vi' ? 'Đã sao chép!' : 'Copied!');
                     }}
@@ -6115,11 +6307,27 @@ sync() -- Initial sync when plugin loads`}
                   <span className="text-xs font-black text-gray-400 tracking-widest uppercase">Generated Luau Source</span>
                 </div>
                 <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => {
+                      handleQuickExport('Script');
+                    }} 
+                    className="text-[10px] font-black text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest flex items-center gap-1"
+                  >
+                    <FileCode2 size={12} /> Script
+                  </button>
+                  <button 
+                    onClick={() => {
+                      handleQuickExport('LocalScript');
+                    }} 
+                    className="text-[10px] font-black text-red-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1"
+                  >
+                    <FileCode2 size={12} /> LocalScript
+                  </button>
                   <div className="text-[10px] text-gray-600 font-mono">ENCODING: UTF-8</div>
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(generatedCode);
-                      alert('Code copied to clipboard!');
+                      showToast(currentLang === 'vi' ? 'Đã sao chép mã!' : 'Code copied to clipboard!');
                     }}
                     className="text-[10px] font-black text-[#4c97ff] hover:text-white transition-colors uppercase tracking-widest"
                   >
@@ -6138,7 +6346,7 @@ sync() -- Initial sync when plugin loads`}
                     ))}
                   </div>
                   <pre className="pl-10 text-gray-300 whitespace-pre-wrap">
-                    {generatedCode || '-- No code generated yet. Add some blocks!'}
+                    {generatedCode}
                   </pre>
                 </div>
               </div>
@@ -6172,9 +6380,11 @@ sync() -- Initial sync when plugin loads`}
         <div className="flex-1 overflow-auto p-1 custom-scrollbar">
           <ExplorerTree 
             instance={explorer} 
-            onSelect={(instance, path) => handleInstanceSelect(path)}
+            onSelect={(instance, path) => handleInstanceSelect(path, instance.id)}
             onToggleExpand={toggleExpand}
             onAddChild={(id) => setShowInsertObjectFor(id)}
+            onRename={(id, newName) => updateInstanceProperty(id, 'Name', newName)}
+            onDelete={deleteInstance}
             selectedId={selectedInstancePath}
           />
         </div>
@@ -6198,10 +6408,138 @@ sync() -- Initial sync when plugin loads`}
             getIcon={getIcon}
             onClose={() => setShowInsertObjectFor(null)}
             onAdd={(className) => {
-              addInstance(showInsertObjectFor, className, className);
+              const initialProps: Record<string, any> = {};
+              if (className === 'Script' || className === 'LocalScript') {
+                initialProps.Source = generatedCode;
+              }
+              addInstance(showInsertObjectFor, className, className, initialProps);
               setShowInsertObjectFor(null);
             }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Easing Style Selector Modal */}
+      <AnimatePresence>
+        {easingStyleTarget && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setEasingStyleTarget(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-96 flex flex-col gap-4 z-10"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Easing Style</h3>
+                <button onClick={() => setEasingStyleTarget(null)} className="text-gray-400 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {['Linear', 'Sine', 'Back', 'Quad', 'Quart', 'Quint', 'Bounce', 'Elastic', 'Exponential', 'Circular', 'Cubic'].map(style => (
+                  <button
+                    key={style}
+                    onClick={() => handleEasingStyleSelect(style)}
+                    className="px-4 py-2 bg-white/5 hover:bg-[#4c97ff] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-left"
+                  >
+                    {style}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Easing Direction Selector Modal */}
+      <AnimatePresence>
+        {easingDirectionTarget && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setEasingDirectionTarget(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-80 flex flex-col gap-4 z-10"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Easing Direction</h3>
+                <button onClick={() => setEasingDirectionTarget(null)} className="text-gray-400 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {['In', 'Out', 'InOut'].map(direction => (
+                  <button
+                    key={direction}
+                    onClick={() => handleEasingDirectionSelect(direction)}
+                    className="px-4 py-2 bg-white/5 hover:bg-[#4c97ff] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-left"
+                  >
+                    {direction}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Client Key Selector Modal */}
+      <AnimatePresence>
+        {clientKeyTarget && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setClientKeyTarget(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-[600px] max-h-[80vh] flex flex-col gap-4 z-10"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Key</h3>
+                <button onClick={() => setClientKeyTarget(null)} className="text-gray-400 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-4 gap-2 overflow-y-auto custom-scrollbar pr-2">
+                {[
+                  "Space", "W", "A", "S", "D", "E", "Q", "F", "G", "R", "T", "Y", "U", "I", "O", "P", "H", "J", "K", "L", "Z", "X", "C", "V", "B", "N", "M",
+                  "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+                  "Up", "Down", "Left", "Right",
+                  "LeftShift", "RightShift", "LeftControl", "RightControl", "LeftAlt", "RightAlt",
+                  "Return", "Backspace", "Tab", "Escape",
+                  "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"
+                ].map(key => (
+                  <button
+                    key={key}
+                    onClick={() => handleClientKeySelect(key)}
+                    className="px-3 py-2 bg-white/5 hover:bg-[#ffab19] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-center"
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
@@ -6484,9 +6822,12 @@ sync() -- Initial sync when plugin loads`}
         .blocklyHtmlInput {
           user-select: text !important;
           -webkit-user-select: text !important;
-          color: #000000 !important;
-          background-color: #ffffff !important;
+          color: #ffffff !important;
+          background-color: #333333 !important;
           font-family: sans-serif !important;
+          border: 1px solid #555 !important;
+          border-radius: 4px !important;
+          padding: 2px 4px !important;
           border: 1px solid #4c97ff !important;
         }
         /* Hide scrollbars for flyout */
@@ -6561,6 +6902,24 @@ sync() -- Initial sync when plugin loads`}
           }
         `).join('\n')}
       `}</style>
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md ${
+              toast.type === 'success' 
+                ? 'bg-emerald-500/90 border-emerald-400/50 text-white' 
+                : 'bg-red-500/90 border-red-400/50 text-white'
+            }`}
+          >
+            {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+            <span className="text-sm font-bold tracking-wide">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

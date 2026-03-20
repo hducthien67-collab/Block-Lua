@@ -302,4 +302,88 @@ export const defineCustomBlocks = () => {
       this.setColour("#48a868");
     }
   };
+
+  // Player Blocks
+  Blockly.Blocks['player_get_by_name'] = {
+    init: function() {
+      this.appendDummyInput().appendField("get player by name");
+      this.appendValueInput("NAME").setCheck("String");
+      this.setOutput(true, null);
+      this.setColour("#0fbd8c");
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['player_kick'] = {
+    init: function() {
+      this.appendDummyInput().appendField("kick");
+      this.appendValueInput("PLAYER").setCheck(null);
+      this.appendDummyInput().appendField("reason:");
+      this.appendValueInput("REASON").setCheck("String");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour("#0fbd8c");
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['player_joined'] = {
+    init: function() {
+      this.appendDummyInput().appendField("player joined");
+      this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour("#0fbd8c");
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['player_leaving'] = {
+    init: function() {
+      this.appendDummyInput().appendField("player leaving");
+      this.appendDummyInput().appendField(new Blockly.FieldLabel("var. _player", "scratch-var-label"), "VAR_LABEL");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour("#0fbd8c");
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['player_get_user_id'] = {
+    init: function() {
+      this.appendDummyInput().appendField("user id of");
+      this.appendValueInput("PLAYER").setCheck(null);
+      this.setOutput(true, "Number");
+      this.setColour("#0fbd8c");
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['player_chat_added'] = {
+    init: function() {
+      this.appendDummyInput().appendField("on player chat");
+      this.appendValueInput("PLAYER").setCheck(null);
+      this.appendDummyInput().appendField(new Blockly.FieldLabel("var. message", "scratch-var-label"), "VAR_LABEL");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour("#0fbd8c");
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['player_respawned'] = {
+    init: function() {
+      this.appendDummyInput().appendField("on player respawned");
+      this.appendValueInput("PLAYER").setCheck(null);
+      this.appendDummyInput().appendField(new Blockly.FieldLabel("var. character", "scratch-var-label"), "VAR_LABEL");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour("#0fbd8c");
+      this.setInputsInline(true);
+    }
+  };
 };

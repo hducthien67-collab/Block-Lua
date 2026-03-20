@@ -1,62 +1,9 @@
 import React, { useState } from 'react';
 import { X, Plus, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ROBLOX_CLASSES, OBJECT_CATEGORIES } from '../../lib/roblox-metadata';
 
-// Re-using categories from Explorer.tsx
-const OBJECT_CATEGORIES = [
-  {
-    name: 'Common',
-    classes: ['Part', 'Model', 'Folder', 'Script', 'LocalScript', 'ModuleScript', 'RemoteEvent', 'BindableEvent']
-  },
-  {
-    name: '3D Objects',
-    classes: ['Part', 'MeshPart', 'UnionOperation', 'WedgePart', 'CornerWedgePart', 'TrussPart', 'Seat', 'VehicleSeat', 'SpawnLocation', 'NegateOperation']
-  },
-  {
-    name: 'User Interface',
-    classes: ['ScreenGui', 'SurfaceGui', 'BillboardGui', 'Frame', 'ScrollingFrame', 'TextLabel', 'TextButton', 'TextBox', 'ImageLabel', 'ImageButton', 'VideoFrame', 'ViewportFrame']
-  },
-  {
-    name: 'UI Layout & Design',
-    classes: ['UIListLayout', 'UIGridLayout', 'UITableLayout', 'UIPageLayout', 'UICorner', 'UIStroke', 'UIGradient', 'UIPadding', 'UIAspectRatioConstraint', 'UISizeConstraint', 'UITextSizeConstraint']
-  },
-  {
-    name: 'Effects',
-    classes: ['ParticleEmitter', 'Trail', 'Beam', 'Fire', 'Smoke', 'Sparkles', 'Explosion', 'ForceField', 'Highlight']
-  },
-  {
-    name: 'Lighting & Post-Process',
-    classes: ['PointLight', 'SpotLight', 'SurfaceLight', 'BloomEffect', 'BlurEffect', 'ColorCorrectionEffect', 'SunRaysEffect', 'DepthOfFieldEffect', 'Sky', 'Atmosphere', 'Clouds']
-  },
-  {
-    name: 'Values',
-    classes: ['StringValue', 'IntValue', 'NumberValue', 'BoolValue', 'ObjectValue', 'Vector3Value', 'Color3Value', 'CFrameValue', 'RayValue']
-  },
-  {
-    name: 'Interaction',
-    classes: ['ClickDetector', 'ProximityPrompt', 'RemoteEvent', 'RemoteFunction', 'BindableEvent', 'BindableFunction', 'Tool', 'HopperBin']
-  },
-  {
-    name: 'Physics & Constraints',
-    classes: ['HingeConstraint', 'BallSocketConstraint', 'RopeConstraint', 'RodConstraint', 'SpringConstraint', 'PrismaticConstraint', 'CylindricalConstraint', 'VectorForce', 'Torque', 'LineForce', 'AngularVelocity', 'AlignOrientation', 'AlignPosition']
-  },
-  {
-    name: 'Legacy Body Movers',
-    classes: ['BodyVelocity', 'BodyPosition', 'BodyGyro', 'BodyThrust', 'BodyForce', 'BodyAngularVelocity', 'RocketPropulsion']
-  },
-  {
-    name: 'Sound',
-    classes: ['Sound', 'SoundGroup', 'ReverbSoundEffect', 'EchoSoundEffect', 'PitchShiftSoundEffect', 'ChorusSoundEffect', 'DistortionSoundEffect', 'EqualizerSoundEffect', 'FlangeSoundEffect', 'TremoloSoundEffect', 'CompressorSoundEffect']
-  },
-  {
-    name: 'Avatar & Character',
-    classes: ['Animation', 'AnimationController', 'Humanoid', 'Accessory', 'Shirt', 'Pants', 'ShirtGraphic', 'CharacterMesh', 'BodyColors', 'HumanoidDescription']
-  },
-  {
-    name: 'Organization',
-    classes: ['Folder', 'Configuration', 'Model', 'WorldModel', 'Team', 'SpawnLocation']
-  }
-];
+const OBJECT_CATEGORIES_LOCAL = OBJECT_CATEGORIES;
 
 interface InsertObjectMenuProps {
   onAdd: (className: string) => void;
@@ -73,7 +20,7 @@ export const InsertObjectMenu: React.FC<InsertObjectMenuProps> = ({ onAdd, onClo
         initial={{ opacity: 0, y: 10, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-        className="w-[400px] h-[500px] bg-[#2d2d2d] border border-[#1a1a1a] rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        className="w-[1000px] h-[600px] bg-[#2d2d2d] border border-[#1a1a1a] rounded-lg shadow-2xl overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-3 bg-[#3d3d3d] flex items-center justify-between border-b border-[#1a1a1a]">
@@ -98,27 +45,33 @@ export const InsertObjectMenu: React.FC<InsertObjectMenuProps> = ({ onAdd, onClo
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-4">
-          {OBJECT_CATEGORIES.map(category => {
-            const filteredClasses = category.classes.filter(cls => 
-              cls.toLowerCase().includes(searchFilter.toLowerCase())
-            );
+          {OBJECT_CATEGORIES_LOCAL.map(category => {
+            const filteredClasses = category.classes
+              .filter(cls => cls.toLowerCase().includes(searchFilter.toLowerCase()))
+              .sort((a, b) => a.localeCompare(b));
 
             if (filteredClasses.length === 0) return null;
 
             return (
               <div key={category.name}>
-                <div className="text-[9px] font-bold text-gray-600 uppercase mb-1 px-1">
-                  {category.name}
+                <div className="text-[9px] font-bold text-gray-600 uppercase mb-1 px-1 flex justify-between items-center">
+                  <span>{category.name}</span>
+                  <span className="bg-[#333] text-gray-400 px-1 rounded-sm text-[8px]">
+                    {filteredClasses.length}
+                  </span>
                 </div>
-                <div className="grid grid-cols-1 gap-0.5">
-                  {filteredClasses.map(cls => (
+                <div className="grid grid-cols-3 gap-0.5">
+                  {filteredClasses.map((cls, index) => (
                     <button
                       key={cls}
                       className="w-full flex items-center gap-2 p-1.5 hover:bg-[#3f3f3f] rounded text-left group"
                       onClick={() => onAdd(cls)}
                     >
                       {getIcon(cls)}
-                      <span className="text-xs text-gray-200 flex-1">{cls}</span>
+                      <span className="text-xs text-gray-200 flex-1">
+                        <span className="text-gray-500 mr-1">{index + 1}.</span>
+                        {cls}
+                      </span>
                       <Plus className="w-3 h-3 text-gray-600 opacity-0 group-hover:opacity-100" />
                     </button>
                   ))}

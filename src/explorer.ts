@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { RobloxInstance } from './types';
+import { ROBLOX_CLASSES } from './lib/roblox-metadata';
 
 const DEFAULT_PROPERTIES: Record<string, any> = {
   Part: {
@@ -26,6 +27,15 @@ const DEFAULT_PROPERTIES: Record<string, any> = {
     Brightness: 2,
     ClockTime: 14,
     GeographicLatitude: 41.733,
+  },
+  Script: {
+    Source: '',
+    Enabled: true,
+    RunContext: 'Legacy',
+  },
+  LocalScript: {
+    Source: '',
+    Enabled: true,
   }
 };
 
@@ -43,6 +53,9 @@ const INITIAL_STRUCTURE: RobloxInstance = {
       expanded: true, 
       Properties: { ...DEFAULT_PROPERTIES.Workspace },
       Children: [
+        { id: 'camera', Name: 'Camera', ClassName: 'Camera', Children: [], Properties: {} },
+        { id: 'terrain', Name: 'Terrain', ClassName: 'Terrain', Children: [], Properties: {} },
+        { id: 'spawnlocation', Name: 'SpawnLocation', ClassName: 'SpawnLocation', Children: [], Properties: {} },
         {
           id: 'baseplate',
           Name: 'Baseplate',
@@ -56,42 +69,72 @@ const INITIAL_STRUCTURE: RobloxInstance = {
             Color: '#3a3a3a',
             Material: 'SmoothPlastic'
           }
-        },
-        {
-          id: 'spawn_part',
-          Name: 'SpawnPart',
-          ClassName: 'Part',
-          Children: [],
-          Properties: {
-            ...DEFAULT_PROPERTIES.Part,
-            Size: { x: 10, y: 1, z: 10 },
-            Position: { x: 0, y: 0.5, z: 0 },
-            Anchored: true,
-            Color: '#4c97ff',
-            Material: 'Neon'
-          }
         }
       ]
     },
-    { id: 'replicatedstorage', Name: 'ReplicatedStorage', ClassName: 'ReplicatedStorage', Children: [], Properties: {} },
-    { id: 'serverscriptservice', Name: 'ServerScriptService', ClassName: 'ServerScriptService', Children: [], Properties: {} },
-    { id: 'startergui', Name: 'StarterGui', ClassName: 'StarterGui', Children: [], Properties: {} },
-    { id: 'starterplayer', Name: 'StarterPlayer', ClassName: 'StarterPlayer', Children: [], Properties: {} },
+    { id: 'players', Name: 'Players', ClassName: 'Players', Children: [], Properties: {} },
     { id: 'lighting', Name: 'Lighting', ClassName: 'Lighting', Children: [], Properties: { ...DEFAULT_PROPERTIES.Lighting } },
+    { id: 'materialservice', Name: 'MaterialService', ClassName: 'MaterialService', Children: [], Properties: {} },
+    { 
+      id: 'networkclient', 
+      Name: 'NetworkClient', 
+      ClassName: 'NetworkClient', 
+      Children: [
+        { id: 'clientreplicator', Name: 'ClientReplicator', ClassName: 'ClientReplicator', Children: [], Properties: {} },
+      ], 
+      Properties: {} 
+    },
+    { id: 'replicatedfirst', Name: 'ReplicatedFirst', ClassName: 'ReplicatedFirst', Children: [], Properties: {} },
+    { 
+      id: 'replicatedstorage', 
+      Name: 'ReplicatedStorage', 
+      ClassName: 'ReplicatedStorage', 
+      Children: [
+        { id: 'lastbloxupdate', Name: 'lastBloxUpdate', ClassName: 'StringValue', Children: [], Properties: {} },
+      ], 
+      Properties: {} 
+    },
+    { id: 'serverscriptservice', Name: 'ServerScriptService', ClassName: 'ServerScriptService', Children: [], Properties: {} },
+    { id: 'serverstorage', Name: 'ServerStorage', ClassName: 'ServerStorage', Children: [], Properties: {} },
+    { id: 'startergui', Name: 'StarterGui', ClassName: 'StarterGui', Children: [], Properties: {} },
+    { id: 'starterpack', Name: 'StarterPack', ClassName: 'StarterPack', Children: [], Properties: {} },
+    { 
+      id: 'starterplayer', 
+      Name: 'StarterPlayer', 
+      ClassName: 'StarterPlayer', 
+      Children: [
+        { id: 'startercharacterscripts', Name: 'StarterCharacterScripts', ClassName: 'StarterCharacterScripts', Children: [], Properties: {} },
+        { id: 'starterplayerscripts', Name: 'StarterPlayerScripts', ClassName: 'StarterPlayerScripts', Children: [], Properties: {} },
+      ], 
+      Properties: {} 
+    },
+    { id: 'teams', Name: 'Teams', ClassName: 'Teams', Children: [], Properties: {} },
     { id: 'soundservice', Name: 'SoundService', ClassName: 'SoundService', Children: [], Properties: {} },
+    { 
+      id: 'textchatservice', 
+      Name: 'TextChatService', 
+      ClassName: 'TextChatService', 
+      Children: [
+        { id: 'chatwindowconfiguration', Name: 'ChatWindowConfiguration', ClassName: 'ChatWindowConfiguration', Children: [], Properties: {} },
+        { id: 'chatinputbarconfiguration', Name: 'ChatInputBarConfiguration', ClassName: 'ChatInputBarConfiguration', Children: [], Properties: {} },
+        { id: 'channeltabsconfiguration', Name: 'ChannelTabsConfiguration', ClassName: 'ChannelTabsConfiguration', Children: [], Properties: {} },
+        { id: 'bubblechatconfiguration', Name: 'BubbleChatConfiguration', ClassName: 'BubbleChatConfiguration', Children: [], Properties: {} },
+      ], 
+      Properties: {} 
+    },
   ],
 };
 
 export const useExplorer = () => {
   const [explorer, setExplorer] = useState<RobloxInstance>(INITIAL_STRUCTURE);
 
-  const addInstance = useCallback((parentId: string, name: string, className: string) => {
+  const addInstance = useCallback((parentId: string, name: string, className: string, initialProps: Record<string, any> = {}) => {
     const newInstance: RobloxInstance = {
       id: Math.random().toString(36).substr(2, 9),
       Name: name,
       ClassName: className,
       Children: [],
-      Properties: { ...(DEFAULT_PROPERTIES[className] || {}) },
+      Properties: { ...(DEFAULT_PROPERTIES[className] || {}), ...initialProps },
     };
 
     const updateChildren = (node: RobloxInstance): RobloxInstance => {
@@ -133,5 +176,25 @@ export const useExplorer = () => {
     setExplorer(prev => updateProp(prev));
   }, []);
 
-  return { explorer, setExplorer, addInstance, toggleExpand, updateInstanceProperty };
+  const deleteInstance = useCallback((id: string) => {
+    const removeFromChildren = (node: RobloxInstance): RobloxInstance => {
+      return {
+        ...node,
+        Children: (node.Children || [])
+          .filter(child => {
+            if (child.id === id) {
+              const metadata = ROBLOX_CLASSES.find(c => c.name === child.ClassName);
+              if (metadata && metadata.category === 'Services') return false;
+              if (['game', 'workspace', 'replicatedstorage', 'serverscriptservice', 'startergui', 'starterplayer', 'lighting', 'soundservice', 'textchatservice', 'chatwindowconfiguration', 'chatinputbarconfiguration', 'channeltabsconfiguration', 'bubblechatconfiguration', 'startercharacterscripts', 'starterplayerscripts'].includes(child.id.toLowerCase())) return false;
+            }
+            return true;
+          })
+          .map(removeFromChildren)
+      };
+    };
+
+    setExplorer(prev => removeFromChildren(prev));
+  }, []);
+
+  return { explorer, setExplorer, addInstance, toggleExpand, updateInstanceProperty, deleteInstance };
 };

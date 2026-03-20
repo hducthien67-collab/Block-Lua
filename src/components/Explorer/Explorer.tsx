@@ -18,136 +18,97 @@ import {
   Radio, 
   Hand,
   Layers,
-  Sparkles
+  Sparkles,
+  Cloud,
+  Sun,
+  Video,
+  Monitor,
+  Database,
+  Globe,
+  Users,
+  User,
+  Shield,
+  Settings,
+  Wrench,
+  Music,
+  Camera,
+  Map,
+  Link,
+  Activity,
+  Cpu,
+  Gamepad2,
+  Package,
+  Trash2,
+  Edit2,
+  Check
 } from 'lucide-react';
 import { RobloxInstance } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { ROBLOX_CLASSES, OBJECT_CATEGORIES } from '../../lib/roblox-metadata';
+import * as LucideIcons from 'lucide-react';
 
 interface ExplorerProps {
   instance: RobloxInstance;
   onSelect: (instance: RobloxInstance, path: string) => void;
   onToggleExpand: (id: string) => void;
   onAddChild: (parentId: string) => void;
+  onRename: (id: string, newName: string) => void;
+  onDelete: (id: string) => void;
   currentPath?: string;
   selectedId?: string;
 }
 
 export const getIcon = (className: string) => {
   if (!className || typeof className !== 'string') return <Box className="w-3.5 h-3.5 text-gray-400" />;
-  if (className.includes('Gui') || className.includes('Frame') || className.includes('Layout') || className.includes('Constraint')) {
-    if (className.includes('Constraint') && !className.includes('UI')) return <Zap className="w-3.5 h-3.5 text-red-400" />;
-    return <Layout className="w-3.5 h-3.5 text-pink-400" />;
+
+  const metadata = ROBLOX_CLASSES.find(c => c.name === className);
+  const iconColor = metadata?.color || 'text-gray-400';
+  const colorStyle = iconColor.startsWith('#') ? { color: iconColor } : {};
+  const colorClass = iconColor.startsWith('#') ? '' : iconColor;
+
+  if (metadata && metadata.icon) {
+    const IconComponent = (LucideIcons as any)[metadata.icon];
+    if (IconComponent) {
+      return <IconComponent className={`w-3.5 h-3.5 ${colorClass}`} style={colorStyle} />;
+    }
   }
-  if (className.includes('Label') || className.includes('Button') || className.includes('Text')) return <Type className="w-3.5 h-3.5 text-pink-300" />;
-  if (className.includes('Image')) return <ImageIcon className="w-3.5 h-3.5 text-pink-200" />;
-  if (className.includes('Light') || className.includes('Effect')) {
-    if (className.includes('Effect') && !className.includes('Sound')) return <Sparkles className="w-3.5 h-3.5 text-purple-300" />;
-    return <Lightbulb className="w-3.5 h-3.5 text-yellow-300" />;
-  }
-  if (className.includes('Value')) return <Variable className="w-3.5 h-3.5 text-green-400" />;
-  if (className.includes('Event') || className.includes('Function')) return <Radio className="w-3.5 h-3.5 text-orange-400" />;
-  if (className.includes('Particle') || className.includes('Fire') || className.includes('Smoke') || className.includes('Sparkles') || className.includes('Beam') || className.includes('Trail')) return <Zap className="w-3.5 h-3.5 text-orange-300" />;
-  if (className.includes('Sound')) return <Volume2 className="w-3.5 h-3.5 text-green-500" />;
-  if (className.includes('Body') || className.includes('Force') || className.includes('Velocity')) return <Zap className="w-3.5 h-3.5 text-red-500" />;
   
-  switch (className) {
-    case 'Folder': return <Folder className="w-3.5 h-3.5 text-yellow-500" />;
-    case 'Part': 
-    case 'MeshPart':
-    case 'WedgePart':
-    case 'TrussPart':
-    case 'CornerWedgePart':
-    case 'UnionOperation':
-    case 'NegateOperation': return <Box className="w-3.5 h-3.5 text-blue-400" />;
-    case 'Model':
-    case 'WorldModel': return <Layers className="w-3.5 h-3.5 text-purple-400" />;
-    case 'Script':
-    case 'LocalScript':
-    case 'ModuleScript': return <FileCode className="w-3.5 h-3.5 text-blue-300" />;
-    case 'ClickDetector':
-    case 'ProximityPrompt': return <Hand className="w-3.5 h-3.5 text-yellow-400" />;
-    case 'SpawnLocation': return <Zap className="w-3.5 h-3.5 text-green-300" />;
-    case 'Humanoid':
-    case 'AnimationController': return <MousePointer2 className="w-3.5 h-3.5 text-red-400" />;
-    case 'Tool':
-    case 'HopperBin': return <Hand className="w-3.5 h-3.5 text-gray-300" />;
-    case 'Team': return <Layers className="w-3.5 h-3.5 text-white" />;
-    default: return <Box className="w-3.5 h-3.5 text-gray-400" />;
-  }
+  return <Box className="w-3.5 h-3.5 text-gray-400" />;
 };
 
-const OBJECT_CATEGORIES = [
-  {
-    name: 'Common',
-    classes: ['Part', 'Model', 'Folder', 'Script', 'LocalScript', 'ModuleScript', 'RemoteEvent', 'BindableEvent']
-  },
-  {
-    name: '3D Objects',
-    classes: ['Part', 'MeshPart', 'UnionOperation', 'WedgePart', 'CornerWedgePart', 'TrussPart', 'Seat', 'VehicleSeat', 'SpawnLocation', 'NegateOperation']
-  },
-  {
-    name: 'User Interface',
-    classes: ['ScreenGui', 'SurfaceGui', 'BillboardGui', 'Frame', 'ScrollingFrame', 'TextLabel', 'TextButton', 'TextBox', 'ImageLabel', 'ImageButton', 'VideoFrame', 'ViewportFrame']
-  },
-  {
-    name: 'UI Layout & Design',
-    classes: ['UIListLayout', 'UIGridLayout', 'UITableLayout', 'UIPageLayout', 'UICorner', 'UIStroke', 'UIGradient', 'UIPadding', 'UIAspectRatioConstraint', 'UISizeConstraint', 'UITextSizeConstraint']
-  },
-  {
-    name: 'Effects',
-    classes: ['ParticleEmitter', 'Trail', 'Beam', 'Fire', 'Smoke', 'Sparkles', 'Explosion', 'ForceField', 'Highlight']
-  },
-  {
-    name: 'Lighting & Post-Process',
-    classes: ['PointLight', 'SpotLight', 'SurfaceLight', 'BloomEffect', 'BlurEffect', 'ColorCorrectionEffect', 'SunRaysEffect', 'DepthOfFieldEffect', 'Sky', 'Atmosphere', 'Clouds']
-  },
-  {
-    name: 'Values',
-    classes: ['StringValue', 'IntValue', 'NumberValue', 'BoolValue', 'ObjectValue', 'Vector3Value', 'Color3Value', 'CFrameValue', 'RayValue']
-  },
-  {
-    name: 'Interaction',
-    classes: ['ClickDetector', 'ProximityPrompt', 'RemoteEvent', 'RemoteFunction', 'BindableEvent', 'BindableFunction', 'Tool', 'HopperBin']
-  },
-  {
-    name: 'Physics & Constraints',
-    classes: ['HingeConstraint', 'BallSocketConstraint', 'RopeConstraint', 'RodConstraint', 'SpringConstraint', 'PrismaticConstraint', 'CylindricalConstraint', 'VectorForce', 'Torque', 'LineForce', 'AngularVelocity', 'AlignOrientation', 'AlignPosition']
-  },
-  {
-    name: 'Legacy Body Movers',
-    classes: ['BodyVelocity', 'BodyPosition', 'BodyGyro', 'BodyThrust', 'BodyForce', 'BodyAngularVelocity', 'RocketPropulsion']
-  },
-  {
-    name: 'Sound',
-    classes: ['Sound', 'SoundGroup', 'ReverbSoundEffect', 'EchoSoundEffect', 'PitchShiftSoundEffect', 'ChorusSoundEffect', 'DistortionSoundEffect', 'EqualizerSoundEffect', 'FlangeSoundEffect', 'TremoloSoundEffect', 'CompressorSoundEffect']
-  },
-  {
-    name: 'Avatar & Character',
-    classes: ['Animation', 'AnimationController', 'Humanoid', 'Accessory', 'Shirt', 'Pants', 'ShirtGraphic', 'CharacterMesh', 'BodyColors', 'HumanoidDescription']
-  },
-  {
-    name: 'Organization',
-    classes: ['Folder', 'Configuration', 'Model', 'WorldModel', 'Team', 'SpawnLocation']
-  }
-];
+
 
 export const ExplorerTree: React.FC<ExplorerProps> = ({ 
   instance, 
   onSelect, 
   onToggleExpand, 
   onAddChild,
+  onRename,
+  onDelete,
   currentPath = '',
   selectedId
 }) => {
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newName, setNewName] = useState(instance.Name);
+
   const isExpanded = instance.expanded;
   const hasChildren = instance.Children.length > 0;
   const fullPath = currentPath ? `${currentPath}.${instance.Name}` : instance.Name;
   const isSelected = selectedId === instance.id;
 
+  const isProtected = ['game', 'workspace', 'replicatedstorage', 'serverscriptservice', 'startergui', 'starterplayer', 'lighting', 'soundservice'].includes(instance.id.toLowerCase());
+
+  const handleRenameSubmit = () => {
+    if (newName.trim() && newName !== instance.Name) {
+      onRename(instance.id, newName);
+    }
+    setIsRenaming(false);
+  };
+
   return (
     <div className="select-none">
       <div 
-        className={`flex items-center py-0.5 px-1 cursor-pointer hover:bg-[#3f3f3f] group ${isSelected ? 'bg-[#4d4d4d]' : ''}`}
+        className={`flex items-center py-1 px-2 cursor-pointer hover:bg-[#3f3f3f] group ${isSelected ? 'bg-[#4d4d4d]' : ''}`}
         onClick={(e) => {
           e.stopPropagation();
           onSelect(instance, fullPath);
@@ -167,18 +128,68 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
         <div className="mr-1.5">
           {getIcon(instance.ClassName)}
         </div>
-        <span className="text-[12px] text-gray-200 font-sans truncate flex-1">
-          {instance.Name}
-        </span>
-        <button 
-          className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[#555] rounded"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddChild(instance.id);
-          }}
-        >
-          <Plus className="w-3 h-3 text-gray-400" />
-        </button>
+        
+        {isRenaming ? (
+          <div className="flex-1 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            <input 
+              type="text"
+              className="flex-1 bg-[#1a1a1a] border border-blue-500 rounded px-1 text-[12px] text-gray-200 outline-none"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleRenameSubmit();
+                if (e.key === 'Escape') setIsRenaming(false);
+              }}
+              autoFocus
+            />
+            <button onClick={handleRenameSubmit} className="text-green-500 hover:text-green-400">
+              <Check className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <span className="text-[13px] text-gray-200 font-sans truncate flex-1">
+            {instance.Name}
+          </span>
+        )}
+
+        {!isRenaming && (
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+            <button 
+              className="p-0.5 hover:bg-[#555] rounded"
+              title="Add Child"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddChild(instance.id);
+              }}
+            >
+              <Plus className="w-3 h-3 text-gray-400" />
+            </button>
+            {!isProtected && (
+              <>
+                <button 
+                  className="p-0.5 hover:bg-[#555] rounded"
+                  title="Rename"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsRenaming(true);
+                  }}
+                >
+                  <Edit2 className="w-3 h-3 text-gray-400" />
+                </button>
+                <button 
+                  className="p-0.5 hover:bg-red-500/20 rounded"
+                  title="Delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(instance.id);
+                  }}
+                >
+                  <Trash2 className="w-3 h-3 text-red-400" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
       
       {isExpanded && hasChildren && (
@@ -190,6 +201,8 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
               onSelect={onSelect} 
               onToggleExpand={onToggleExpand}
               onAddChild={onAddChild}
+              onRename={onRename}
+              onDelete={onDelete}
               currentPath={fullPath}
               selectedId={selectedId}
             />
@@ -206,7 +219,9 @@ export const ExplorerPanel: React.FC<{
   onClose: () => void;
   onToggleExpand: (id: string) => void;
   onAddInstance: (parentId: string, name: string, className: string) => void;
-}> = ({ explorer, onSelect, onClose, onToggleExpand, onAddInstance }) => {
+  onRename: (id: string, newName: string) => void;
+  onDelete: (id: string) => void;
+}> = ({ explorer, onSelect, onClose, onToggleExpand, onAddInstance, onRename, onDelete }) => {
   const [selectedInstance, setSelectedInstance] = useState<{instance: RobloxInstance, path: string} | null>(null);
   const [showAddMenu, setShowAddMenu] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
@@ -231,7 +246,7 @@ export const ExplorerPanel: React.FC<{
       onClick={onClose}
     >
       <div 
-        className="w-[700px] h-[600px] bg-[#2d2d2d] border border-[#1a1a1a] shadow-2xl rounded-lg flex flex-col overflow-hidden"
+        className="w-[1100px] h-[800px] bg-[#2d2d2d] border border-[#1a1a1a] shadow-2xl rounded-lg flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -247,7 +262,7 @@ export const ExplorerPanel: React.FC<{
 
         <div className="flex-1 flex overflow-hidden">
           {/* Left: Explorer Tree */}
-          <div className="w-[300px] border-r border-[#1a1a1a] flex flex-col bg-[#222]">
+          <div className="w-[400px] border-r border-[#1a1a1a] flex flex-col bg-[#222]">
             <div className="p-2 text-[10px] font-bold text-gray-500 uppercase bg-[#2a2a2a] border-b border-[#1a1a1a]">
               Explorer
             </div>
@@ -257,6 +272,8 @@ export const ExplorerPanel: React.FC<{
                 onSelect={handleSelect}
                 onToggleExpand={onToggleExpand}
                 onAddChild={(id) => setShowAddMenu(id)}
+                onRename={onRename}
+                onDelete={onDelete}
                 selectedId={selectedInstance?.instance.id}
               />
             </div>
@@ -271,7 +288,7 @@ export const ExplorerPanel: React.FC<{
               {selectedInstance ? (
                 <div className="space-y-4">
                   {/* Children List */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {selectedInstance.instance.Children.map(child => (
                       <div 
                         key={child.id}
@@ -347,7 +364,7 @@ export const ExplorerPanel: React.FC<{
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="w-[400px] h-[500px] bg-[#2d2d2d] border border-[#1a1a1a] rounded-lg shadow-2xl overflow-hidden flex flex-col"
+              className="w-[1000px] h-[700px] bg-[#2d2d2d] border border-[#1a1a1a] rounded-lg shadow-2xl overflow-hidden flex flex-col"
               onClick={e => e.stopPropagation()}
             >
               <div className="p-3 bg-[#3d3d3d] flex items-center justify-between border-b border-[#1a1a1a]">
@@ -372,9 +389,9 @@ export const ExplorerPanel: React.FC<{
 
               <div className="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-4">
                 {OBJECT_CATEGORIES.map(category => {
-                  const filteredClasses = category.classes.filter(cls => 
-                    cls.toLowerCase().includes(searchFilter.toLowerCase())
-                  );
+                  const filteredClasses = category.classes
+                    .filter(cls => cls.toLowerCase().includes(searchFilter.toLowerCase()))
+                    .sort((a, b) => a.localeCompare(b));
 
                   if (filteredClasses.length === 0) return null;
 
@@ -383,8 +400,8 @@ export const ExplorerPanel: React.FC<{
                       <div className="text-[9px] font-bold text-gray-600 uppercase mb-1 px-1">
                         {category.name}
                       </div>
-                      <div className="grid grid-cols-1 gap-0.5">
-                        {filteredClasses.map(cls => (
+                      <div className="grid grid-cols-3 gap-1">
+                        {filteredClasses.map((cls, index) => (
                           <button
                             key={cls}
                             className="w-full flex items-center gap-2 p-1.5 hover:bg-[#3f3f3f] rounded text-left group"
@@ -395,7 +412,10 @@ export const ExplorerPanel: React.FC<{
                             }}
                           >
                             {getIcon(cls)}
-                            <span className="text-xs text-gray-200 flex-1">{cls}</span>
+                            <span className="text-xs text-gray-200 flex-1">
+                              <span className="text-gray-500 mr-1">{index + 1}.</span>
+                              {cls}
+                            </span>
                             <Plus className="w-3 h-3 text-gray-600 opacity-0 group-hover:opacity-100" />
                           </button>
                         ))}

@@ -175,4 +175,43 @@ export const defineCustomGenerators = () => {
   luaGenerator.forBlock['loops_break_lua'] = function() {
     return 'break\n';
   };
+
+  // Player Generators
+  luaGenerator.forBlock['player_get_by_name'] = function(block: any) {
+    const name = luaGenerator.valueToCode(block, 'NAME', Order.NONE) || '""';
+    return ['game.Players:FindFirstChild(' + name + ')', Order.HIGH];
+  };
+
+  luaGenerator.forBlock['player_kick'] = function(block: any) {
+    const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+    const reason = luaGenerator.valueToCode(block, 'REASON', Order.NONE) || '""';
+    return player + ':Kick(' + reason + ')\n';
+  };
+
+  luaGenerator.forBlock['player_joined'] = function(block: any) {
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return 'game.Players.PlayerAdded:Connect(function(_player)\n' + branch + 'end)\n';
+  };
+
+  luaGenerator.forBlock['player_leaving'] = function(block: any) {
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return 'game.Players.PlayerRemoving:Connect(function(_player)\n' + branch + 'end)\n';
+  };
+
+  luaGenerator.forBlock['player_get_user_id'] = function(block: any) {
+    const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+    return [player + '.UserId', Order.HIGH];
+  };
+
+  luaGenerator.forBlock['player_chat_added'] = function(block: any) {
+    const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return player + '.Chatted:Connect(function(message)\n' + branch + 'end)\n';
+  };
+
+  luaGenerator.forBlock['player_respawned'] = function(block: any) {
+    const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return player + '.CharacterAdded:Connect(function(character)\n' + branch + 'end)\n';
+  };
 };

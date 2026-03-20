@@ -11,7 +11,7 @@ interface InstancePickerProps {
 
 export const InstancePicker: React.FC<InstancePickerProps> = ({ value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { explorer, toggleExpand, addInstance } = useExplorer();
+  const { explorer, toggleExpand, addInstance, updateInstanceProperty, deleteInstance } = useExplorer();
 
   return (
     <div className="relative inline-block w-full max-w-md">
@@ -43,6 +43,8 @@ export const InstancePicker: React.FC<InstancePickerProps> = ({ value, onChange 
             onClose={() => setIsOpen(false)}
             onToggleExpand={toggleExpand}
             onAddInstance={addInstance}
+            onRename={(id, newName) => updateInstanceProperty(id, 'Name', newName)}
+            onDelete={deleteInstance}
           />
         )}
       </AnimatePresence>

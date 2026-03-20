@@ -2,15 +2,20 @@
 
 /* Force white text on all Blockly blocks */
 .blocklyText, 
-.blocklyHtmlInput, 
 .blocklyFieldLabel, 
-.blocklyEditableText > text,
 .blocklyFlyoutLabelText,
 .blocklyTreeLabel,
-.blocklyTreeIcon,
-.blocklyDropdownText {
+.blocklyTreeIcon {
   fill: #ffffff !important;
   color: #ffffff !important;
+}
+
+/* Keep text in editable fields (white boxes) dark */
+.blocklyEditableText > text,
+.blocklyHtmlInput,
+.blocklyDropdownText {
+  fill: #333333 !important;
+  color: #333333 !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar {

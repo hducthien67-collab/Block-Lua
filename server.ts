@@ -44,6 +44,29 @@ async function startServer() {
     res.json({ tree: robloxTree });
   });
 
+  let pendingScript: any = null;
+
+  // Endpoint to queue a script export
+  app.post("/api/export", (req, res) => {
+    try {
+      if (req.body && req.body.type && req.body.path && req.body.code) {
+        pendingScript = req.body;
+        res.json({ success: true, message: "Script queued for export" });
+      } else {
+        res.status(400).json({ success: false, message: "Invalid payload" });
+      }
+    } catch (error) {
+      console.error("Error queueing script:", error);
+      res.status(500).json({ success: false, message: "Internal server error" });
+    }
+  });
+
+  // Endpoint for Roblox Studio to poll for pending scripts
+  app.get("/api/export", (req, res) => {
+    res.json({ script: pendingScript });
+    pendingScript = null; // Clear after reading
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
