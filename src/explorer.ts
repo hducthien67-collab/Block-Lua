@@ -73,7 +73,10 @@ const INITIAL_STRUCTURE: RobloxInstance = {
       ]
     },
     { id: 'players', Name: 'Players', ClassName: 'Players', Children: [], Properties: {} },
-    { id: 'lighting', Name: 'Lighting', ClassName: 'Lighting', Children: [], Properties: { ...DEFAULT_PROPERTIES.Lighting } },
+    { id: 'lighting', Name: 'Lighting', ClassName: 'Lighting', Children: [
+        { id: 'sky', Name: 'Sky', ClassName: 'Sky', Children: [], Properties: {} },
+        { id: 'atmosphere', Name: 'Atmosphere', ClassName: 'Atmosphere', Children: [], Properties: {} },
+      ], Properties: { ...DEFAULT_PROPERTIES.Lighting } },
     { id: 'materialservice', Name: 'MaterialService', ClassName: 'MaterialService', Children: [], Properties: {} },
     { 
       id: 'networkclient', 
@@ -91,6 +94,7 @@ const INITIAL_STRUCTURE: RobloxInstance = {
       ClassName: 'ReplicatedStorage', 
       Children: [
         { id: 'lastbloxupdate', Name: 'lastBloxUpdate', ClassName: 'StringValue', Children: [], Properties: {} },
+        { id: 'folder', Name: 'Folder', ClassName: 'Folder', Children: [], Properties: {} },
       ], 
       Properties: {} 
     },
@@ -110,18 +114,20 @@ const INITIAL_STRUCTURE: RobloxInstance = {
     },
     { id: 'teams', Name: 'Teams', ClassName: 'Teams', Children: [], Properties: {} },
     { id: 'soundservice', Name: 'SoundService', ClassName: 'SoundService', Children: [], Properties: {} },
-    { 
-      id: 'textchatservice', 
-      Name: 'TextChatService', 
-      ClassName: 'TextChatService', 
-      Children: [
+    { id: 'textchatservice', Name: 'TextChatService', ClassName: 'TextChatService', Children: [
         { id: 'chatwindowconfiguration', Name: 'ChatWindowConfiguration', ClassName: 'ChatWindowConfiguration', Children: [], Properties: {} },
         { id: 'chatinputbarconfiguration', Name: 'ChatInputBarConfiguration', ClassName: 'ChatInputBarConfiguration', Children: [], Properties: {} },
         { id: 'channeltabsconfiguration', Name: 'ChannelTabsConfiguration', ClassName: 'ChannelTabsConfiguration', Children: [], Properties: {} },
         { id: 'bubblechatconfiguration', Name: 'BubbleChatConfiguration', ClassName: 'BubbleChatConfiguration', Children: [], Properties: {} },
-      ], 
-      Properties: {} 
+      ], Properties: {} 
     },
+    { id: 'localizationservice', Name: 'LocalizationService', ClassName: 'LocalizationService', Children: [], Properties: {} },
+    { id: 'testservice', Name: 'TestService', ClassName: 'TestService', Children: [], Properties: {} },
+    { id: 'physicsservice', Name: 'PhysicsService', ClassName: 'PhysicsService', Children: [], Properties: {} },
+    { id: 'collectionservice', Name: 'CollectionService', ClassName: 'CollectionService', Children: [], Properties: {} },
+    { id: 'runservice', Name: 'RunService', ClassName: 'RunService', Children: [], Properties: {} },
+    { id: 'httpservice', Name: 'HttpService', ClassName: 'HttpService', Children: [], Properties: {} },
+    { id: 'tweenservice', Name: 'TweenService', ClassName: 'TweenService', Children: [], Properties: {} },
   ],
 };
 
@@ -130,7 +136,7 @@ export const useExplorer = () => {
 
   const addInstance = useCallback((parentId: string, name: string, className: string, initialProps: Record<string, any> = {}) => {
     const newInstance: RobloxInstance = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: `${className}-${Math.random().toString(36).substr(2, 9)}`,
       Name: name,
       ClassName: className,
       Children: [],
