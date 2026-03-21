@@ -95,23 +95,9 @@ export default function App() {
       return;
     }
     
-    const scriptName = type === 'Script' ? 'Script' : 'LocalScript';
-    addInstance(selectedInstanceId, scriptName, scriptName, { Source: generatedCode });
-    
-    fetch('/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: type,
-        path: selectedInstancePath,
-        code: generatedCode
-      })
-    }).then(() => {
-       showToast(currentLang === 'vi' ? `Đã xuất ${type} tới ${selectedInstancePath}` : `Successfully exported ${type} to ${selectedInstancePath}`);
-    }).catch(err => {
-      console.error(err);
-      showToast(currentLang === 'vi' ? 'Lỗi khi xuất lệnh!' : 'Error exporting script!', 'error');
-    });
+    setExportScriptType(type);
+    setSelectorTarget('export');
+    showToast(currentLang === 'vi' ? 'Vui lòng chọn một đối tượng trong Explorer để tạo script' : 'Please select an object in the Explorer to create the script');
   };
   const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
   const [definedVariables, setDefinedVariables] = useState<string[]>([]);
@@ -278,9 +264,10 @@ export default function App() {
           code: generatedCode
         })
       }).then(() => {
-        // alert(`Successfully exported ${exportScriptType} to ${displayPath}`);
+        showToast(currentLang === 'vi' ? `Đã xuất ${exportScriptType} tới ${displayPath}` : `Successfully exported ${exportScriptType} to ${displayPath}`);
       }).catch(err => {
         console.error(err);
+        showToast(currentLang === 'vi' ? 'Lỗi khi xuất lệnh!' : 'Error exporting script!', 'error');
       });
       
       setSelectorTarget(null);
@@ -5612,9 +5599,21 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm"
-            onClick={() => setSelectorTarget(null)}
-          />
+            className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-md flex items-center justify-center pointer-events-auto"
+            onClick={() => {
+              setSelectorTarget(null);
+              setExportScriptType(null);
+            }}
+          >
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="bg-[#4c97ff] text-white px-6 py-3 rounded-2xl font-black tracking-widest shadow-2xl flex items-center gap-3 animate-bounce"
+            >
+              <MousePointer2 size={24} />
+              {currentLang === 'vi' ? 'CHỌN ĐỐI TƯỢNG TRONG EXPLORER' : 'SELECT AN OBJECT IN EXPLORER'}
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -6371,7 +6370,7 @@ sync() -- Initial sync on load`;
       {/* Explorer Sidebar */}
       <div 
         style={{ width: sidebarWidth }}
-        className={`relative bg-[#1a1a1a] border-l border-white/5 flex flex-col transition-shadow ${selectorTarget ? 'z-[120] ring-2 ring-[#4c97ff] ring-inset shadow-[0_0_50px_rgba(76,151,255,0.2)]' : 'z-20'}`}
+        className={`relative bg-[#1a1a1a] border-l border-white/5 flex flex-col transition-shadow ${selectorTarget ? 'z-[200] ring-4 ring-[#4c97ff] ring-inset shadow-[0_0_100px_rgba(76,151,255,0.4)]' : 'z-20'}`}
       >
         {/* Resize Handle */}
         <div 
@@ -6384,7 +6383,12 @@ sync() -- Initial sync on load`;
             <Layers className="text-[#4c97ff]" size={16} />
             <span className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Explorer</span>
           </div>
-          {selectorTarget && (
+          {selectorTarget === 'export' && (
+            <div className="flex items-center gap-1 px-2 py-0.5 bg-red-500/20 rounded text-[9px] font-bold text-red-400 animate-pulse">
+              SELECT TARGET...
+            </div>
+          )}
+          {selectorTarget && selectorTarget !== 'export' && (
             <div className="flex items-center gap-1 px-2 py-0.5 bg-[#4c97ff]/20 rounded text-[9px] font-bold text-[#4c97ff] animate-pulse">
               SELECTING...
             </div>
@@ -6402,13 +6406,21 @@ sync() -- Initial sync on load`;
           />
         </div>
         {selectorTarget && (
-          <div className="p-3 bg-[#4c97ff]/10 border-t border-[#4c97ff]/20">
-            <p className="text-[10px] text-gray-400 mb-2">Select an instance from the tree above to update the block.</p>
+          <div className={`p-3 border-t ${selectorTarget === 'export' ? 'bg-red-500/10 border-red-500/20' : 'bg-[#4c97ff]/10 border-[#4c97ff]/20'}`}>
+            <p className="text-[10px] text-gray-400 mb-2">
+              {selectorTarget === 'export' 
+                ? (currentLang === 'vi' ? 'Chọn một đối tượng để tạo script.' : 'Select an instance to create the script.')
+                : (currentLang === 'vi' ? 'Chọn một đối tượng để cập nhật khối lệnh.' : 'Select an instance to update the block.')
+              }
+            </p>
             <button 
-              onClick={() => setSelectorTarget(null)}
+              onClick={() => {
+                setSelectorTarget(null);
+                setExportScriptType(null);
+              }}
               className="w-full py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold rounded transition-colors"
             >
-              CANCEL SELECTION
+              {currentLang === 'vi' ? 'HỦY BỎ' : 'CANCEL SELECTION'}
             </button>
           </div>
         )}
