@@ -8,7 +8,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("String").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
       this.setInputsInline(true);
     }
   };
@@ -18,7 +18,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Number").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
       this.setInputsInline(true);
     }
   };
@@ -27,7 +27,8 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("SOUND").setCheck("Instance").appendField("Play sound");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
+      this.setInputsInline(true);
     }
   };
   Blockly.Blocks['sound_stop'] = {
@@ -35,7 +36,8 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("SOUND").setCheck("Instance").appendField("Stop sound");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
+      this.setInputsInline(true);
     }
   };
   Blockly.Blocks['sound_pause'] = {
@@ -43,7 +45,8 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("SOUND").setCheck("Instance").appendField("Pause sound");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
+      this.setInputsInline(true);
     }
   };
   Blockly.Blocks['sound_looped'] = {
@@ -52,7 +55,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Boolean").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
       this.setInputsInline(true);
     }
   };
@@ -62,7 +65,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Boolean").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
       this.setInputsInline(true);
     }
   };
@@ -72,7 +75,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Number").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
       this.setInputsInline(true);
     }
   };
@@ -82,7 +85,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Number").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
       this.setInputsInline(true);
     }
   };
@@ -94,7 +97,7 @@ export const defineCustomBlocks = () => {
       this.setInputsInline(true);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#59c059");
+      this.setColour("#6600FF");
     }
   };
 
@@ -105,7 +108,8 @@ export const defineCustomBlocks = () => {
           .appendField("Instance")
           .appendField(new Blockly.FieldDropdown([["game.Workspace", "game.Workspace"], ["game.ReplicatedStorage", "game.ReplicatedStorage"]]), "INSTANCE");
       this.setOutput(true, "Instance");
-      this.setColour("#6600ff");
+      this.setColour("#4C97FF");
+      this.setInputsInline(true);
     }
   };
 
@@ -115,7 +119,8 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("do");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#ffab19");
+      this.setColour("#FF4B4B");
+      this.setInputsInline(true);
     }
   };
 
@@ -127,7 +132,8 @@ export const defineCustomBlocks = () => {
           .appendField(new Blockly.FieldTextInput("comment"), "TEXT");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#999999");
+      this.setColour("#FF4B4B");
+      this.setInputsInline(true);
     }
   };
 
@@ -139,7 +145,8 @@ export const defineCustomBlocks = () => {
           .appendField("print");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#ff8c1a");
+      this.setColour("#FF8C1A");
+      this.setInputsInline(true);
     }
   };
 
@@ -150,7 +157,8 @@ export const defineCustomBlocks = () => {
           .appendField("warn");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#ff8c1a");
+      this.setColour("#FF8C1A");
+      this.setInputsInline(true);
     }
   };
 
@@ -161,7 +169,8 @@ export const defineCustomBlocks = () => {
           .appendField(new Blockly.FieldTextInput("print('hello')"), "CODE");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#ff8c1a");
+      this.setColour("#FF8C1A");
+      this.setInputsInline(true);
     }
   };
 
@@ -172,7 +181,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("DATA").setCheck(null).appendField("with data");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#ffab19");
+      this.setColour("#CF63CF");
       this.setInputsInline(true);
     }
   };
@@ -184,7 +193,8 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("then");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#4c97ff");
+      this.setColour("#FFCC00");
+      this.setInputsInline(true);
     }
   };
 
@@ -192,7 +202,8 @@ export const defineCustomBlocks = () => {
     init: function() {
       this.appendValueInput("BOOL").setCheck("Boolean").appendField("not");
       this.setOutput(true, "Boolean");
-      this.setColour("#4c97ff");
+      this.setColour("#FFCC00");
+      this.setInputsInline(true);
     }
   };
 
@@ -202,7 +213,7 @@ export const defineCustomBlocks = () => {
         this.appendValueInput("A").setCheck(null);
         this.appendValueInput("B").setCheck(null).appendField(label);
         this.setOutput(true, "Boolean");
-        this.setColour("#4c97ff");
+        this.setColour("#FFCC00");
         this.setInputsInline(true);
       }
     };
@@ -217,7 +228,8 @@ export const defineCustomBlocks = () => {
     init: function() {
       this.appendDummyInput().appendField("true");
       this.setOutput(true, "Boolean");
-      this.setColour("#4c97ff");
+      this.setColour("#CF63CF");
+      this.setInputsInline(true);
     }
   };
 
@@ -225,7 +237,8 @@ export const defineCustomBlocks = () => {
     init: function() {
       this.appendDummyInput().appendField("false");
       this.setOutput(true, "Boolean");
-      this.setColour("#4c97ff");
+      this.setColour("#CF63CF");
+      this.setInputsInline(true);
     }
   };
 
@@ -235,7 +248,7 @@ export const defineCustomBlocks = () => {
         this.appendValueInput("A").setCheck("Boolean");
         this.appendValueInput("B").setCheck("Boolean").appendField(label);
         this.setOutput(true, "Boolean");
-        this.setColour("#4c97ff");
+        this.setColour("#FFCC00");
         this.setInputsInline(true);
       }
     };
@@ -250,7 +263,8 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("SECONDS").setCheck("Number").appendField("wait");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#48a868");
+      this.setColour("#FFCC00");
+      this.setInputsInline(true);
     }
   };
 
@@ -260,7 +274,8 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("do");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#48a868");
+      this.setColour("#FFCC00");
+      this.setInputsInline(true);
     }
   };
 
@@ -270,7 +285,8 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("CONDITION").setCheck("Boolean").appendField("until");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#48a868");
+      this.setColour("#FFCC00");
+      this.setInputsInline(true);
     }
   };
 
@@ -280,7 +296,8 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("do");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#48a868");
+      this.setColour("#FFCC00");
+      this.setInputsInline(true);
     }
   };
 
@@ -290,7 +307,8 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("do");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#48a868");
+      this.setColour("#FFCC00");
+      this.setInputsInline(true);
     }
   };
 
@@ -299,7 +317,8 @@ export const defineCustomBlocks = () => {
       this.appendDummyInput().appendField("break");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#48a868");
+      this.setColour("#FFCC00");
+      this.setInputsInline(true);
     }
   };
 
@@ -309,7 +328,7 @@ export const defineCustomBlocks = () => {
       this.appendDummyInput().appendField("get player by name");
       this.appendValueInput("NAME").setCheck("String");
       this.setOutput(true, null);
-      this.setColour("#0fbd8c");
+      this.setColour("#FFCC00");
       this.setInputsInline(true);
     }
   };
@@ -322,7 +341,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("REASON").setCheck("String");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#0fbd8c");
+      this.setColour("#FFCC00");
       this.setInputsInline(true);
     }
   };
@@ -334,7 +353,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#0fbd8c");
+      this.setColour("#FFCC00");
       this.setInputsInline(true);
     }
   };
@@ -346,7 +365,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#0fbd8c");
+      this.setColour("#FFCC00");
       this.setInputsInline(true);
     }
   };
@@ -356,11 +375,10 @@ export const defineCustomBlocks = () => {
       this.appendDummyInput().appendField("user id of");
       this.appendValueInput("PLAYER").setCheck(null);
       this.setOutput(true, "Number");
-      this.setColour("#0fbd8c");
+      this.setColour("#FFCC00");
       this.setInputsInline(true);
     }
   };
-
   Blockly.Blocks['player_chat_added'] = {
     init: function() {
       this.appendDummyInput().appendField("on player chat");
@@ -369,7 +387,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#0fbd8c");
+      this.setColour("#FFCC00");
       this.setInputsInline(true);
     }
   };
@@ -382,7 +400,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#0fbd8c");
+      this.setColour("#FFCC00");
       this.setInputsInline(true);
     }
   };

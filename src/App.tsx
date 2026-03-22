@@ -39,33 +39,75 @@ import { defineCustomBlocks } from './blocks';
 import { defineCustomGenerators } from './generators';
 import { toolbox } from './toolbox';
 
-const CATEGORIES = [
-  { name: 'Comment', color: '#999999' },
-  { name: 'Debug', color: '#ff8c1a' },
-  { name: 'Logic', color: '#4c97ff' },
-  { name: 'Math', color: '#59c059' },
-  { name: 'Text', color: '#ffab19' },
-  { name: 'Sound', color: '#59c059' },
-  { name: 'Values', color: '#4cbfe6' },
-  { name: 'Variables', color: '#ff661a' },
-  { name: 'Lists', color: '#cf142b' },
-  { name: 'Loops', color: '#48a868' },
-  { name: 'World', color: '#4c97ff' },
-  { name: 'Instance', color: '#6600ff' },
-  { name: 'Part', color: '#4d4d4d' },
-  { name: 'Character', color: '#ff3355' },
-  { name: 'Model', color: '#9966ff' },
-  { name: 'Gui', color: '#cf63cf' },
-  { name: 'Player', color: '#0fbd8c' },
-  { name: 'Clickdetector', color: '#ff8c1a' },
-  { name: 'Marketplace', color: '#4c97ff' },
-  { name: 'Tweening', color: '#59c059' },
-  { name: 'Client', color: '#ffab19' },
-  { name: 'Server', color: '#40bf4a' },
-  { name: 'Leaderstats', color: '#ff8c1a' },
-  { name: 'Functions', color: '#ff661a' },
-  { name: 'Datastore', color: '#4c97ff' },
+const RAINBOW_COLORS = [
+  '#FF4B4B', // Red
+  '#FF8C1A', // Orange
+  '#FFCC00', // Yellow
+  '#48A868', // Green
+  '#4C97FF', // Blue
+  '#6600FF', // Indigo
+  '#CF63CF', // Violet
 ];
+
+const CATEGORIES = [
+  { name: 'Comment' },
+  { name: 'Debug' },
+  { name: 'Logic' },
+  { name: 'Math' },
+  { name: 'Text' },
+  { name: 'Sound' },
+  { name: 'Values' },
+  { name: 'Variables' },
+  { name: 'Lists' },
+  { name: 'Loops' },
+  { name: 'World' },
+  { name: 'Instance' },
+  { name: 'Part' },
+  { name: 'Character' },
+  { name: 'Model' },
+  { name: 'Gui' },
+  { name: 'Player' },
+  { name: 'Clickdetector' },
+  { name: 'Marketplace' },
+  { name: 'Tweening' },
+  { name: 'Client' },
+  { name: 'Server' },
+  { name: 'Leaderstats' },
+  { name: 'Functions' },
+  { name: 'Datastore' },
+  { name: 'Services' },
+  { name: 'Events' },
+  { name: 'Input' },
+  { name: 'Camera' },
+  { name: 'Animation' },
+  { name: 'Physics' },
+  { name: 'Raycast' },
+  { name: 'Pathfinding' },
+  { name: 'Teleport' },
+  { name: 'Collection' },
+  { name: 'RunService' },
+  { name: 'Lighting' },
+  { name: 'Effects' },
+].map((cat, index) => ({
+  ...cat,
+  color: RAINBOW_COLORS[index % RAINBOW_COLORS.length]
+}));
+
+const SERVICES_LIST = [
+  'Workspace', 'Players', 'ReplicatedStorage', 'ServerStorage', 'ServerScriptService',
+  'StarterPlayer', 'StarterGui', 'StarterPack', 'Lighting', 'SoundService',
+  'RunService', 'TweenService', 'UserInputService', 'ContextActionService',
+  'CollectionService', 'Teams', 'Debris', 'DataStoreService', 'MemoryStoreService',
+  'MessagingService', 'HttpService', 'MarketplaceService', 'TeleportService',
+  'BadgeService', 'PathfindingService', 'ProximityPromptService', 'TextService',
+  'LocalizationService', 'AvatarEditorService', 'ContentProvider', 'InsertService',
+  'GuiService', 'PhysicsService'
+];
+
+const getCategoryColor = (name: string) => {
+  const cat = CATEGORIES.find(c => c.name === name);
+  return cat ? cat.color : '#999999';
+};
 
 export default function App() {
   const { explorer, setExplorer, toggleExpand, addInstance, updateInstanceProperty, deleteInstance } = useExplorer();
@@ -455,7 +497,7 @@ export default function App() {
               .appendField(new Blockly.FieldTextInput("comment"), "TEXT");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#999999");
+          this.setColour(getCategoryColor('Comment'));
         }
       };
 
@@ -467,7 +509,7 @@ export default function App() {
               .appendField("print");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Debug'));
         }
       };
 
@@ -478,7 +520,7 @@ export default function App() {
               .appendField("warn");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Debug'));
         }
       };
 
@@ -489,7 +531,7 @@ export default function App() {
               .appendField(new Blockly.FieldTextInput("-- lua code here"), "CODE");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Debug'));
         }
       };
 
@@ -503,7 +545,7 @@ export default function App() {
               .appendField("seconds");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Loops'));
         }
       };
 
@@ -517,7 +559,7 @@ export default function App() {
           this.appendStatementInput("DO");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
         }
       };
 
@@ -525,7 +567,7 @@ export default function App() {
         init: function() {
           this.appendValueInput("BOOL").setCheck(null).appendField("not");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
         }
       };
 
@@ -535,7 +577,7 @@ export default function App() {
           this.appendDummyInput().appendField("=");
           this.appendValueInput("B").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
           this.setInputsInline(true);
         }
       };
@@ -546,7 +588,7 @@ export default function App() {
           this.appendDummyInput().appendField("<");
           this.appendValueInput("B").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
           this.setInputsInline(true);
         }
       };
@@ -557,7 +599,7 @@ export default function App() {
           this.appendDummyInput().appendField(">");
           this.appendValueInput("B").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
           this.setInputsInline(true);
         }
       };
@@ -568,7 +610,7 @@ export default function App() {
           this.appendDummyInput().appendField("≠");
           this.appendValueInput("B").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
           this.setInputsInline(true);
         }
       };
@@ -577,7 +619,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("true");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
         }
       };
 
@@ -585,7 +627,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("false");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
         }
       };
 
@@ -595,7 +637,7 @@ export default function App() {
           this.appendDummyInput().appendField("and");
           this.appendValueInput("B").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
           this.setInputsInline(true);
         }
       };
@@ -606,7 +648,7 @@ export default function App() {
           this.appendDummyInput().appendField("or");
           this.appendValueInput("B").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Logic'));
           this.setInputsInline(true);
         }
       };
@@ -616,7 +658,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("me");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
         }
       };
 
@@ -624,7 +666,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("this script");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
         }
       };
 
@@ -645,7 +687,7 @@ export default function App() {
               .appendField("instance")
               .appendField(field, "NAME");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
         }
       };
 
@@ -661,7 +703,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -674,7 +716,7 @@ export default function App() {
           this.appendValueInput("INSTANCE")
               .setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -688,7 +730,7 @@ export default function App() {
           this.appendValueInput("INSTANCE")
               .setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -700,7 +742,7 @@ export default function App() {
           this.appendValueInput("Y").setCheck("Number").appendField("y");
           this.appendValueInput("Z").setCheck("Number").appendField("z");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -713,7 +755,7 @@ export default function App() {
               .appendField(new Blockly.FieldTextInput("0"), "Y")
               .appendField(new Blockly.FieldTextInput("0"), "Z");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -723,7 +765,7 @@ export default function App() {
           this.appendDummyInput().appendField("get instance by path");
           this.appendValueInput("PATH").setCheck("String");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -738,7 +780,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -750,7 +792,7 @@ export default function App() {
           this.appendDummyInput().appendField("of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -762,7 +804,7 @@ export default function App() {
           this.appendDummyInput().appendField("in");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -774,7 +816,7 @@ export default function App() {
           this.appendValueInput("G").setCheck("Number").appendField("g (number)");
           this.appendValueInput("B").setCheck("Number").appendField("b (number)");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -787,7 +829,7 @@ export default function App() {
               .appendField(new Blockly.FieldTextInput("0"), "G")
               .appendField(new Blockly.FieldTextInput("0"), "B");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -799,10 +841,10 @@ export default function App() {
               .appendField(new Blockly.FieldTextInput("Part"), "CLASS")
               .appendField("in");
           this.appendValueInput("PARENT").setCheck(null);
-          this.appendDummyInput().appendField(createVarLabel("var. _instance", "#4c97ff"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _instance", getCategoryColor('World')), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -811,10 +853,10 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("clone");
           this.appendValueInput("INSTANCE").setCheck(null);
-          this.appendDummyInput().appendField(createVarLabel("var. _clone", "#4c97ff"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _clone", getCategoryColor('World')), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('World'));
           this.setInputsInline(true);
         }
       };
@@ -875,7 +917,7 @@ export default function App() {
           this.appendDummyInput().appendField("clone");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -884,11 +926,11 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("child added")
-              .appendField(createVarLabel("var. _child", "#6600ff"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _child", getCategoryColor('Instance')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -897,11 +939,11 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("child removed")
-              .appendField(createVarLabel("var. _child", "#6600ff"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _child", getCategoryColor('Instance')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -910,11 +952,11 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("descendant added")
-              .appendField(createVarLabel("var. _descendant", "#6600ff"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _descendant", getCategoryColor('Instance')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -923,11 +965,11 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("descendant removing")
-              .appendField(createVarLabel("var. _descendant", "#6600ff"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _descendant", getCategoryColor('Instance')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -937,7 +979,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -948,7 +990,7 @@ export default function App() {
               .appendField("is a")
               .appendField(new Blockly.FieldTextInput("BasePart"), "CLASS");
           this.setOutput(true, "Boolean");
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -959,7 +1001,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("String");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -968,7 +1010,7 @@ export default function App() {
           this.appendDummyInput().appendField("name of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, "String");
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -977,7 +1019,7 @@ export default function App() {
           this.appendDummyInput().appendField("parent of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -988,7 +1030,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#6600ff");
+          this.setColour(getCategoryColor('Instance'));
           this.setInputsInline(true);
         }
       };
@@ -1001,7 +1043,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Boolean");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1012,7 +1054,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Boolean");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1023,7 +1065,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Boolean");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1034,7 +1076,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Boolean");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1045,7 +1087,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1056,7 +1098,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1065,7 +1107,7 @@ export default function App() {
           this.appendDummyInput().appendField("orientation of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1076,7 +1118,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1085,7 +1127,7 @@ export default function App() {
           this.appendDummyInput().appendField("position of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1096,7 +1138,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1105,7 +1147,7 @@ export default function App() {
           this.appendDummyInput().appendField("size of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1114,11 +1156,11 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("touched by part")
-              .appendField(createVarLabel("var. _touched_part", "#4d4d4d"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _touched_part", getCategoryColor('Part')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1127,11 +1169,11 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput()
               .appendField("touched by character")
-              .appendField(createVarLabel("var. _touched_part", "#4d4d4d"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _touched_part", getCategoryColor('Part')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1142,7 +1184,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4d4d4d");
+          this.setColour(getCategoryColor('Part'));
           this.setInputsInline(true);
         }
       };
@@ -1152,7 +1194,7 @@ export default function App() {
               .appendField("number")
               .appendField(new Blockly.FieldTextInput("0"), "NUM");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
         }
       };
 
@@ -1162,7 +1204,7 @@ export default function App() {
           this.appendDummyInput().appendField("+");
           this.appendValueInput("B").setCheck("Number");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
           this.setInputsInline(true);
         }
       };
@@ -1174,7 +1216,7 @@ export default function App() {
           this.appendDummyInput().appendField("to");
           this.appendValueInput("TO").setCheck("Number");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
           this.setInputsInline(true);
         }
       };
@@ -1183,7 +1225,7 @@ export default function App() {
           this.appendDummyInput().appendField("round");
           this.appendValueInput("NUM").setCheck("Number");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
           this.setInputsInline(true);
         }
       };
@@ -1192,7 +1234,7 @@ export default function App() {
           this.appendDummyInput().appendField("abs");
           this.appendValueInput("NUM").setCheck("Number");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
           this.setInputsInline(true);
         }
       };
@@ -1201,7 +1243,7 @@ export default function App() {
           this.appendDummyInput().appendField("ceil");
           this.appendValueInput("NUM").setCheck("Number");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
           this.setInputsInline(true);
         }
       };
@@ -1210,7 +1252,7 @@ export default function App() {
           this.appendDummyInput().appendField("floor");
           this.appendValueInput("NUM").setCheck("Number");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
           this.setInputsInline(true);
         }
       };
@@ -1220,7 +1262,7 @@ export default function App() {
           this.appendValueInput("NUM").setCheck("Number");
           this.appendDummyInput().appendField(new Blockly.FieldTextInput("* 2 + 1"), "EXPR");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
           this.setInputsInline(true);
         }
       };
@@ -1230,7 +1272,7 @@ export default function App() {
           this.appendDummyInput().appendField(new Blockly.FieldTextInput("1 + 2 *"), "EXPR");
           this.appendValueInput("NUM").setCheck("Number");
           this.setOutput(true, "Number");
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Math'));
           this.setInputsInline(true);
         }
       };
@@ -1242,7 +1284,7 @@ export default function App() {
               .appendField("string")
               .appendField(new Blockly.FieldTextInput(""), "TEXT");
           this.setOutput(true, "String");
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Text'));
         }
       };
 
@@ -1253,7 +1295,7 @@ export default function App() {
           this.appendDummyInput().appendField("with");
           this.appendValueInput("B").setCheck("String");
           this.setOutput(true, "String");
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Text'));
           this.setInputsInline(true);
         }
       };
@@ -1262,7 +1304,7 @@ export default function App() {
           this.appendDummyInput().appendField("length of");
           this.appendValueInput("TEXT").setCheck("String");
           this.setOutput(true, "Number");
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Text'));
           this.setInputsInline(true);
         }
       };
@@ -1271,7 +1313,7 @@ export default function App() {
           this.appendDummyInput().appendField("to upper case");
           this.appendValueInput("TEXT").setCheck("String");
           this.setOutput(true, "String");
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Text'));
           this.setInputsInline(true);
         }
       };
@@ -1280,7 +1322,7 @@ export default function App() {
           this.appendDummyInput().appendField("to lower case");
           this.appendValueInput("TEXT").setCheck("String");
           this.setOutput(true, "String");
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Text'));
           this.setInputsInline(true);
         }
       };
@@ -1291,7 +1333,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.appendDummyInput().appendField("to string");
           this.setOutput(true, "String");
-          this.setColour("#4cbfe6");
+          this.setColour(getCategoryColor('Values'));
           this.setInputsInline(true);
         }
       };
@@ -1301,7 +1343,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.appendDummyInput().appendField("to number");
           this.setOutput(true, "Number");
-          this.setColour("#4cbfe6");
+          this.setColour(getCategoryColor('Values'));
           this.setInputsInline(true);
         }
       };
@@ -1316,7 +1358,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Variables'));
           this.setInputsInline(true);
         }
       };
@@ -1360,25 +1402,25 @@ export default function App() {
               container.id = 'variable-autocomplete-dropdown';
               container.style.position = 'fixed';
               container.style.zIndex = '20000';
-              container.style.background = 'rgba(255, 255, 255, 0.95)';
+              container.style.background = '#252525';
               container.style.backdropFilter = 'blur(10px)';
               (container.style as any).webkitBackdropFilter = 'blur(10px)';
-              container.style.border = '1px solid rgba(0,0,0,0.1)';
+              container.style.border = '1px solid rgba(255,255,255,0.1)';
               container.style.borderRadius = '12px';
-              container.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
-              container.style.minWidth = '180px';
-              container.style.padding = '6px';
+              container.style.boxShadow = '0 8px 32px rgba(0,0,0,0.4)';
+              container.style.minWidth = '200px';
+              container.style.padding = '8px';
               container.style.display = 'flex';
               container.style.flexDirection = 'column';
-              container.style.gap = '4px';
+              container.style.gap = '6px';
               container.style.opacity = '0';
               container.style.transform = 'translateY(5px)';
-              container.style.transition = 'opacity 0.1s ease, transform 0.1s ease';
+              container.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
               container.style.fontFamily = 'Inter, sans-serif';
               
               // Search Header
               const searchWrapper = document.createElement('div');
-              searchWrapper.style.padding = '2px';
+              searchWrapper.style.padding = '4px';
               searchWrapper.style.position = 'sticky';
               searchWrapper.style.top = '0';
               searchWrapper.style.background = 'transparent';
@@ -1386,35 +1428,36 @@ export default function App() {
 
               const searchInput = document.createElement('input');
               searchInput.type = 'text';
-              searchInput.placeholder = 'Search...';
+              searchInput.placeholder = 'Search variables...';
               searchInput.style.width = '100%';
-              searchInput.style.padding = '6px 10px';
+              searchInput.style.padding = '8px 12px';
               searchInput.style.fontSize = '12px';
-              searchInput.style.border = '1px solid rgba(0,0,0,0.05)';
+              searchInput.style.border = '1px solid rgba(255,255,255,0.05)';
               searchInput.style.borderRadius = '8px';
               searchInput.style.outline = 'none';
-              searchInput.style.background = 'rgba(0,0,0,0.03)';
+              searchInput.style.background = 'rgba(255,255,255,0.05)';
+              searchInput.style.color = 'white';
               searchInput.style.transition = 'all 0.2s';
               
               searchInput.onfocus = () => {
                 searchInput.style.borderColor = '#4c97ff';
-                searchInput.style.background = '#fff';
-                searchInput.style.boxShadow = '0 0 0 2px rgba(76, 151, 255, 0.1)';
+                searchInput.style.background = 'rgba(255,255,255,0.08)';
+                searchInput.style.boxShadow = '0 0 0 2px rgba(76, 151, 255, 0.2)';
               };
               searchInput.onblur = () => {
-                searchInput.style.borderColor = 'rgba(0,0,0,0.05)';
-                searchInput.style.background = 'rgba(0,0,0,0.03)';
+                searchInput.style.borderColor = 'rgba(255,255,255,0.05)';
+                searchInput.style.background = 'rgba(255,255,255,0.05)';
                 searchInput.style.boxShadow = 'none';
               };
               
               const title = document.createElement('div');
               title.textContent = 'Variables';
-              title.style.fontSize = '9px';
-              title.style.fontWeight = '700';
+              title.style.fontSize = '10px';
+              title.style.fontWeight = '800';
               title.style.color = '#4c97ff';
               title.style.textTransform = 'uppercase';
-              title.style.letterSpacing = '0.05em';
-              title.style.padding = '2px 8px';
+              title.style.letterSpacing = '0.1em';
+              title.style.padding = '4px 8px';
               
               searchWrapper.appendChild(title);
               searchWrapper.appendChild(searchInput);
@@ -1422,15 +1465,13 @@ export default function App() {
 
               const listContainer = document.createElement('div');
               listContainer.style.overflowY = 'auto';
-              // Max 3 items visible (approx 32px each)
-              listContainer.style.maxHeight = '96px';
+              listContainer.style.maxHeight = '120px';
               listContainer.style.display = 'flex';
               listContainer.style.flexDirection = 'column';
               listContainer.style.gap = '2px';
               listContainer.style.padding = '2px';
-              // Custom scrollbar styling
               listContainer.style.scrollbarWidth = 'thin';
-              listContainer.style.scrollbarColor = 'rgba(0,0,0,0.2) transparent';
+              listContainer.style.scrollbarColor = 'rgba(255,255,255,0.1) transparent';
               container.appendChild(listContainer);
               
               let selectedIndex = -1;
@@ -1455,9 +1496,9 @@ export default function App() {
                 if (filtered.length === 0) {
                   const item = document.createElement('div');
                   item.textContent = filter === '' ? 'No variables found' : 'No matches found';
-                  item.style.padding = '12px 14px';
-                  item.style.fontSize = '13px';
-                  item.style.color = '#999999';
+                  item.style.padding = '16px';
+                  item.style.fontSize = '12px';
+                  item.style.color = '#666';
                   item.style.fontStyle = 'italic';
                   item.style.textAlign = 'center';
                   listContainer.appendChild(item);
@@ -1474,17 +1515,17 @@ export default function App() {
                     const before = v.substring(0, index);
                     const match = v.substring(index, index + searchTerm.length);
                     const after = v.substring(index + searchTerm.length);
-                    item.innerHTML = `${before}<span style="color: #4c97ff; font-weight: 600;">${match}</span>${after}`;
+                    item.innerHTML = `${before}<span style="color: #4c97ff; font-weight: 700;">${match}</span>${after}`;
                   } else {
                     item.textContent = v;
                   }
                   
-                  item.style.padding = '8px 12px';
+                  item.style.padding = '10px 14px';
                   item.style.cursor = 'pointer';
                   item.style.fontSize = '13px';
-                  item.style.color = '#1a1a1a';
+                  item.style.color = '#ccc';
                   item.style.borderRadius = '8px';
-                  item.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+                  item.style.transition = 'all 0.2s';
                   item.style.marginBottom = '1px';
                   item.style.fontWeight = '500';
                   
@@ -1515,13 +1556,13 @@ export default function App() {
                   const items = listContainer.querySelectorAll('div[id^="autocomplete-item-"]');
                   items.forEach((item: any, idx) => {
                     if (idx === selectedIndex) {
-                      item.style.background = 'rgba(76, 151, 255, 0.1)';
-                      item.style.color = '#4c97ff';
+                      item.style.background = '#4c97ff';
+                      item.style.color = 'white';
                       item.style.transform = 'translateX(4px)';
                       item.scrollIntoView({ block: 'nearest' });
                     } else {
                       item.style.background = 'transparent';
-                      item.style.color = '#1a1a1a';
+                      item.style.color = '#ccc';
                       item.style.transform = 'translateX(0)';
                     }
                   });
@@ -1746,7 +1787,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("empty list");
           this.setOutput(true, "Array");
-          this.setColour("#cf142b");
+          this.setColour(getCategoryColor('Lists'));
         }
       };
 
@@ -1760,7 +1801,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf142b");
+          this.setColour(getCategoryColor('Lists'));
           this.setInputsInline(true);
         }
       };
@@ -1772,7 +1813,7 @@ export default function App() {
           this.appendDummyInput().appendField("of");
           this.appendValueInput("LIST").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#cf142b");
+          this.setColour(getCategoryColor('Lists'));
           this.setInputsInline(true);
         }
       };
@@ -1785,7 +1826,7 @@ export default function App() {
           this.appendValueInput("LIST").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf142b");
+          this.setColour(getCategoryColor('Lists'));
           this.setInputsInline(true);
         }
       };
@@ -1798,7 +1839,7 @@ export default function App() {
           this.appendValueInput("LIST").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf142b");
+          this.setColour(getCategoryColor('Lists'));
           this.setInputsInline(true);
         }
       };
@@ -1811,7 +1852,7 @@ export default function App() {
           this.appendStatementInput("DO");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#48a868");
+          this.setColour(getCategoryColor('Loops'));
         }
       };
 
@@ -1819,7 +1860,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput()
               .appendField("repeat")
-              .appendField(createVarLabel("var. _count", "#48a868"), "VAR_LABEL");
+              .appendField(createVarLabel("var. _count", getCategoryColor('Loops')), "VAR_LABEL");
           this.appendDummyInput().appendField("from");
           this.appendValueInput("FROM").setCheck("Number");
           this.appendDummyInput().appendField("to");
@@ -1827,7 +1868,7 @@ export default function App() {
           this.appendStatementInput("DO");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#48a868");
+          this.setColour(getCategoryColor('Loops'));
           this.setInputsInline(true);
         }
       };
@@ -1836,11 +1877,11 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("loop through children of");
           this.appendValueInput("INSTANCE").setCheck(null);
-          this.appendDummyInput().appendField(createVarLabel("var. _child", "#48a868"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _child", getCategoryColor('Loops')), "VAR_LABEL");
           this.appendStatementInput("DO");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#48a868");
+          this.setColour(getCategoryColor('Loops'));
           this.setInputsInline(true);
         }
       };
@@ -1849,11 +1890,11 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("loop through descendants of");
           this.appendValueInput("INSTANCE").setCheck(null);
-          this.appendDummyInput().appendField(createVarLabel("var. _descendant", "#48a868"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _descendant", getCategoryColor('Loops')), "VAR_LABEL");
           this.appendStatementInput("DO");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#48a868");
+          this.setColour(getCategoryColor('Loops'));
           this.setInputsInline(true);
         }
       };
@@ -1863,7 +1904,7 @@ export default function App() {
           this.appendDummyInput().appendField("break this loop");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#48a868");
+          this.setColour(getCategoryColor('Loops'));
         }
       };
 
@@ -1965,11 +2006,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("HUMANOID").setCheck(null);
           this.appendDummyInput().appendField("is climbing");
-          this.appendDummyInput().appendField(createVarLabel("var. _climb_speed", "#ff3355"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _climb_speed", getCategoryColor('Character')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -1981,7 +2022,7 @@ export default function App() {
           this.appendValueInput("NUMBER").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -1992,7 +2033,7 @@ export default function App() {
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2003,7 +2044,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2011,10 +2052,10 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("get humanoid from model");
           this.appendValueInput("MODEL").setCheck(null);
-          this.appendDummyInput().appendField(createVarLabel("var. _humanoid", "#ff3355"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _humanoid", getCategoryColor('Character')), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2022,10 +2063,10 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("get model from humanoid");
           this.appendValueInput("HUMANOID").setCheck(null);
-          this.appendDummyInput().appendField(createVarLabel("var. _character_model", "#ff3355"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _character_model", getCategoryColor('Character')), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2036,7 +2077,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2044,11 +2085,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("HUMANOID").setCheck(null);
           this.appendDummyInput().appendField("Health changed");
-          this.appendDummyInput().appendField(createVarLabel("var. _new_health", "#ff3355"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _new_health", getCategoryColor('Character')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2058,7 +2099,7 @@ export default function App() {
           this.appendValueInput("HUMANOID").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2069,7 +2110,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2080,7 +2121,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2090,7 +2131,7 @@ export default function App() {
           this.appendValueInput("HUMANOID").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2101,7 +2142,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2113,7 +2154,7 @@ export default function App() {
           this.appendValueInput("POSITION").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2121,11 +2162,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("HUMANOID").setCheck(null);
           this.appendDummyInput().appendField("finished moving");
-          this.appendDummyInput().appendField(createVarLabel("var. _reached_goal", "#ff3355"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _reached_goal", getCategoryColor('Character')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2134,7 +2175,7 @@ export default function App() {
           this.appendDummyInput().appendField("player of");
           this.appendValueInput("CHARACTER").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2144,7 +2185,7 @@ export default function App() {
           this.appendDummyInput().appendField("unequip tool");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2155,7 +2196,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff3355");
+          this.setColour(getCategoryColor('Character'));
           this.setInputsInline(true);
         }
       };
@@ -2167,7 +2208,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#9966ff");
+          this.setColour(getCategoryColor('Model'));
           this.setInputsInline(true);
         }
       };
@@ -2176,7 +2217,7 @@ export default function App() {
           this.appendDummyInput().appendField("orientation of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#9966ff");
+          this.setColour(getCategoryColor('Model'));
           this.setInputsInline(true);
         }
       };
@@ -2185,7 +2226,7 @@ export default function App() {
           this.appendDummyInput().appendField("position of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#9966ff");
+          this.setColour(getCategoryColor('Model'));
           this.setInputsInline(true);
         }
       };
@@ -2194,7 +2235,7 @@ export default function App() {
           this.appendDummyInput().appendField("size of");
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#9966ff");
+          this.setColour(getCategoryColor('Model'));
           this.setInputsInline(true);
         }
       };
@@ -2206,7 +2247,7 @@ export default function App() {
           this.appendValueInput("PART").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#9966ff");
+          this.setColour(getCategoryColor('Model'));
           this.setInputsInline(true);
         }
       };
@@ -2218,7 +2259,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#9966ff");
+          this.setColour(getCategoryColor('Model'));
           this.setInputsInline(true);
         }
       };
@@ -2230,7 +2271,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#9966ff");
+          this.setColour(getCategoryColor('Model'));
           this.setInputsInline(true);
         }
       };
@@ -2240,7 +2281,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("get mouse");
           this.setOutput(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
         }
       };
       Blockly.Blocks['gui_get_player_gui'] = {
@@ -2248,7 +2289,7 @@ export default function App() {
           this.appendDummyInput().appendField("get PlayerGui of");
           this.appendValueInput("PLAYER").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2258,7 +2299,7 @@ export default function App() {
               .appendField(new Blockly.FieldTextInput("ScreenGui"), "CLASS");
           this.appendValueInput("PARENT").setCheck(null).appendField("parented to");
           this.setOutput(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2269,7 +2310,7 @@ export default function App() {
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2277,11 +2318,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput().appendField("input began");
-          this.appendDummyInput().appendField(createVarLabel("var. _input", "#cf63cf"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _input", getCategoryColor('Gui')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2289,11 +2330,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.appendDummyInput().appendField("input ended");
-          this.appendDummyInput().appendField(createVarLabel("var. _input", "#cf63cf"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _input", getCategoryColor('Gui')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2302,11 +2343,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is left mouse button");
-          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#cf63cf"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", getCategoryColor('Gui')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2315,11 +2356,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is middle mouse button");
-          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#cf63cf"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", getCategoryColor('Gui')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2328,11 +2369,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is right mouse button");
-          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#cf63cf"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", getCategoryColor('Gui')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2341,11 +2382,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is touch");
-          this.appendDummyInput().appendField(createVarLabel("var. _touch_input", "#cf63cf"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _touch_input", getCategoryColor('Gui')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2355,7 +2396,7 @@ export default function App() {
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("position");
           this.setOutput(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2365,7 +2406,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2375,7 +2416,7 @@ export default function App() {
           this.appendValueInput("INSTANCE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2385,7 +2426,7 @@ export default function App() {
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("position");
           this.setOutput(true, null);
-          this.setColour("#cf63cf");
+          this.setColour(getCategoryColor('Gui'));
           this.setInputsInline(true);
         }
       };
@@ -2396,7 +2437,7 @@ export default function App() {
           this.appendDummyInput().appendField("character of");
           this.appendValueInput("PLAYER").setCheck(null);
           this.setOutput(true, null);
-          this.setColour("#0fbd8c");
+          this.setColour(getCategoryColor('Player'));
           this.setInputsInline(true);
         }
       };
@@ -2405,7 +2446,7 @@ export default function App() {
           this.appendDummyInput().appendField("get player by name");
           this.appendValueInput("NAME").setCheck("String");
           this.setOutput(true, null);
-          this.setColour("#0fbd8c");
+          this.setColour(getCategoryColor('Player'));
           this.setInputsInline(true);
         }
       };
@@ -2417,29 +2458,29 @@ export default function App() {
           this.appendValueInput("REASON").setCheck("String");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#0fbd8c");
+          this.setColour(getCategoryColor('Player'));
           this.setInputsInline(true);
         }
       };
       Blockly.Blocks['player_joined'] = {
         init: function() {
           this.appendDummyInput().appendField("player joined");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", "#0fbd8c"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Player')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#0fbd8c");
+          this.setColour(getCategoryColor('Player'));
           this.setInputsInline(true);
         }
       };
       Blockly.Blocks['player_leaving'] = {
         init: function() {
           this.appendDummyInput().appendField("player leaving");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", "#0fbd8c"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Player')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#0fbd8c");
+          this.setColour(getCategoryColor('Player'));
           this.setInputsInline(true);
         }
       };
@@ -2448,7 +2489,31 @@ export default function App() {
           this.appendDummyInput().appendField("user id of");
           this.appendValueInput("PLAYER").setCheck(null);
           this.setOutput(true, "Number");
-          this.setColour("#0fbd8c");
+          this.setColour(getCategoryColor('Player'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['player_chat_added'] = {
+        init: function() {
+          this.appendDummyInput().appendField("on player chat");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.appendDummyInput().appendField(createVarLabel("var. message", getCategoryColor('Player')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Player'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['player_respawned'] = {
+        init: function() {
+          this.appendDummyInput().appendField("on player respawned");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.appendDummyInput().appendField(createVarLabel("var. character", getCategoryColor('Player')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Player'));
           this.setInputsInline(true);
         }
       };
@@ -2458,10 +2523,10 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("add click detector to");
           this.appendValueInput("INSTANCE").setCheck(null);
-          this.appendDummyInput().appendField(createVarLabel("var. _click_detector", "#ff8c1a"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _click_detector", getCategoryColor('Clickdetector')), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Clickdetector'));
           this.setInputsInline(true);
         }
       };
@@ -2469,11 +2534,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("CLICK_DETECTOR").setCheck(null);
           this.appendDummyInput().appendField("clicked");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", "#ff8c1a"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Clickdetector')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Clickdetector'));
           this.setInputsInline(true);
         }
       };
@@ -2481,11 +2546,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("CLICK_DETECTOR").setCheck(null);
           this.appendDummyInput().appendField("hover enter");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", "#ff8c1a"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Clickdetector')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Clickdetector'));
           this.setInputsInline(true);
         }
       };
@@ -2493,11 +2558,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("CLICK_DETECTOR").setCheck(null);
           this.appendDummyInput().appendField("hover leave");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", "#ff8c1a"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Clickdetector')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Clickdetector'));
           this.setInputsInline(true);
         }
       };
@@ -2505,11 +2570,11 @@ export default function App() {
         init: function() {
           this.appendValueInput("CLICK_DETECTOR").setCheck(null);
           this.appendDummyInput().appendField("right clicked");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", "#ff8c1a"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Clickdetector')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Clickdetector'));
           this.setInputsInline(true);
         }
       };
@@ -2523,7 +2588,7 @@ export default function App() {
           this.appendValueInput("ASSET_ID").setCheck(null);
           this.appendDummyInput().appendField("?");
           this.setOutput(true, "Boolean");
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Marketplace'));
           this.setInputsInline(true);
         }
       };
@@ -2535,19 +2600,19 @@ export default function App() {
           this.appendValueInput("GAMEPASS_ID").setCheck(null);
           this.appendDummyInput().appendField("?");
           this.setOutput(true, "Boolean");
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Marketplace'));
           this.setInputsInline(true);
         }
       };
       Blockly.Blocks['marketplace_product_bought'] = {
         init: function() {
           this.appendDummyInput().appendField("product bought");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", "#4c97ff"), "VAR_LABEL");
-          this.appendDummyInput().appendField(createVarLabel("var. _productId", "#4c97ff"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Marketplace')), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _productId", getCategoryColor('Marketplace')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Marketplace'));
           this.setInputsInline(true);
         }
       };
@@ -2559,7 +2624,7 @@ export default function App() {
           this.appendValueInput("PLAYER").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Marketplace'));
           this.setInputsInline(true);
         }
       };
@@ -2571,7 +2636,7 @@ export default function App() {
           this.appendValueInput("PLAYER").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Marketplace'));
           this.setInputsInline(true);
         }
       };
@@ -2583,7 +2648,7 @@ export default function App() {
           this.appendValueInput("PLAYER").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Marketplace'));
           this.setInputsInline(true);
         }
       };
@@ -2600,7 +2665,7 @@ export default function App() {
           this.appendValueInput("TWEEN_INFO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Tweening'));
           this.setInputsInline(true);
         }
       };
@@ -2629,7 +2694,7 @@ export default function App() {
               .appendField("easing direction")
               .appendField(directionField, "DIRECTION");
           this.setOutput(true, null);
-          this.setColour("#59c059");
+          this.setColour(getCategoryColor('Tweening'));
           this.setInputsInline(true);
         }
       };
@@ -2647,7 +2712,7 @@ export default function App() {
           this.appendDummyInput()
               .appendField(new Blockly.FieldLabel("player", "faded-placeholder-text"));
           this.setOutput(true, null);
-          this.setColour("#0fbd8c");
+          this.setColour(getCategoryColor('Player'));
         }
       };
 
@@ -2659,29 +2724,29 @@ export default function App() {
           this.appendValueInput("DATA").setCheck(null).appendField("data to send");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
       Blockly.Blocks['client_input_began'] = {
         init: function() {
           this.appendDummyInput().appendField("user input began");
-          this.appendDummyInput().appendField(createVarLabel("var. _input", "#ffab19"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _input", getCategoryColor('Client')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
       Blockly.Blocks['client_input_ended'] = {
         init: function() {
           this.appendDummyInput().appendField("user input ended");
-          this.appendDummyInput().appendField(createVarLabel("var. _input", "#ffab19"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _input", getCategoryColor('Client')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2690,11 +2755,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is keyboard");
-          this.appendDummyInput().appendField(createVarLabel("var. _key_input", "#ffab19"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _key_input", getCategoryColor('Client')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2703,11 +2768,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is left mouse button");
-          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#ffab19"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", getCategoryColor('Client')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2716,11 +2781,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is middle mouse button");
-          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#ffab19"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", getCategoryColor('Client')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2729,11 +2794,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is right mouse button");
-          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", "#ffab19"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _mouse_input", getCategoryColor('Client')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2742,11 +2807,11 @@ export default function App() {
           this.appendDummyInput().appendField("if");
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("is touch");
-          this.appendDummyInput().appendField(createVarLabel("var. _touch_input", "#ffab19"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _touch_input", getCategoryColor('Client')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2767,7 +2832,7 @@ export default function App() {
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2775,7 +2840,7 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("local player");
           this.setOutput(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
         }
       };
       Blockly.Blocks['client_mouse_position'] = {
@@ -2784,7 +2849,7 @@ export default function App() {
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("position");
           this.setOutput(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2792,11 +2857,11 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("fired by server");
           this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
-          this.appendDummyInput().appendField(createVarLabel("var. _received_data", "#ffab19"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _received_data", getCategoryColor('Client')), "VAR_LABEL");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2806,7 +2871,7 @@ export default function App() {
           this.appendValueInput("INPUT").setCheck(null);
           this.appendDummyInput().appendField("position");
           this.setOutput(true, null);
-          this.setColour("#ffab19");
+          this.setColour(getCategoryColor('Client'));
           this.setInputsInline(true);
         }
       };
@@ -2816,12 +2881,12 @@ export default function App() {
         init: function() {
           this.appendDummyInput().appendField("fired by client");
           this.appendValueInput("EVENT").setCheck(null).appendField("remote event");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", "#40bf4a"), "VAR_LABEL_PLAYER");
-          this.appendDummyInput().appendField(createVarLabel("var. _data", "#40bf4a"), "VAR_LABEL_DATA");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Server')), "VAR_LABEL_PLAYER");
+          this.appendDummyInput().appendField(createVarLabel("var. _data", getCategoryColor('Server')), "VAR_LABEL_DATA");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#40bf4a");
+          this.setColour(getCategoryColor('Server'));
           this.setInputsInline(true);
         }
       };
@@ -2832,7 +2897,7 @@ export default function App() {
           this.appendValueInput("DATA").setCheck(null).appendField("data to send");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#40bf4a");
+          this.setColour(getCategoryColor('Server'));
           this.setInputsInline(true);
         }
       };
@@ -2844,7 +2909,7 @@ export default function App() {
           this.appendValueInput("DATA").setCheck(null).appendField("data to send");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#40bf4a");
+          this.setColour(getCategoryColor('Server'));
           this.setInputsInline(true);
         }
       };
@@ -2857,7 +2922,7 @@ export default function App() {
           this.appendValueInput("DEFAULT").setCheck("Number").appendField("default value");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Leaderstats'));
           this.setInputsInline(true);
         }
       };
@@ -2868,7 +2933,7 @@ export default function App() {
           this.appendValueInput("DEFAULT").setCheck("String").appendField("default value");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Leaderstats'));
           this.setInputsInline(true);
         }
       };
@@ -2877,7 +2942,7 @@ export default function App() {
           this.appendDummyInput().appendField("enable leaderstats");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Leaderstats'));
         }
       };
       Blockly.Blocks['leaderstats_get'] = {
@@ -2886,7 +2951,7 @@ export default function App() {
           this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
           this.appendValueInput("PLAYER").setCheck(null).appendField("of");
           this.setOutput(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Leaderstats'));
           this.setInputsInline(true);
         }
       };
@@ -2898,7 +2963,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null).appendField("to");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff8c1a");
+          this.setColour(getCategoryColor('Leaderstats'));
           this.setInputsInline(true);
         }
       };
@@ -2913,7 +2978,7 @@ export default function App() {
           this.appendStatementInput("STACK");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Functions'));
           this.setInputsInline(true);
         }
       };
@@ -2923,10 +2988,10 @@ export default function App() {
           this.appendDummyInput().appendField(new Blockly.FieldTextInput("name"), "NAME");
           this.appendDummyInput().appendField("arguments:");
           this.appendDummyInput().appendField(new Blockly.FieldTextInput("val1, val2"), "ARGS");
-          this.appendDummyInput().appendField(createVarLabel("var. _result", "#ff661a"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _result", getCategoryColor('Functions')), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Functions'));
           this.setInputsInline(true);
         }
       };
@@ -2936,7 +3001,7 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Functions'));
           this.setInputsInline(true);
         }
       };
@@ -2949,7 +3014,7 @@ export default function App() {
           this.appendStatementInput("STACK");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Functions'));
           this.setInputsInline(true);
         }
       };
@@ -2961,7 +3026,7 @@ export default function App() {
           this.appendDummyInput().appendField(new Blockly.FieldTextInput("val1, val2"), "ARGS");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Functions'));
           this.setInputsInline(true);
         }
       };
@@ -2972,7 +3037,7 @@ export default function App() {
           this.appendDummyInput().appendField("setup Datastores for this script");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Datastore'));
         }
       };
       Blockly.Blocks['datastore_instance'] = {
@@ -2981,7 +3046,7 @@ export default function App() {
               .appendField("datastore")
               .appendField(new Blockly.FieldTextInput("datastore name"), "NAME");
           this.setOutput(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Datastore'));
         }
       };
       Blockly.Blocks['datastore_use'] = {
@@ -2991,7 +3056,7 @@ export default function App() {
               .appendField(new Blockly.FieldTextInput("datastore name"), "NAME");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Datastore'));
           this.setInputsInline(true);
         }
       };
@@ -3001,10 +3066,10 @@ export default function App() {
           this.appendValueInput("DATASTORE").setCheck(null).appendField("datastore");
           this.appendValueInput("PLAYER").setCheck(null).appendField("player:");
           this.appendDummyInput().appendField("value:");
-          this.appendDummyInput().appendField(createVarLabel("var. _value", "#4c97ff"), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _value", getCategoryColor('Datastore')), "VAR_LABEL");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Datastore'));
           this.setInputsInline(true);
         }
       };
@@ -3016,10 +3081,573 @@ export default function App() {
           this.appendValueInput("VALUE").setCheck(null).appendField("value:");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#4c97ff");
+          this.setColour(getCategoryColor('Datastore'));
           this.setInputsInline(true);
         }
       };
+
+      // Events Category
+      Blockly.Blocks['event_game_start'] = {
+        init: function() {
+          this.appendDummyInput().appendField("when game start");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Events'));
+        }
+      };
+      Blockly.Blocks['event_player_join'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("when player join")
+              .appendField(createVarLabel("var. _player", getCategoryColor('Events')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Events'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['event_touched'] = {
+        init: function() {
+          this.appendDummyInput().appendField("when");
+          this.appendValueInput("PART").setCheck(null);
+          this.appendDummyInput()
+              .appendField("is touched")
+              .appendField(createVarLabel("var. _otherPart", getCategoryColor('Events')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Events'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['event_clicked'] = {
+        init: function() {
+          this.appendDummyInput().appendField("when");
+          this.appendValueInput("CLICK_DETECTOR").setCheck(null);
+          this.appendDummyInput()
+              .appendField("is clicked")
+              .appendField(createVarLabel("var. _player", getCategoryColor('Events')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Events'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['event_value_changed'] = {
+        init: function() {
+          this.appendDummyInput().appendField("when value of");
+          this.appendValueInput("VALUE").setCheck(null);
+          this.appendDummyInput()
+              .appendField("changed")
+              .appendField(createVarLabel("var. _newValue", getCategoryColor('Events')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Events'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Input Category
+      Blockly.Blocks['input_key_pressed'] = {
+        init: function() {
+          this.appendDummyInput().appendField("when key");
+          this.appendDummyInput().appendField(new Blockly.FieldTextInput("Space"), "KEY");
+          this.appendDummyInput().appendField("is pressed");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['input_mouse_click'] = {
+        init: function() {
+          this.appendDummyInput().appendField("when mouse");
+          this.appendDummyInput().appendField(new Blockly.FieldDropdown([["Left", "MouseButton1"], ["Right", "MouseButton2"]]), "BUTTON");
+          this.appendDummyInput().appendField("click");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['input_touch'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("when screen is touched")
+              .appendField(createVarLabel("var. _touchPosition", getCategoryColor('Input')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['input_button_pressed'] = {
+        init: function() {
+          this.appendDummyInput().appendField("when button");
+          this.appendValueInput("BUTTON").setCheck(null);
+          this.appendDummyInput().appendField("is pressed");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['input_mouse_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get mouse position");
+          this.setOutput(true, "Vector2");
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      // Camera Category
+      Blockly.Blocks['camera_set_type'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set camera type to");
+          this.appendDummyInput().appendField(new Blockly.FieldDropdown([["Custom", "Custom"], ["Scriptable", "Scriptable"], ["Fixed", "Fixed"], ["Attach", "Attach"], ["Watch", "Watch"]]), "TYPE");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Camera'));
+        }
+      };
+      Blockly.Blocks['camera_set_subject'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set camera subject to");
+          this.appendValueInput("SUBJECT").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Camera'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['camera_move'] = {
+        init: function() {
+          this.appendDummyInput().appendField("move camera to");
+          this.appendValueInput("POSITION").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Camera'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['camera_set_fov'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set camera FOV to");
+          this.appendValueInput("FOV").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Camera'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Animation Category
+      Blockly.Blocks['animation_load'] = {
+        init: function() {
+          this.appendDummyInput().appendField("load animation");
+          this.appendValueInput("ANIM_ID").setCheck("String");
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Animation'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['animation_play'] = {
+        init: function() {
+          this.appendDummyInput().appendField("play animation");
+          this.appendValueInput("ANIM_TRACK").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Animation'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['animation_stop'] = {
+        init: function() {
+          this.appendDummyInput().appendField("stop animation");
+          this.appendValueInput("ANIM_TRACK").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Animation'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['animation_adjust_speed'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set animation");
+          this.appendValueInput("ANIM_TRACK").setCheck(null);
+          this.appendDummyInput().appendField("speed to");
+          this.appendValueInput("SPEED").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Animation'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Physics Category
+      Blockly.Blocks['physics_apply_force'] = {
+        init: function() {
+          this.appendDummyInput().appendField("apply force");
+          this.appendValueInput("FORCE").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("PART").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Physics'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['physics_set_velocity'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set velocity of");
+          this.appendValueInput("PART").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("VELOCITY").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Physics'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['physics_enable'] = {
+        init: function() {
+          this.appendDummyInput().appendField("enable physics for");
+          this.appendValueInput("PART").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Physics'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['physics_set_mass'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set mass of");
+          this.appendValueInput("PART").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("MASS").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Physics'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Raycast Category
+      Blockly.Blocks['raycast_forward'] = {
+        init: function() {
+          this.appendDummyInput().appendField("raycast forward from");
+          this.appendValueInput("ORIGIN").setCheck(null);
+          this.appendDummyInput().appendField("distance");
+          this.appendValueInput("DISTANCE").setCheck("Number");
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Raycast'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['raycast_down'] = {
+        init: function() {
+          this.appendDummyInput().appendField("raycast down from");
+          this.appendValueInput("ORIGIN").setCheck(null);
+          this.appendDummyInput().appendField("distance");
+          this.appendValueInput("DISTANCE").setCheck("Number");
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Raycast'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['raycast_get_hit_object'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get hit object from");
+          this.appendValueInput("RAYCAST_RESULT").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Raycast'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['raycast_get_hit_position'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get hit position from");
+          this.appendValueInput("RAYCAST_RESULT").setCheck(null);
+          this.setOutput(true, "Vector3");
+          this.setColour(getCategoryColor('Raycast'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Pathfinding Category
+      Blockly.Blocks['pathfinding_create'] = {
+        init: function() {
+          this.appendDummyInput().appendField("create path");
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Pathfinding'));
+        }
+      };
+      Blockly.Blocks['pathfinding_compute'] = {
+        init: function() {
+          this.appendDummyInput().appendField("compute path from");
+          this.appendValueInput("START").setCheck(null);
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("END").setCheck(null);
+          this.appendDummyInput().appendField("using");
+          this.appendValueInput("PATH").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Pathfinding'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['pathfinding_move_to'] = {
+        init: function() {
+          this.appendDummyInput().appendField("move");
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.appendDummyInput().appendField("to waypoint");
+          this.appendValueInput("WAYPOINT").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Pathfinding'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['pathfinding_stop'] = {
+        init: function() {
+          this.appendDummyInput().appendField("stop pathfinding for");
+          this.appendValueInput("HUMANOID").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Pathfinding'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Teleport Category
+      Blockly.Blocks['teleport_player'] = {
+        init: function() {
+          this.appendDummyInput().appendField("teleport player");
+          this.appendValueInput("PLAYER").setCheck(null);
+          this.appendDummyInput().appendField("to place");
+          this.appendValueInput("PLACE_ID").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Teleport'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['teleport_players'] = {
+        init: function() {
+          this.appendDummyInput().appendField("teleport players");
+          this.appendValueInput("PLAYERS").setCheck("Array");
+          this.appendDummyInput().appendField("to place");
+          this.appendValueInput("PLACE_ID").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Teleport'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['teleport_reserve_server'] = {
+        init: function() {
+          this.appendValueInput("PLACE_ID").setCheck("Number").appendField("reserve server for place");
+          this.setOutput(true, "String");
+          this.setColour(getCategoryColor('Teleport'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['teleport_async'] = {
+        init: function() {
+          this.appendDummyInput().appendField("teleport async to place");
+          this.appendValueInput("PLACE_ID").setCheck("Number");
+          this.appendDummyInput().appendField("with players");
+          this.appendValueInput("PLAYERS").setCheck("Array");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Teleport'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Collection Category
+      Blockly.Blocks['collection_add_tag'] = {
+        init: function() {
+          this.appendDummyInput().appendField("add tag");
+          this.appendValueInput("TAG").setCheck("String");
+          this.appendDummyInput().appendField("to");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Collection'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['collection_remove_tag'] = {
+        init: function() {
+          this.appendDummyInput().appendField("remove tag");
+          this.appendValueInput("TAG").setCheck("String");
+          this.appendDummyInput().appendField("from");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Collection'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['collection_get_tagged'] = {
+        init: function() {
+          this.appendDummyInput().appendField("get objects with tag");
+          this.appendValueInput("TAG").setCheck("String");
+          this.setOutput(true, "Array");
+          this.setColour(getCategoryColor('Collection'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // RunService Category
+      Blockly.Blocks['runservice_heartbeat'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("on heartbeat")
+              .appendField(createVarLabel("var. _deltaTime", getCategoryColor('RunService')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('RunService'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['runservice_stepped'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("on stepped")
+              .appendField(createVarLabel("var. _time, var. _deltaTime", getCategoryColor('RunService')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('RunService'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['runservice_renderstep'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("on render step")
+              .appendField(createVarLabel("var. _deltaTime", getCategoryColor('RunService')), "VAR_LABEL");
+          this.appendStatementInput("DO").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('RunService'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Lighting Category
+      Blockly.Blocks['lighting_set_brightness'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set brightness to");
+          this.appendValueInput("VALUE").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Lighting'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['lighting_set_time'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("set time of day to")
+              .appendField(new Blockly.FieldTextInput("12:00:00"), "TIME");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Lighting'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['lighting_change_sky'] = {
+        init: function() {
+          this.appendDummyInput().appendField("change sky texture to");
+          this.appendValueInput("SKY_ID").setCheck("String");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Lighting'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['lighting_set_ambient'] = {
+        init: function() {
+          this.appendDummyInput().appendField("set ambient color to");
+          this.appendValueInput("COLOR").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Lighting'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Effects Category
+      Blockly.Blocks['effects_emit'] = {
+        init: function() {
+          this.appendDummyInput().appendField("emit");
+          this.appendValueInput("COUNT").setCheck("Number");
+          this.appendDummyInput().appendField("particles from");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_enable'] = {
+        init: function() {
+          this.appendDummyInput().appendField("enable effect");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_disable'] = {
+        init: function() {
+          this.appendDummyInput().appendField("disable effect");
+          this.appendValueInput("INSTANCE").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_spawn'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("spawn effect")
+              .appendField(new Blockly.FieldDropdown([["Explosion", "Explosion"], ["Fire", "Fire"], ["Smoke", "Smoke"], ["Sparkles", "Sparkles"]]), "TYPE")
+              .appendField("on");
+          this.appendValueInput("PARENT").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+
+      // Services Category
+      SERVICES_LIST.forEach(service => {
+        Blockly.Blocks[`service_${service.toLowerCase()}`] = {
+          init: function() {
+            this.appendDummyInput().appendField(service);
+            this.setOutput(true, null);
+            this.setColour(getCategoryColor('Services'));
+          }
+        };
+      });
 
     const defineGenerators = () => {
       // Comment
@@ -3984,6 +4612,250 @@ export default function App() {
         const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
         return 'pcall(function()\n  ' + ds + ':SetAsync(' + player + '.UserId, ' + val + ')\nend)\n';
       };
+
+      // Events
+      luaGenerator.forBlock['event_game_start'] = function(block: any) {
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `-- Game Start Event\n${statements}`;
+      };
+      luaGenerator.forBlock['event_player_join'] = function(block: any) {
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `game.Players.PlayerAdded:Connect(function(player)\n${statements}end)\n`;
+      };
+      luaGenerator.forBlock['event_touched'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'script.Parent';
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `${instance}.Touched:Connect(function(hit)\n${statements}end)\n`;
+      };
+      luaGenerator.forBlock['event_clicked'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'script.Parent';
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `${instance}.MouseClick:Connect(function(player)\n${statements}end)\n`;
+      };
+      luaGenerator.forBlock['event_value_changed'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'script.Parent';
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `${instance}.Changed:Connect(function(value)\n${statements}end)\n`;
+      };
+
+      // Input
+      luaGenerator.forBlock['input_key_pressed'] = function(block: any) {
+        const key = block.getFieldValue('KEY');
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `game:GetService("UserInputService").InputBegan:Connect(function(input, processed)\n  if not processed and input.KeyCode == Enum.KeyCode.${key} then\n${statements}  end\nend)\n`;
+      };
+      luaGenerator.forBlock['input_mouse_click'] = function(block: any) {
+        const button = block.getFieldValue('BUTTON');
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `game:GetService("UserInputService").InputBegan:Connect(function(input, processed)\n  if not processed and input.UserInputType == Enum.UserInputType.${button} then\n${statements}  end\nend)\n`;
+      };
+      luaGenerator.forBlock['input_touch'] = function(block: any) {
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `game:GetService("UserInputService").TouchTapInWorld:Connect(function(position, processed)\n  if not processed then\n${statements}  end\nend)\n`;
+      };
+      luaGenerator.forBlock['input_button_pressed'] = function(block: any) {
+        const button = luaGenerator.valueToCode(block, 'BUTTON', Order.ATOMIC) || 'nil';
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `${button}.MouseButton1Click:Connect(function()\n${statements}end)\n`;
+      };
+      luaGenerator.forBlock['input_mouse_position'] = function() {
+        return ['game:GetService("UserInputService"):GetMouseLocation()', Order.ATOMIC];
+      };
+
+      // Camera
+      luaGenerator.forBlock['camera_set_type'] = function(block: any) {
+        const type = block.getFieldValue('TYPE');
+        return `workspace.CurrentCamera.CameraType = Enum.CameraType.${type}\n`;
+      };
+      luaGenerator.forBlock['camera_set_subject'] = function(block: any) {
+        const subject = luaGenerator.valueToCode(block, 'SUBJECT', Order.ATOMIC) || 'nil';
+        return `workspace.CurrentCamera.CameraSubject = ${subject}\n`;
+      };
+      luaGenerator.forBlock['camera_move'] = function(block: any) {
+        const position = luaGenerator.valueToCode(block, 'POSITION', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        return `workspace.CurrentCamera.CFrame = CFrame.new(${position})\n`;
+      };
+      luaGenerator.forBlock['camera_set_fov'] = function(block: any) {
+        const fov = luaGenerator.valueToCode(block, 'FOV', Order.ATOMIC) || '70';
+        return `workspace.CurrentCamera.FieldOfView = ${fov}\n`;
+      };
+
+      // Animation
+      luaGenerator.forBlock['animation_load'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.ATOMIC) || 'nil';
+        const id = luaGenerator.valueToCode(block, 'ID', Order.ATOMIC) || '0';
+        return [`${humanoid}:LoadAnimation(Instance.new("Animation", {AnimationId = "rbxassetid://" .. ${id}}))`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['animation_play'] = function(block: any) {
+        const track = luaGenerator.valueToCode(block, 'TRACK', Order.ATOMIC) || 'nil';
+        return `${track}:Play()\n`;
+      };
+      luaGenerator.forBlock['animation_stop'] = function(block: any) {
+        const track = luaGenerator.valueToCode(block, 'TRACK', Order.ATOMIC) || 'nil';
+        return `${track}:Stop()\n`;
+      };
+      luaGenerator.forBlock['animation_adjust_speed'] = function(block: any) {
+        const track = luaGenerator.valueToCode(block, 'TRACK', Order.ATOMIC) || 'nil';
+        const speed = luaGenerator.valueToCode(block, 'SPEED', Order.ATOMIC) || '1';
+        return `${track}:AdjustSpeed(${speed})\n`;
+      };
+
+      // Physics
+      luaGenerator.forBlock['physics_apply_force'] = function(block: any) {
+        const part = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'nil';
+        const force = luaGenerator.valueToCode(block, 'FORCE', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        return `${part}:ApplyImpulse(${force})\n`;
+      };
+      luaGenerator.forBlock['physics_set_velocity'] = function(block: any) {
+        const part = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'nil';
+        const velocity = luaGenerator.valueToCode(block, 'VELOCITY', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        return `${part}.AssemblyLinearVelocity = ${velocity}\n`;
+      };
+      luaGenerator.forBlock['physics_enable'] = function(block: any) {
+        const part = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'nil';
+        return `${part}.Anchored = false\n`;
+      };
+      luaGenerator.forBlock['physics_set_mass'] = function(block: any) {
+        const part = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'nil';
+        const mass = luaGenerator.valueToCode(block, 'MASS', Order.ATOMIC) || '1';
+        return `-- Mass is read-only, setting density instead\nlocal props = Instance.new("PhysicalProperties", {Density = ${mass}})\n${part}.CustomPhysicalProperties = props\n`;
+      };
+
+      // Raycast
+      luaGenerator.forBlock['raycast_forward'] = function(block: any) {
+        const origin = luaGenerator.valueToCode(block, 'ORIGIN', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        const distance = luaGenerator.valueToCode(block, 'DISTANCE', Order.ATOMIC) || '10';
+        return [`workspace:Raycast(${origin}, workspace.CurrentCamera.CFrame.LookVector * ${distance})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['raycast_down'] = function(block: any) {
+        const origin = luaGenerator.valueToCode(block, 'ORIGIN', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        const distance = luaGenerator.valueToCode(block, 'DISTANCE', Order.ATOMIC) || '10';
+        return [`workspace:Raycast(${origin}, Vector3.new(0, -${distance}, 0))`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['raycast_get_hit_object'] = function(block: any) {
+        const result = luaGenerator.valueToCode(block, 'RESULT', Order.ATOMIC) || 'nil';
+        return [`${result} and ${result}.Instance`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['raycast_get_hit_position'] = function(block: any) {
+        const result = luaGenerator.valueToCode(block, 'RESULT', Order.ATOMIC) || 'nil';
+        return [`${result} and ${result}.Position`, Order.ATOMIC];
+      };
+
+      // Pathfinding
+      luaGenerator.forBlock['pathfinding_create'] = function() {
+        return ['game:GetService("PathfindingService"):CreatePath()', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['pathfinding_compute'] = function(block: any) {
+        const path = luaGenerator.valueToCode(block, 'PATH', Order.ATOMIC) || 'nil';
+        const start = luaGenerator.valueToCode(block, 'START', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        const finish = luaGenerator.valueToCode(block, 'FINISH', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        return `${path}:ComputeAsync(${start}, ${finish})\n`;
+      };
+      luaGenerator.forBlock['pathfinding_move_to'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.ATOMIC) || 'nil';
+        const waypoint = luaGenerator.valueToCode(block, 'WAYPOINT', Order.ATOMIC) || 'nil';
+        return `${humanoid}:MoveTo(${waypoint}.Position)\n`;
+      };
+      luaGenerator.forBlock['pathfinding_stop'] = function(block: any) {
+        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.ATOMIC) || 'nil';
+        return `${humanoid}:MoveTo(${humanoid}.Parent.PrimaryPart.Position)\n`;
+      };
+
+      // Teleport
+      luaGenerator.forBlock['teleport_player'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.ATOMIC) || 'nil';
+        const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
+        return `game:GetService("TeleportService"):Teleport(${placeId}, ${player})\n`;
+      };
+      luaGenerator.forBlock['teleport_players'] = function(block: any) {
+        const players = luaGenerator.valueToCode(block, 'PLAYERS', Order.ATOMIC) || '{}';
+        const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
+        return `game:GetService("TeleportService"):TeleportPartyAsync(${placeId}, ${players})\n`;
+      };
+      luaGenerator.forBlock['teleport_reserve_server'] = function(block: any) {
+        const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
+        return [`game:GetService("TeleportService"):ReserveServer(${placeId})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['teleport_async'] = function(block: any) {
+        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.ATOMIC) || 'nil';
+        const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
+        return `game:GetService("TeleportService"):TeleportAsync(${placeId}, {${player}})\n`;
+      };
+
+      // Collection
+      luaGenerator.forBlock['collection_add_tag'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
+        const tag = luaGenerator.valueToCode(block, 'TAG', Order.ATOMIC) || '""';
+        return `game:GetService("CollectionService"):AddTag(${instance}, ${tag})\n`;
+      };
+      luaGenerator.forBlock['collection_remove_tag'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
+        const tag = luaGenerator.valueToCode(block, 'TAG', Order.ATOMIC) || '""';
+        return `game:GetService("CollectionService"):RemoveTag(${instance}, ${tag})\n`;
+      };
+      luaGenerator.forBlock['collection_get_tagged'] = function(block: any) {
+        const tag = luaGenerator.valueToCode(block, 'TAG', Order.ATOMIC) || '""';
+        return [`game:GetService("CollectionService"):GetTagged(${tag})`, Order.ATOMIC];
+      };
+
+      // RunService
+      luaGenerator.forBlock['runservice_heartbeat'] = function(block: any) {
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `game:GetService("RunService").Heartbeat:Connect(function(step)\n${statements}end)\n`;
+      };
+      luaGenerator.forBlock['runservice_stepped'] = function(block: any) {
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `game:GetService("RunService").Stepped:Connect(function(time, step)\n${statements}end)\n`;
+      };
+      luaGenerator.forBlock['runservice_renderstep'] = function(block: any) {
+        const statements = luaGenerator.statementToCode(block, 'DO');
+        return `game:GetService("RunService").RenderStepped:Connect(function(step)\n${statements}end)\n`;
+      };
+
+      // Lighting
+      luaGenerator.forBlock['lighting_set_brightness'] = function(block: any) {
+        const value = luaGenerator.valueToCode(block, 'VALUE', Order.ATOMIC) || '1';
+        return `game:GetService("Lighting").Brightness = ${value}\n`;
+      };
+      luaGenerator.forBlock['lighting_set_time'] = function(block: any) {
+        const value = luaGenerator.valueToCode(block, 'VALUE', Order.ATOMIC) || '""';
+        return `game:GetService("Lighting").TimeOfDay = ${value}\n`;
+      };
+      luaGenerator.forBlock['lighting_change_sky'] = function(block: any) {
+        const id = luaGenerator.valueToCode(block, 'ID', Order.ATOMIC) || '0';
+        return `local sky = game:GetService("Lighting"):FindFirstChildOfClass("Sky") or Instance.new("Sky", game:GetService("Lighting"))\nsky.SkyboxBk = "rbxassetid://" .. ${id}\nsky.SkyboxDn = "rbxassetid://" .. ${id}\nsky.SkyboxFt = "rbxassetid://" .. ${id}\nsky.SkyboxLf = "rbxassetid://" .. ${id}\nsky.SkyboxRt = "rbxassetid://" .. ${id}\nsky.SkyboxUp = "rbxassetid://" .. ${id}\n`;
+      };
+      luaGenerator.forBlock['lighting_set_ambient'] = function(block: any) {
+        const color = luaGenerator.valueToCode(block, 'COLOR', Order.ATOMIC) || 'Color3.new(1,1,1)';
+        return `game:GetService("Lighting").Ambient = ${color}\n`;
+      };
+
+      // Effects
+      luaGenerator.forBlock['effects_emit'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
+        const count = luaGenerator.valueToCode(block, 'COUNT', Order.ATOMIC) || '10';
+        return `${instance}:Emit(${count})\n`;
+      };
+      luaGenerator.forBlock['effects_enable'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
+        return `${instance}.Enabled = true\n`;
+      };
+      luaGenerator.forBlock['effects_disable'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
+        return `${instance}.Enabled = false\n`;
+      };
+      luaGenerator.forBlock['effects_spawn'] = function(block: any) {
+        const type = block.getFieldValue('TYPE');
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.ATOMIC) || 'workspace';
+        return `Instance.new("${type}", ${parent})\n`;
+      };
+
+      // Services
+      SERVICES_LIST.forEach(service => {
+        luaGenerator.forBlock[`service_${service.toLowerCase()}`] = function() {
+          return [`game:GetService("${service}")`, Order.ATOMIC];
+        };
+      });
 
       // Placeholders
       luaGenerator.forBlock['placeholder_string'] = function() { return ['""', Order.ATOMIC]; };
@@ -5040,6 +5912,288 @@ export default function App() {
               }
             }
           ];
+        } else if (cat.name === 'Services') {
+          blocks = SERVICES_LIST.map(service => ({
+            kind: 'block',
+            type: `service_${service.toLowerCase()}`
+          }));
+        } else if (cat.name === 'Events') {
+          blocks = [
+            { kind: 'block', type: 'event_game_start' },
+            { 
+              kind: 'block', 
+              type: 'event_player_join' 
+            },
+            { 
+              kind: 'block', 
+              type: 'event_touched',
+              inputs: { PART: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_clicked',
+              inputs: { CLICK_DETECTOR: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_value_changed',
+              inputs: { VALUE: { shadow: { type: 'placeholder_any' } } }
+            }
+          ];
+        } else if (cat.name === 'Input') {
+          blocks = [
+            { kind: 'block', type: 'input_key_pressed' },
+            { kind: 'block', type: 'input_mouse_click' },
+            { kind: 'block', type: 'input_touch' },
+            { 
+              kind: 'block', 
+              type: 'input_button_pressed',
+              inputs: { BUTTON: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { kind: 'block', type: 'input_mouse_position' }
+          ];
+        } else if (cat.name === 'Camera') {
+          blocks = [
+            { kind: 'block', type: 'camera_set_type' },
+            { 
+              kind: 'block', 
+              type: 'camera_set_subject',
+              inputs: { SUBJECT: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'camera_move',
+              inputs: { POSITION: { shadow: { type: 'placeholder_vector3' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'camera_set_fov',
+              inputs: { FOV: { shadow: { type: 'placeholder_number' } } }
+            }
+          ];
+        } else if (cat.name === 'Animation') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'animation_load',
+              inputs: { 
+                ANIM_ID: { shadow: { type: 'placeholder_string' } },
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'animation_play',
+              inputs: { ANIM_TRACK: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'animation_stop',
+              inputs: { ANIM_TRACK: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'animation_adjust_speed',
+              inputs: { 
+                ANIM_TRACK: { shadow: { type: 'placeholder_any' } },
+                SPEED: { shadow: { type: 'placeholder_number' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Physics') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'physics_apply_force',
+              inputs: { 
+                FORCE: { shadow: { type: 'placeholder_vector3' } },
+                PART: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'physics_set_velocity',
+              inputs: { 
+                PART: { shadow: { type: 'placeholder_instance' } },
+                VELOCITY: { shadow: { type: 'placeholder_vector3' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'physics_enable',
+              inputs: { PART: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'physics_set_mass',
+              inputs: { 
+                PART: { shadow: { type: 'placeholder_instance' } },
+                MASS: { shadow: { type: 'placeholder_number' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Raycast') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'raycast_forward',
+              inputs: { 
+                ORIGIN: { shadow: { type: 'placeholder_vector3' } },
+                DISTANCE: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'raycast_down',
+              inputs: { 
+                ORIGIN: { shadow: { type: 'placeholder_vector3' } },
+                DISTANCE: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'raycast_get_hit_object',
+              inputs: { RAYCAST_RESULT: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'raycast_get_hit_position',
+              inputs: { RAYCAST_RESULT: { shadow: { type: 'placeholder_any' } } }
+            }
+          ];
+        } else if (cat.name === 'Pathfinding') {
+          blocks = [
+            { kind: 'block', type: 'pathfinding_create' },
+            { 
+              kind: 'block', 
+              type: 'pathfinding_compute',
+              inputs: { 
+                START: { shadow: { type: 'placeholder_vector3' } },
+                END: { shadow: { type: 'placeholder_vector3' } },
+                PATH: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'pathfinding_move_to',
+              inputs: { 
+                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
+                WAYPOINT: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'pathfinding_stop',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            }
+          ];
+        } else if (cat.name === 'Teleport') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'teleport_player',
+              inputs: { 
+                PLAYER: { shadow: { type: 'placeholder_player' } },
+                PLACE_ID: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'teleport_players',
+              inputs: { 
+                PLAYERS: { shadow: { type: 'placeholder_any' } },
+                PLACE_ID: { shadow: { type: 'placeholder_number' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'teleport_reserve_server',
+              inputs: { PLACE_ID: { shadow: { type: 'placeholder_number' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'teleport_async',
+              inputs: { 
+                PLACE_ID: { shadow: { type: 'placeholder_number' } },
+                PLAYERS: { shadow: { type: 'placeholder_any' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'Collection') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'collection_add_tag',
+              inputs: { 
+                TAG: { shadow: { type: 'placeholder_string' } },
+                INSTANCE: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'collection_remove_tag',
+              inputs: { 
+                TAG: { shadow: { type: 'placeholder_string' } },
+                INSTANCE: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'collection_get_tagged',
+              inputs: { TAG: { shadow: { type: 'placeholder_string' } } }
+            }
+          ];
+        } else if (cat.name === 'RunService') {
+          blocks = [
+            { kind: 'block', type: 'runservice_heartbeat' },
+            { kind: 'block', type: 'runservice_stepped' },
+            { kind: 'block', type: 'runservice_renderstep' }
+          ];
+        } else if (cat.name === 'Lighting') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'lighting_set_brightness',
+              inputs: { VALUE: { shadow: { type: 'placeholder_number' } } }
+            },
+            { kind: 'block', type: 'lighting_set_time' },
+            { 
+              kind: 'block', 
+              type: 'lighting_change_sky',
+              inputs: { SKY_ID: { shadow: { type: 'placeholder_string' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'lighting_set_ambient',
+              inputs: { COLOR: { shadow: { type: 'placeholder_color3' } } }
+            }
+          ];
+        } else if (cat.name === 'Effects') {
+          blocks = [
+            { 
+              kind: 'block', 
+              type: 'effects_emit',
+              inputs: { 
+                COUNT: { shadow: { type: 'placeholder_number' } },
+                INSTANCE: { shadow: { type: 'placeholder_instance' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'effects_enable',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'effects_disable',
+              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'effects_spawn',
+              inputs: { PARENT: { shadow: { type: 'placeholder_instance' } } }
+            }
+          ];
         } else {
           blocks = [
             { kind: 'label', text: 'Coming Soon...' }
@@ -5646,16 +6800,6 @@ export default function App() {
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   className="absolute top-full left-0 mt-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[120] overflow-hidden py-2 origin-top-left"
                 >
-                    <button 
-                      onClick={() => {
-                        setShowGuide(true);
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
-                    >
-                      <BookOpen size={18} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Hướng Dẫn' : 'Guide'}
-                    </button>
                     <button 
                       onClick={() => {
                         setShowInfo(true);
