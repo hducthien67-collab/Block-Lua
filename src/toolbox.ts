@@ -1,37 +1,28 @@
-const RAINBOW_COLORS = [
-  '#FF4B4B', // Red
-  '#FF8C1A', // Orange
-  '#FFCC00', // Yellow
-  '#48A868', // Green
-  '#4C97FF', // Blue
-  '#6600FF', // Indigo
-  '#CF63CF', // Violet
-];
+import { getCategoryColor } from './colors';
 
 const SERVICES_LIST = [
-  'Workspace', 'Players', 'ReplicatedStorage', 'ServerStorage', 'ServerScriptService',
-  'StarterPlayer', 'StarterGui', 'StarterPack', 'Lighting', 'SoundService',
-  'RunService', 'TweenService', 'UserInputService', 'ContextActionService',
-  'CollectionService', 'Teams', 'Debris', 'DataStoreService', 'MemoryStoreService',
-  'MessagingService', 'HttpService', 'MarketplaceService', 'TeleportService',
-  'BadgeService', 'PathfindingService', 'ProximityPromptService', 'TextService',
-  'LocalizationService', 'AvatarEditorService', 'ContentProvider', 'InsertService',
-  'GuiService', 'PhysicsService'
+  'Workspace', 'Players', 'Lighting', 'MaterialService', 'NetworkClient', 
+  'ReplicatedFirst', 'ReplicatedStorage', 'ServerScriptService', 'ServerStorage', 
+  'StarterPack', 'Teams', 'SoundService', 'TextChatService',
+  'StarterPlayer', 'StarterGui', 'RunService', 'TweenService', 'UserInputService', 
+  'ContextActionService', 'CollectionService', 'Debris', 'DataStoreService', 
+  'MemoryStoreService', 'MessagingService', 'HttpService', 'MarketplaceService', 
+  'TeleportService', 'BadgeService', 'PathfindingService', 'ProximityPromptService', 
+  'TextService', 'AvatarEditorService', 'ContentProvider', 
+  'InsertService', 'GuiService', 'PhysicsService'
 ];
 
-export const toolbox = {
+const rawToolbox = {
   kind: 'categoryToolbox',
   contents: [
     {
       kind: 'category',
       name: 'Comment',
-      colour: RAINBOW_COLORS[0],
       contents: [{ kind: 'block', type: 'comment' }]
     },
     {
       kind: 'category',
       name: 'Debug',
-      colour: RAINBOW_COLORS[1],
       contents: [
         { kind: 'block', type: 'print' },
         { kind: 'block', type: 'warn' },
@@ -41,7 +32,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Logic',
-      colour: RAINBOW_COLORS[2],
       contents: [
         { kind: 'block', type: 'lua_if' },
         { kind: 'block', type: 'logic_negate' },
@@ -58,7 +48,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Math',
-      colour: RAINBOW_COLORS[3],
       contents: [
         { kind: 'block', type: 'math_number' },
         { kind: 'block', type: 'math_arithmetic' },
@@ -78,7 +67,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Text',
-      colour: RAINBOW_COLORS[4],
       contents: [
         { kind: 'block', type: 'text' },
         { kind: 'block', type: 'text_join' },
@@ -97,7 +85,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Sound',
-      colour: RAINBOW_COLORS[5],
       contents: [
         { kind: 'block', type: 'sound_play' },
         { kind: 'block', type: 'sound_stop' },
@@ -114,25 +101,21 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Values',
-      colour: RAINBOW_COLORS[6],
       contents: []
     },
     {
       kind: 'category',
       name: 'Variables',
       custom: 'VARIABLE',
-      colour: RAINBOW_COLORS[0]
     },
     {
       kind: 'category',
       name: 'Lists',
-      colour: RAINBOW_COLORS[1],
       contents: []
     },
     {
       kind: 'category',
       name: 'Loops',
-      colour: RAINBOW_COLORS[2],
       contents: [
         { kind: 'block', type: 'wait' },
         { kind: 'block', type: 'loops_while_lua' },
@@ -144,9 +127,18 @@ export const toolbox = {
     },
     {
       kind: 'category',
+      name: 'Roblox Services',
+      contents: SERVICES_LIST.map(service => ({
+        kind: 'block',
+        type: `service_${service.toLowerCase()}`
+      }))
+    },
+    {
+      kind: 'category',
       name: 'World',
-      colour: RAINBOW_COLORS[3],
       contents: [
+        { kind: 'block', type: 'world_game' },
+        { kind: 'block', type: 'world_workspace' },
         { kind: 'block', type: 'world_me' },
         { kind: 'block', type: 'world_this_script' },
         { kind: 'block', type: 'world_instance' },
@@ -167,7 +159,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Instance',
-      colour: RAINBOW_COLORS[4],
       contents: [
         { kind: 'block', type: 'instance_selector' }
       ]
@@ -175,31 +166,26 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Part',
-      colour: RAINBOW_COLORS[5],
       contents: []
     },
     {
       kind: 'category',
       name: 'Character',
-      colour: RAINBOW_COLORS[6],
       contents: []
     },
     {
       kind: 'category',
       name: 'Model',
-      colour: RAINBOW_COLORS[0],
       contents: []
     },
     {
       kind: 'category',
       name: 'Gui',
-      colour: RAINBOW_COLORS[1],
       contents: []
     },
     {
       kind: 'category',
       name: 'Player',
-      colour: RAINBOW_COLORS[2],
       contents: [
         { kind: 'block', type: 'player_joined' },
         { kind: 'block', type: 'player_leaving' },
@@ -213,43 +199,36 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Clickdetector',
-      colour: RAINBOW_COLORS[3],
       contents: []
     },
     {
       kind: 'category',
       name: 'Marketplace',
-      colour: RAINBOW_COLORS[4],
       contents: []
     },
     {
       kind: 'category',
       name: 'Tweening',
-      colour: RAINBOW_COLORS[5],
       contents: []
     },
     {
       kind: 'category',
       name: 'Client',
-      colour: RAINBOW_COLORS[6],
       contents: []
     },
     {
       kind: 'category',
       name: 'Server',
-      colour: RAINBOW_COLORS[0],
       contents: []
     },
     {
       kind: 'category',
       name: 'Leaderstats',
-      colour: RAINBOW_COLORS[1],
       contents: []
     },
     {
       kind: 'category',
       name: 'Events',
-      colour: RAINBOW_COLORS[5],
       contents: [
         { kind: 'block', type: 'event_game_start' },
         { kind: 'block', type: 'event_player_join' },
@@ -260,8 +239,15 @@ export const toolbox = {
     },
     {
       kind: 'category',
+      name: 'RemoteEvent',
+      contents: [
+        { kind: 'block', type: 'remote_on_server_event' },
+        { kind: 'block', type: 'remote_fire_server' }
+      ]
+    },
+    {
+      kind: 'category',
       name: 'Input',
-      colour: RAINBOW_COLORS[6],
       contents: [
         { kind: 'block', type: 'input_key_pressed' },
         { kind: 'block', type: 'input_mouse_click' },
@@ -273,7 +259,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Camera',
-      colour: RAINBOW_COLORS[0],
       contents: [
         { kind: 'block', type: 'camera_set_type' },
         { kind: 'block', type: 'camera_set_subject' },
@@ -284,7 +269,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Animation',
-      colour: RAINBOW_COLORS[1],
       contents: [
         { kind: 'block', type: 'animation_load' },
         { kind: 'block', type: 'animation_play' },
@@ -295,7 +279,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Physics',
-      colour: RAINBOW_COLORS[2],
       contents: [
         { kind: 'block', type: 'physics_apply_force' },
         { kind: 'block', type: 'physics_set_velocity' },
@@ -306,7 +289,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Raycast',
-      colour: RAINBOW_COLORS[3],
       contents: [
         { kind: 'block', type: 'raycast_forward' },
         { kind: 'block', type: 'raycast_down' },
@@ -317,7 +299,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Pathfinding',
-      colour: RAINBOW_COLORS[4],
       contents: [
         { kind: 'block', type: 'pathfinding_create' },
         { kind: 'block', type: 'pathfinding_compute' },
@@ -328,7 +309,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Teleport',
-      colour: RAINBOW_COLORS[5],
       contents: [
         { kind: 'block', type: 'teleport_player' },
         { kind: 'block', type: 'teleport_players' },
@@ -339,7 +319,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Collection',
-      colour: RAINBOW_COLORS[6],
       contents: [
         { kind: 'block', type: 'collection_add_tag' },
         { kind: 'block', type: 'collection_remove_tag' },
@@ -349,7 +328,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'RunService',
-      colour: RAINBOW_COLORS[0],
       contents: [
         { kind: 'block', type: 'runservice_heartbeat' },
         { kind: 'block', type: 'runservice_stepped' },
@@ -359,7 +337,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Lighting',
-      colour: RAINBOW_COLORS[1],
       contents: [
         { kind: 'block', type: 'lighting_set_brightness' },
         { kind: 'block', type: 'lighting_set_time' },
@@ -370,7 +347,6 @@ export const toolbox = {
     {
       kind: 'category',
       name: 'Effects',
-      colour: RAINBOW_COLORS[2],
       contents: [
         { kind: 'block', type: 'effects_emit' },
         { kind: 'block', type: 'effects_enable' },
@@ -382,12 +358,10 @@ export const toolbox = {
       kind: 'category',
       name: 'Functions',
       custom: 'PROCEDURE',
-      colour: RAINBOW_COLORS[2]
     },
     {
       kind: 'category',
       name: 'Datastore',
-      colour: RAINBOW_COLORS[3],
       contents: [
         { kind: 'block', type: 'datastore_setup' },
         { kind: 'block', type: 'datastore_instance' },
@@ -395,15 +369,14 @@ export const toolbox = {
         { kind: 'block', type: 'datastore_get' },
         { kind: 'block', type: 'datastore_save' }
       ]
-    },
-    {
-      kind: 'category',
-      name: 'Services',
-      colour: RAINBOW_COLORS[4],
-      contents: SERVICES_LIST.map(service => ({
-        kind: 'block',
-        type: `service_${service.toLowerCase()}`
-      }))
     }
   ]
+};
+
+export const toolbox = {
+  ...rawToolbox,
+  contents: rawToolbox.contents.map(cat => ({
+    ...cat,
+    colour: getCategoryColor(cat.name)
+  }))
 };

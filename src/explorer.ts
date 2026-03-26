@@ -50,15 +50,23 @@ const INITIAL_STRUCTURE: RobloxInstance = {
         { id: 'camera', Name: 'Camera', ClassName: 'Camera', Children: [], Properties: {} },
         { id: 'terrain', Name: 'Terrain', ClassName: 'Terrain', Children: [], Properties: {} },
     ] },
+    { id: 'players', Name: 'Players', ClassName: 'Players', Children: [], Properties: {} },
+    { id: 'lighting', Name: 'Lighting', ClassName: 'Lighting', expanded: false, Properties: { ...DEFAULT_PROPERTIES.Lighting }, Children: [] },
+    { id: 'materialservice', Name: 'MaterialService', ClassName: 'MaterialService', Children: [], Properties: {} },
+    { id: 'networkclient', Name: 'NetworkClient', ClassName: 'NetworkClient', Children: [], Properties: {} },
+    { id: 'replicatedfirst', Name: 'ReplicatedFirst', ClassName: 'ReplicatedFirst', Children: [], Properties: {} },
     { id: 'replicatedstorage', Name: 'ReplicatedStorage', ClassName: 'ReplicatedStorage', Children: [], Properties: {} },
     { id: 'serverscriptservice', Name: 'ServerScriptService', ClassName: 'ServerScriptService', Children: [], Properties: {} },
     { id: 'serverstorage', Name: 'ServerStorage', ClassName: 'ServerStorage', Children: [], Properties: {} },
-    { id: 'startergui', Name: 'StarterGui', ClassName: 'StarterGui', Children: [], Properties: {} },
     { id: 'starterpack', Name: 'StarterPack', ClassName: 'StarterPack', Children: [], Properties: {} },
+    { id: 'startergui', Name: 'StarterGui', ClassName: 'StarterGui', Children: [], Properties: {} },
     { id: 'starterplayer', Name: 'StarterPlayer', ClassName: 'StarterPlayer', Children: [
         { id: 'startercharacterscripts', Name: 'StarterCharacterScripts', ClassName: 'StarterCharacterScripts', Children: [], Properties: {} },
         { id: 'starterplayerscripts', Name: 'StarterPlayerScripts', ClassName: 'StarterPlayerScripts', Children: [], Properties: {} },
     ], Properties: {} },
+    { id: 'teams', Name: 'Teams', ClassName: 'Teams', Children: [], Properties: {} },
+    { id: 'soundservice', Name: 'SoundService', ClassName: 'SoundService', Children: [], Properties: {} },
+    { id: 'textchatservice', Name: 'TextChatService', ClassName: 'TextChatService', Children: [], Properties: {} },
   ],
 };
 
@@ -128,7 +136,12 @@ export const useExplorer = () => {
             if (child.id === id) {
               const metadata = ROBLOX_CLASSES.find(c => c.name === child.ClassName);
               const isService = metadata && metadata.category === 'Services';
-              const isProtected = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterpack', 'starterplayer', 'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'].includes(child.id.toLowerCase());
+              const isProtected = [
+                'workspace', 'players', 'lighting', 'materialservice', 'networkclient', 
+                'replicatedfirst', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 
+                'starterpack', 'startergui', 'starterplayer', 'teams', 'soundservice', 'textchatservice',
+                'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'
+              ].includes(child.id.toLowerCase());
               
               if (isService || isProtected) return true; // Keep (don't delete)
               return false; // Delete

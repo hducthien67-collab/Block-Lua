@@ -6,6 +6,25 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as Blockly from 'blockly';
 import { luaGenerator, Order } from 'blockly/lua';
+
+class CustomZelosConstantProvider extends Blockly.zelos.ConstantProvider {
+  shapeFor(connection: Blockly.RenderedConnection) {
+    const shape = super.shapeFor(connection);
+    if (shape === this.HEXAGONAL) {
+      return this.ROUNDED;
+    }
+    return shape;
+  }
+}
+
+class CustomZelosRenderer extends Blockly.zelos.Renderer {
+  makeConstants_() {
+    return new CustomZelosConstantProvider();
+  }
+}
+
+Blockly.blockRendering.register('custom_zelos', CustomZelosRenderer);
+
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BookOpen, 
@@ -38,16 +57,7 @@ import { InsertObjectMenu } from './components/Explorer/InsertObjectMenu';
 import { defineCustomBlocks } from './blocks';
 import { defineCustomGenerators } from './generators';
 import { toolbox } from './toolbox';
-
-const RAINBOW_COLORS = [
-  '#FF4B4B', // Red
-  '#FF8C1A', // Orange
-  '#FFCC00', // Yellow
-  '#48A868', // Green
-  '#4C97FF', // Blue
-  '#6600FF', // Indigo
-  '#CF63CF', // Violet
-];
+import { getCategoryColor } from './colors';
 
 const CATEGORIES = [
   { name: 'Comment' },
@@ -56,6 +66,7 @@ const CATEGORIES = [
   { name: 'Math' },
   { name: 'Text' },
   { name: 'Sound' },
+  { name: 'RemoteEvent' },
   { name: 'Values' },
   { name: 'Variables' },
   { name: 'Lists' },
@@ -75,7 +86,6 @@ const CATEGORIES = [
   { name: 'Leaderstats' },
   { name: 'Functions' },
   { name: 'Datastore' },
-  { name: 'Services' },
   { name: 'Events' },
   { name: 'Input' },
   { name: 'Camera' },
@@ -88,25 +98,131 @@ const CATEGORIES = [
   { name: 'RunService' },
   { name: 'Lighting' },
   { name: 'Effects' },
-].map((cat, index) => ({
+].map((cat) => ({
   ...cat,
-  color: RAINBOW_COLORS[index % RAINBOW_COLORS.length]
+  color: getCategoryColor(cat.name)
 }));
 
-const SERVICES_LIST = [
-  'Workspace', 'Players', 'ReplicatedStorage', 'ServerStorage', 'ServerScriptService',
-  'StarterPlayer', 'StarterGui', 'StarterPack', 'Lighting', 'SoundService',
-  'RunService', 'TweenService', 'UserInputService', 'ContextActionService',
-  'CollectionService', 'Teams', 'Debris', 'DataStoreService', 'MemoryStoreService',
-  'MessagingService', 'HttpService', 'MarketplaceService', 'TeleportService',
-  'BadgeService', 'PathfindingService', 'ProximityPromptService', 'TextService',
-  'LocalizationService', 'AvatarEditorService', 'ContentProvider', 'InsertService',
-  'GuiService', 'PhysicsService'
-];
+const BlocklyPreview = ({ blockType }: { blockType: string }) => {
+  const previewRef = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null);
 
-const getCategoryColor = (name: string) => {
-  const cat = CATEGORIES.find(c => c.name === name);
-  return cat ? cat.color : '#999999';
+  useEffect(() => {
+    if (!previewRef.current) return;
+
+    // Clean up previous workspace
+    if (workspaceRef.current) {
+      try {
+        workspaceRef.current.dispose();
+      } catch (e) {
+        console.warn("Error disposing workspace:", e);
+      }
+      workspaceRef.current = null;
+    }
+
+    // Inject new read-only workspace
+    workspaceRef.current = Blockly.inject(previewRef.current, {
+      readOnly: true,
+      sounds: false,
+      scrollbars: false,
+      trashcan: false,
+      renderer: 'custom_zelos',
+      move: {
+        scrollbars: false,
+        drag: false,
+        wheel: false
+      },
+      theme: Blockly.Theme.defineTheme('previewTheme', {
+        name: 'previewTheme',
+        base: Blockly.Themes.Classic,
+        componentStyles: {
+          workspaceBackgroundColour: 'transparent',
+          toolboxBackgroundColour: 'transparent',
+          toolboxForegroundColour: '#fff',
+          flyoutBackgroundColour: '#252526',
+          flyoutForegroundColour: '#ccc',
+          flyoutOpacity: 1,
+          scrollbarColour: '#797979',
+          insertionMarkerColour: '#fff',
+          insertionMarkerOpacity: 0.3,
+          scrollbarOpacity: 0.4,
+          cursorColour: '#d0d0d0'
+        }
+      })
+    });
+
+    // Create the block
+    try {
+      const block = workspaceRef.current.newBlock(blockType);
+      block.initSvg();
+      block.render();
+
+      // Center the block
+      const metrics = workspaceRef.current.getMetrics();
+      const blockMetrics = block.getBoundingRectangle();
+      
+      const width = blockMetrics.right - blockMetrics.left;
+      const height = blockMetrics.bottom - blockMetrics.top;
+      
+      const x = (metrics.viewWidth - width) / 2;
+      const y = (metrics.viewHeight - height) / 2;
+      
+      block.moveBy(x, y);
+    } catch (e) {
+      console.error("Failed to render preview block:", e);
+    }
+
+    return () => {
+      if (workspaceRef.current) {
+        try {
+          workspaceRef.current.dispose();
+        } catch (e) {
+          console.warn("Error disposing workspace:", e);
+        }
+        workspaceRef.current = null;
+      }
+    };
+  }, [blockType]);
+
+  return <div ref={previewRef} className="w-full h-full" />;
+};
+
+const getBlockDescription = (block: any, lang: string) => {
+  const type = block.type.toLowerCase();
+  if (type.includes('event')) {
+    return lang === 'vi' 
+      ? `Khối sự kiện này sẽ kích hoạt các khối lệnh bên trong nó khi sự kiện ${block.name} xảy ra.`
+      : `This event block triggers the blocks inside it when the ${block.name} event occurs.`;
+  }
+  if (type.includes('set_')) {
+    return lang === 'vi'
+      ? `Khối lệnh này dùng để thay đổi thuộc tính ${block.name.replace('set ', '')} của một đối tượng.`
+      : `This block is used to change the ${block.name.replace('set ', '')} property of an object.`;
+  }
+  if (type.includes('get_')) {
+    return lang === 'vi'
+      ? `Khối lệnh này dùng để lấy giá trị thuộc tính ${block.name.replace('get ', '')} của một đối tượng.`
+      : `This block is used to get the ${block.name.replace('get ', '')} property value of an object.`;
+  }
+  if (type.includes('math')) {
+    return lang === 'vi'
+      ? `Khối lệnh toán học này thực hiện phép tính ${block.name} và trả về kết quả.`
+      : `This math block performs the ${block.name} calculation and returns the result.`;
+  }
+  if (type.includes('logic')) {
+    return lang === 'vi'
+      ? `Khối lệnh logic này dùng để kiểm tra điều kiện ${block.name} và trả về đúng (true) hoặc sai (false).`
+      : `This logic block is used to check the ${block.name} condition and returns true or false.`;
+  }
+  if (type.includes('loops')) {
+    return lang === 'vi'
+      ? `Khối vòng lặp này sẽ lặp lại các khối lệnh bên trong nó dựa trên điều kiện ${block.name}.`
+      : `This loop block repeats the blocks inside it based on the ${block.name} condition.`;
+  }
+  
+  return lang === 'vi' 
+    ? `Khối lệnh này thuộc nhóm ${block.category}. Nó được sử dụng để thực hiện các thao tác liên quan đến ${block.name} trong trò chơi Roblox của bạn.`
+    : `This block belongs to the ${block.category} category. It is used to perform operations related to ${block.name} in your Roblox game.`;
 };
 
 export default function App() {
@@ -122,7 +238,8 @@ export default function App() {
   const [showInfo, setShowInfo] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
-  const [showGuide, setShowGuide] = useState<boolean>(false);
+  const [showBlockInfoModal, setShowBlockInfoModal] = useState<boolean>(false);
+  const [selectedBlockInfo, setSelectedBlockInfo] = useState<any>(null);
 
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -143,10 +260,6 @@ export default function App() {
   };
   const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
   const [definedVariables, setDefinedVariables] = useState<string[]>([]);
-  const [showTutorial, setShowTutorial] = useState<boolean>(() => {
-    return localStorage.getItem('blocklua_tutorial_seen') !== 'true';
-  });
-  const [tutorialStep, setTutorialStep] = useState<number>(0);
   const [enableEffects, setEnableEffects] = useState<boolean>(true);
   const [gameStructure, setGameStructure] = useState<any>(null);
 
@@ -202,6 +315,9 @@ export default function App() {
   const [easingStyleTarget, setEasingStyleTarget] = useState<string | null>(null);
   const [easingDirectionTarget, setEasingDirectionTarget] = useState<string | null>(null);
   const [clientKeyTarget, setClientKeyTarget] = useState<string | null>(null);
+  const [mouseButtonTarget, setMouseButtonTarget] = useState<string | null>(null);
+  const [cameraTypeTarget, setCameraTypeTarget] = useState<string | null>(null);
+  const [effectTypeTarget, setEffectTypeTarget] = useState<string | null>(null);
 
   useEffect(() => {
     (window as any).openInstanceSelector = (blockId: string) => {
@@ -215,6 +331,15 @@ export default function App() {
     };
     (window as any).openClientKeySelector = (blockId: string) => {
       setClientKeyTarget(blockId);
+    };
+    (window as any).openMouseButtonSelector = (blockId: string) => {
+      setMouseButtonTarget(blockId);
+    };
+    (window as any).openCameraTypeSelector = (blockId: string) => {
+      setCameraTypeTarget(blockId);
+    };
+    (window as any).openEffectTypeSelector = (blockId: string) => {
+      setEffectTypeTarget(blockId);
     };
   }, []);
 
@@ -245,6 +370,36 @@ export default function App() {
         block.setFieldValue(key, 'KEY_NAME');
       }
       setClientKeyTarget(null);
+    }
+  };
+
+  const handleMouseButtonSelect = (button: string) => {
+    if (mouseButtonTarget && workspace.current) {
+      const block = workspace.current.getBlockById(mouseButtonTarget);
+      if (block) {
+        block.setFieldValue(button, 'BUTTON');
+      }
+      setMouseButtonTarget(null);
+    }
+  };
+
+  const handleCameraTypeSelect = (type: string) => {
+    if (cameraTypeTarget && workspace.current) {
+      const block = workspace.current.getBlockById(cameraTypeTarget);
+      if (block) {
+        block.setFieldValue(type, 'TYPE');
+      }
+      setCameraTypeTarget(null);
+    }
+  };
+
+  const handleEffectTypeSelect = (type: string) => {
+    if (effectTypeTarget && workspace.current) {
+      const block = workspace.current.getBlockById(effectTypeTarget);
+      if (block) {
+        block.setFieldValue(type, 'TYPE');
+      }
+      setEffectTypeTarget(null);
     }
   };
 
@@ -320,66 +475,13 @@ export default function App() {
     if (selectorTarget && workspace.current) {
       const block = workspace.current.getBlockById(selectorTarget);
       if (block) {
-        block.setFieldValue(displayPath, 'NAME');
+        block.setFieldValue(displayPath, 'INSTANCE');
       }
       setSelectorTarget(null);
     } else {
       setSelectedInstancePath(displayPath);
       setSelectedInstanceId(instanceId);
     }
-  };
-
-  const tutorialSteps = [
-    {
-      title: currentLang === 'vi' ? "Chào mừng đến với BlockLua!" : "Welcome to BlockLua!",
-      text: currentLang === 'vi' ? "Hãy cùng xem qua không gian làm việc. Nhấn phím bất kỳ hoặc click để tiếp tục." : "Let's take a quick tour of the workspace. Press any key or click anywhere to continue.",
-      position: "center"
-    },
-    {
-      title: currentLang === 'vi' ? "Hộp Công Cụ (Toolbox)" : "The Toolbox",
-      text: currentLang === 'vi' ? "Nơi chứa tất cả các khối lệnh. Nhấn vào một nhóm để mở và kéo khối lệnh ra." : "Here you can find all the blocks. Click a category to open it, and drag blocks out.",
-      position: "left"
-    },
-    {
-      title: currentLang === 'vi' ? "Không Gian Làm Việc" : "The Workspace",
-      text: currentLang === 'vi' ? "Kéo thả và kết nối các khối lệnh tại đây để tạo logic của bạn." : "Drop your blocks here and connect them together to build your logic.",
-      position: "center"
-    },
-    {
-      title: currentLang === 'vi' ? "Chuyển Đổi Chế Độ Xem" : "View Switcher",
-      text: currentLang === 'vi' ? "Chuyển đổi giữa giao diện Khối lệnh và Mã Luau được tạo ra." : "Toggle between the visual blocks and the generated Luau code.",
-      position: "top"
-    },
-    {
-      title: currentLang === 'vi' ? "Các Hành Động" : "Actions",
-      text: currentLang === 'vi' ? "Lưu dự án, tải lại sau, hoặc xuất mã để dùng trong Roblox Studio." : "Save your project, load it later, or copy the code to Roblox Studio.",
-      position: "top-right"
-    }
-  ];
-
-  const nextTutorialStep = useCallback(() => {
-    if (tutorialStep < tutorialSteps.length - 1) {
-      setTutorialStep(prev => prev + 1);
-    } else {
-      closeTutorial();
-    }
-  }, [tutorialStep, tutorialSteps.length]);
-
-  useEffect(() => {
-    if (!showTutorial) return;
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-      e.preventDefault();
-      nextTutorialStep();
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showTutorial, nextTutorialStep]);
-
-  const closeTutorial = () => {
-    localStorage.setItem('blocklua_tutorial_seen', 'true');
-    setShowTutorial(false);
   };
 
   const saveWorkspace = useCallback(() => {
@@ -654,6 +756,20 @@ export default function App() {
       };
 
       // World Category
+      Blockly.Blocks['world_game'] = {
+        init: function() {
+          this.appendDummyInput().appendField("game");
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('World'));
+        }
+      };
+      Blockly.Blocks['world_workspace'] = {
+        init: function() {
+          this.appendDummyInput().appendField("workspace");
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('World'));
+        }
+      };
       Blockly.Blocks['world_me'] = {
         init: function() {
           this.appendDummyInput().appendField("me");
@@ -672,21 +788,46 @@ export default function App() {
 
       Blockly.Blocks['world_instance'] = {
         init: function() {
-          const field = new Blockly.FieldTextInput("game.Workspace", (newValue) => {
-            return newValue;
+          const field = new Blockly.FieldTextInput("Instance", function(newValue) {
+            const val = newValue === '' ? 'Instance' : newValue;
+            if (this.textElement_) {
+              if (val === 'Instance') {
+                this.textElement_.style.fillOpacity = '0.5';
+                this.textElement_.style.fontStyle = 'italic';
+              } else {
+                this.textElement_.style.fillOpacity = '1';
+                this.textElement_.style.fontStyle = 'normal';
+              }
+            }
+            return val;
           });
           
+          const originalInit = field.init;
+          field.init = function() {
+            originalInit.call(this);
+            if (this.textElement_) {
+              if (this.getValue() === 'Instance') {
+                this.textElement_.style.fillOpacity = '0.5';
+                this.textElement_.style.fontStyle = 'italic';
+              } else {
+                this.textElement_.style.fillOpacity = '1';
+                this.textElement_.style.fontStyle = 'normal';
+              }
+            }
+          };
+          
           // Custom click handler for the field
-          (field as any).showEditor_ = function() {
+          (field as any).showEditor_ = function(e: Event) {
+            // Do not call originalShowEditor to prevent text input from appearing
             if ((window as any).openInstanceSelector) {
               (window as any).openInstanceSelector(this.getSourceBlock()?.id);
             }
           };
 
           this.appendDummyInput()
-              .appendField("instance")
-              .appendField(field, "NAME");
-          this.setOutput(true, null);
+              .appendField("Instance")
+              .appendField(field, "INSTANCE");
+          this.setOutput(true, "Instance");
           this.setColour(getCategoryColor('World'));
         }
       };
@@ -1963,7 +2104,7 @@ export default function App() {
       Blockly.Blocks['placeholder_instance'] = {
         init: function() {
           this.appendDummyInput()
-              .appendField(new Blockly.FieldLabel("instance", "faded-placeholder-text"));
+              .appendField(new Blockly.FieldLabel("Instance", "faded-placeholder-text"));
           this.setOutput(true, null);
           this.setColour("#3d79cc"); // Darker World/Logic color
         }
@@ -2607,8 +2748,8 @@ export default function App() {
       Blockly.Blocks['marketplace_product_bought'] = {
         init: function() {
           this.appendDummyInput().appendField("product bought");
-          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Marketplace')), "VAR_LABEL");
-          this.appendDummyInput().appendField(createVarLabel("var. _productId", getCategoryColor('Marketplace')), "VAR_LABEL");
+          this.appendDummyInput().appendField(createVarLabel("var. _player", getCategoryColor('Marketplace')), "VAR_LABEL_PLAYER");
+          this.appendDummyInput().appendField(createVarLabel("var. _productId", getCategoryColor('Marketplace')), "VAR_LABEL_PRODUCT");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -3166,8 +3307,15 @@ export default function App() {
       };
       Blockly.Blocks['input_mouse_click'] = {
         init: function() {
+          const buttonField = new Blockly.FieldTextInput("MouseButton1");
+          (buttonField as any).showEditor_ = () => {
+            if ((window as any).openMouseButtonSelector) {
+              (window as any).openMouseButtonSelector(this.id);
+            }
+          };
+
           this.appendDummyInput().appendField("when mouse");
-          this.appendDummyInput().appendField(new Blockly.FieldDropdown([["Left", "MouseButton1"], ["Right", "MouseButton2"]]), "BUTTON");
+          this.appendDummyInput().appendField(buttonField, "BUTTON");
           this.appendDummyInput().appendField("click");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
@@ -3211,11 +3359,20 @@ export default function App() {
       // Camera Category
       Blockly.Blocks['camera_set_type'] = {
         init: function() {
-          this.appendDummyInput().appendField("set camera type to");
-          this.appendDummyInput().appendField(new Blockly.FieldDropdown([["Custom", "Custom"], ["Scriptable", "Scriptable"], ["Fixed", "Fixed"], ["Attach", "Attach"], ["Watch", "Watch"]]), "TYPE");
+          const typeField = new Blockly.FieldTextInput("Custom");
+          (typeField as any).showEditor_ = () => {
+            if ((window as any).openCameraTypeSelector) {
+              (window as any).openCameraTypeSelector(this.id);
+            }
+          };
+
+          this.appendDummyInput()
+              .appendField("set camera type to")
+              .appendField(typeField, "TYPE");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour(getCategoryColor('Camera'));
+          this.setInputsInline(true);
         }
       };
       Blockly.Blocks['camera_set_subject'] = {
@@ -3527,7 +3684,9 @@ export default function App() {
         init: function() {
           this.appendDummyInput()
               .appendField("on stepped")
-              .appendField(createVarLabel("var. _time, var. _deltaTime", getCategoryColor('RunService')), "VAR_LABEL");
+              .appendField(createVarLabel("var. _time", getCategoryColor('RunService')), "VAR_TIME")
+              .appendField(", ")
+              .appendField(createVarLabel("var. _deltaTime", getCategoryColor('RunService')), "VAR_DELTA");
           this.appendStatementInput("DO").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -3626,9 +3785,16 @@ export default function App() {
       };
       Blockly.Blocks['effects_spawn'] = {
         init: function() {
+          const typeField = new Blockly.FieldTextInput("Explosion");
+          (typeField as any).showEditor_ = () => {
+            if ((window as any).openEffectTypeSelector) {
+              (window as any).openEffectTypeSelector(this.id);
+            }
+          };
+
           this.appendDummyInput()
               .appendField("spawn effect")
-              .appendField(new Blockly.FieldDropdown([["Explosion", "Explosion"], ["Fire", "Fire"], ["Smoke", "Smoke"], ["Sparkles", "Sparkles"]]), "TYPE")
+              .appendField(typeField, "TYPE")
               .appendField("on");
           this.appendValueInput("PARENT").setCheck(null);
           this.setPreviousStatement(true, null);
@@ -3637,17 +3803,6 @@ export default function App() {
           this.setInputsInline(true);
         }
       };
-
-      // Services Category
-      SERVICES_LIST.forEach(service => {
-        Blockly.Blocks[`service_${service.toLowerCase()}`] = {
-          init: function() {
-            this.appendDummyInput().appendField(service);
-            this.setOutput(true, null);
-            this.setColour(getCategoryColor('Services'));
-          }
-        };
-      });
 
     const defineGenerators = () => {
       // Comment
@@ -3888,7 +4043,8 @@ export default function App() {
         const from = luaGenerator.valueToCode(block, 'FROM', Order.NONE) || '1';
         const to = luaGenerator.valueToCode(block, 'TO', Order.NONE) || '10';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'for i = ' + from + ', ' + to + ' do\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _count').replace('var. ', '');
+        return 'for ' + varName + ' = ' + from + ', ' + to + ' do\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['loops_while_lua'] = function(block: any) {
         const condition = luaGenerator.valueToCode(block, 'CONDITION', Order.NONE) || 'false';
@@ -3898,12 +4054,14 @@ export default function App() {
       luaGenerator.forBlock['loops_for_children'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'for _, child in pairs(' + instance + ':GetChildren()) do\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _child').replace('var. ', '');
+        return 'for _, ' + varName + ' in pairs(' + instance + ':GetChildren()) do\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['loops_for_descendants'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'for _, descendant in pairs(' + instance + ':GetDescendants()) do\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _descendant').replace('var. ', '');
+        return 'for _, ' + varName + ' in pairs(' + instance + ':GetDescendants()) do\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['loops_break_lua'] = function() {
         return 'break\n';
@@ -3927,6 +4085,12 @@ export default function App() {
       };
 
       // World
+      luaGenerator.forBlock['world_game'] = function() {
+        return ['game', Order.ATOMIC];
+      };
+      luaGenerator.forBlock['world_workspace'] = function() {
+        return ['workspace', Order.ATOMIC];
+      };
       luaGenerator.forBlock['world_me'] = function() {
         return ['script.Parent', Order.ATOMIC];
       };
@@ -3934,8 +4098,9 @@ export default function App() {
         return ['script', Order.ATOMIC];
       };
       luaGenerator.forBlock['world_instance'] = function(block: any) {
-        const name = block.getFieldValue('NAME');
-        return [name, Order.ATOMIC];
+        const instance = block.getFieldValue('INSTANCE');
+        if (instance === 'Instance' || instance === '') return ['nil', Order.ATOMIC];
+        return [instance, Order.ATOMIC];
       };
       luaGenerator.forBlock['world_vector3'] = function(block: any) {
         const x = luaGenerator.valueToCode(block, 'X', Order.NONE) || '0';
@@ -4000,11 +4165,13 @@ export default function App() {
       luaGenerator.forBlock['world_create_instance_direct'] = function(block: any) {
         const className = block.getFieldValue('CLASS');
         const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
-        return 'local _instance = Instance.new("' + className + '", ' + parent + ')\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _instance').replace('var. ', '');
+        return 'local ' + varName + ' = Instance.new("' + className + '", ' + parent + ')\n';
       };
       luaGenerator.forBlock['world_clone_instance'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
-        return 'local _clone = ' + instance + ':Clone()\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _clone').replace('var. ', '');
+        return 'local ' + varName + ' = ' + instance + ':Clone()\n';
       };
 
       // Instance
@@ -4042,22 +4209,26 @@ export default function App() {
       luaGenerator.forBlock['instance_child_added'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return instance + '.ChildAdded:Connect(function(child)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _child').replace('var. ', '');
+        return instance + '.ChildAdded:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['instance_child_removed'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return instance + '.ChildRemoved:Connect(function(child)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _child').replace('var. ', '');
+        return instance + '.ChildRemoved:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['instance_descendant_added'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return instance + '.DescendantAdded:Connect(function(descendant)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _descendant').replace('var. ', '');
+        return instance + '.DescendantAdded:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['instance_descendant_removing'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return instance + '.DescendantRemoving:Connect(function(descendant)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _descendant').replace('var. ', '');
+        return instance + '.DescendantRemoving:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['instance_is_a'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
@@ -4148,12 +4319,14 @@ export default function App() {
       luaGenerator.forBlock['part_touched_by_part'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return instance + '.Touched:Connect(function(otherPart)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touched_part').replace('var. ', '');
+        return instance + '.Touched:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['part_touched_by_character'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return instance + '.Touched:Connect(function(otherPart)\n  local character = otherPart.Parent\n  local humanoid = character:FindFirstChildOfClass("Humanoid")\n  if humanoid then\n' + branch + '  end\nend)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touched_part').replace('var. ', '');
+        return instance + '.Touched:Connect(function(' + varName + ')\n  local character = ' + varName + '.Parent\n  local humanoid = character:FindFirstChildOfClass("Humanoid")\n  if humanoid then\n' + branch + '  end\nend)\n';
       };
 
       // Character
@@ -4165,7 +4338,8 @@ export default function App() {
       luaGenerator.forBlock['character_is_climbing'] = function(block: any) {
         const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return humanoid + '.Climbing:Connect(function(speed)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _climb_speed').replace('var. ', '');
+        return humanoid + '.Climbing:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['character_died'] = function(block: any) {
         const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
@@ -4197,7 +4371,8 @@ export default function App() {
       luaGenerator.forBlock['character_health_changed'] = function(block: any) {
         const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return humanoid + '.HealthChanged:Connect(function(health)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _new_health').replace('var. ', '');
+        return humanoid + '.HealthChanged:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['character_jump'] = function(block: any) {
         const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
@@ -4230,7 +4405,8 @@ export default function App() {
       luaGenerator.forBlock['character_finished_moving'] = function(block: any) {
         const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return humanoid + '.MoveToFinished:Connect(function(reached)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _reached_goal').replace('var. ', '');
+        return humanoid + '.MoveToFinished:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['character_player_of'] = function(block: any) {
         const char = luaGenerator.valueToCode(block, 'CHARACTER', Order.NONE) || 'nil';
@@ -4302,32 +4478,38 @@ export default function App() {
       luaGenerator.forBlock['gui_input_began'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return instance + '.InputBegan:Connect(function(input, processed)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return instance + '.InputBegan:Connect(function(' + varName + ', _processed)\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['gui_input_ended'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return instance + '.InputEnded:Connect(function(input, processed)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return instance + '.InputEnded:Connect(function(' + varName + ', _processed)\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['gui_is_left_mouse'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton1 then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _mouse_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton1 then\n  local ' + varName + ' = ' + input + '\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['gui_is_middle_mouse'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton3 then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _mouse_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton3 then\n  local ' + varName + ' = ' + input + '\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['gui_is_right_mouse'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton2 then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _mouse_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton2 then\n  local ' + varName + ' = ' + input + '\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['gui_is_touch'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.Touch then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touch_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.Touch then\n  local ' + varName + ' = ' + input + '\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['gui_mouse_position'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
@@ -4366,21 +4548,25 @@ export default function App() {
       };
       luaGenerator.forBlock['player_joined'] = function(block: any) {
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'game.Players.PlayerAdded:Connect(function(_player)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
+        return 'game.Players.PlayerAdded:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['player_leaving'] = function(block: any) {
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'game.Players.PlayerRemoving:Connect(function(_player)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
+        return 'game.Players.PlayerRemoving:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['player_chat_added'] = function(block: any) {
         const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return player + '.Chatted:Connect(function(message)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. message').replace('var. ', '');
+        return player + '.Chatted:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['player_respawned'] = function(block: any) {
         const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return player + '.CharacterAdded:Connect(function(character)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. character').replace('var. ', '');
+        return player + '.CharacterAdded:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
 
       // Clickdetector
@@ -4391,22 +4577,26 @@ export default function App() {
       luaGenerator.forBlock['clickdetector_clicked'] = function(block: any) {
         const cd = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return cd + '.MouseClick:Connect(function(player)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
+        return cd + '.MouseClick:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['clickdetector_hover_enter'] = function(block: any) {
         const cd = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return cd + '.MouseHoverEnter:Connect(function(player)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
+        return cd + '.MouseHoverEnter:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['clickdetector_hover_leave'] = function(block: any) {
         const cd = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return cd + '.MouseHoverLeave:Connect(function(player)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
+        return cd + '.MouseHoverLeave:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['clickdetector_right_clicked'] = function(block: any) {
         const cd = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return cd + '.RightMouseClick:Connect(function(player)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
+        return cd + '.RightMouseClick:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
 
       // Marketplace
@@ -4422,7 +4612,9 @@ export default function App() {
       };
       luaGenerator.forBlock['marketplace_product_bought'] = function(block: any) {
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'game:GetService("MarketplaceService").ProcessReceipt = function(receiptInfo)\n' + branch + '\nreturn Enum.ProductPurchaseDecision.PurchaseGranted\nend\n';
+        const varPlayer = (block.getFieldValue('VAR_LABEL_PLAYER') || 'var. _player').replace('var. ', '');
+        const varProduct = (block.getFieldValue('VAR_LABEL_PRODUCT') || 'var. _productId').replace('var. ', '');
+        return 'game:GetService("MarketplaceService").ProcessReceipt = function(receiptInfo)\n  local ' + varPlayer + ' = game.Players:GetPlayerByUserId(receiptInfo.PlayerId)\n  local ' + varProduct + ' = receiptInfo.ProductId\n' + branch + '\n  return Enum.ProductPurchaseDecision.PurchaseGranted\nend\n';
       };
       luaGenerator.forBlock['marketplace_prompt_asset'] = function(block: any) {
         const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
@@ -4463,36 +4655,43 @@ export default function App() {
       };
       luaGenerator.forBlock['client_input_began'] = function(block: any) {
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'game:GetService("UserInputService").InputBegan:Connect(function(input, processed)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return 'game:GetService("UserInputService").InputBegan:Connect(function(' + varName + ', _processed)\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['client_input_ended'] = function(block: any) {
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'game:GetService("UserInputService").InputEnded:Connect(function(input, processed)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return 'game:GetService("UserInputService").InputEnded:Connect(function(' + varName + ', _processed)\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['client_is_keyboard'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.Keyboard then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _key_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.Keyboard then\n  local ' + varName + ' = ' + input + '.KeyCode\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['client_is_left_mouse'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton1 then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _mouse_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton1 then\n  local ' + varName + ' = ' + input + '\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['client_is_middle_mouse'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton3 then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _mouse_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton3 then\n  local ' + varName + ' = ' + input + '\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['client_is_right_mouse'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton2 then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _mouse_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.MouseButton2 then\n  local ' + varName + ' = ' + input + '\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['client_is_touch'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + input + '.UserInputType == Enum.UserInputType.Touch then\n' + branch + 'end\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touch_input').replace('var. ', '');
+        return 'if ' + input + '.UserInputType == Enum.UserInputType.Touch then\n  local ' + varName + ' = ' + input + '\n' + branch + 'end\n';
       };
       luaGenerator.forBlock['client_key_is'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'KEY', Order.NONE) || 'nil';
@@ -4510,7 +4709,8 @@ export default function App() {
       luaGenerator.forBlock['client_fired_by_server'] = function(block: any) {
         const event = luaGenerator.valueToCode(block, 'EVENT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return event + '.OnClientEvent:Connect(function(data)\n' + branch + 'end)\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _received_data').replace('var. ', '');
+        return event + '.OnClientEvent:Connect(function(' + varName + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['client_touch_position'] = function(block: any) {
         const input = luaGenerator.valueToCode(block, 'INPUT', Order.NONE) || 'nil';
@@ -4521,7 +4721,9 @@ export default function App() {
       luaGenerator.forBlock['server_fired_by_client'] = function(block: any) {
         const event = luaGenerator.valueToCode(block, 'EVENT', Order.NONE) || 'nil';
         const branch = luaGenerator.statementToCode(block, 'DO');
-        return event + '.OnServerEvent:Connect(function(player, data)\n' + branch + 'end)\n';
+        const varPlayer = (block.getFieldValue('VAR_LABEL_PLAYER') || 'var. _player').replace('var. ', '');
+        const varData = (block.getFieldValue('VAR_LABEL_DATA') || 'var. _data').replace('var. ', '');
+        return event + '.OnServerEvent:Connect(function(' + varPlayer + ', ' + varData + ')\n' + branch + 'end)\n';
       };
       luaGenerator.forBlock['server_fire_all_clients'] = function(block: any) {
         const event = luaGenerator.valueToCode(block, 'EVENT', Order.NONE) || 'nil';
@@ -4571,7 +4773,8 @@ export default function App() {
       luaGenerator.forBlock['functions_call'] = function(block: any) {
         const name = block.getFieldValue('NAME');
         const args = block.getFieldValue('ARGS') || '';
-        return 'local _result = ' + name + '(' + args + ')\n';
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _result').replace('var. ', '');
+        return 'local ' + varName + ' = ' + name + '(' + args + ')\n';
       };
       luaGenerator.forBlock['functions_return'] = function(block: any) {
         const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
@@ -4604,7 +4807,8 @@ export default function App() {
       luaGenerator.forBlock['datastore_get'] = function(block: any) {
         const ds = luaGenerator.valueToCode(block, 'DATASTORE', Order.NONE) || 'nil';
         const player = luaGenerator.valueToCode(block, 'PLAYER', Order.NONE) || 'nil';
-        return [ds + ':GetAsync(' + player + '.UserId)', Order.HIGH];
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _value').replace('var. ', '');
+        return 'local ' + varName + ' = ' + ds + ':GetAsync(' + player + '.UserId)\n';
       };
       luaGenerator.forBlock['datastore_save'] = function(block: any) {
         const ds = luaGenerator.valueToCode(block, 'DATASTORE', Order.NONE) || 'nil';
@@ -4620,22 +4824,26 @@ export default function App() {
       };
       luaGenerator.forBlock['event_player_join'] = function(block: any) {
         const statements = luaGenerator.statementToCode(block, 'DO');
-        return `game.Players.PlayerAdded:Connect(function(player)\n${statements}end)\n`;
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
+        return `game.Players.PlayerAdded:Connect(function(${varName})\n${statements}end)\n`;
       };
       luaGenerator.forBlock['event_touched'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'script.Parent';
+        const instance = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'script.Parent';
         const statements = luaGenerator.statementToCode(block, 'DO');
-        return `${instance}.Touched:Connect(function(hit)\n${statements}end)\n`;
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _otherPart').replace('var. ', '');
+        return `${instance}.Touched:Connect(function(${varName})\n${statements}end)\n`;
       };
       luaGenerator.forBlock['event_clicked'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'script.Parent';
+        const instance = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.ATOMIC) || 'script.Parent';
         const statements = luaGenerator.statementToCode(block, 'DO');
-        return `${instance}.MouseClick:Connect(function(player)\n${statements}end)\n`;
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
+        return `${instance}.MouseClick:Connect(function(${varName})\n${statements}end)\n`;
       };
       luaGenerator.forBlock['event_value_changed'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'script.Parent';
+        const instance = luaGenerator.valueToCode(block, 'VALUE', Order.ATOMIC) || 'script.Parent';
         const statements = luaGenerator.statementToCode(block, 'DO');
-        return `${instance}.Changed:Connect(function(value)\n${statements}end)\n`;
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _newValue').replace('var. ', '');
+        return `${instance}.Changed:Connect(function(${varName})\n${statements}end)\n`;
       };
 
       // Input
@@ -4651,7 +4859,8 @@ export default function App() {
       };
       luaGenerator.forBlock['input_touch'] = function(block: any) {
         const statements = luaGenerator.statementToCode(block, 'DO');
-        return `game:GetService("UserInputService").TouchTapInWorld:Connect(function(position, processed)\n  if not processed then\n${statements}  end\nend)\n`;
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touchPosition').replace('var. ', '');
+        return `game:GetService("UserInputService").TouchTapInWorld:Connect(function(${varName}, _processed)\n  if not _processed then\n${statements}  end\nend)\n`;
       };
       luaGenerator.forBlock['input_button_pressed'] = function(block: any) {
         const button = luaGenerator.valueToCode(block, 'BUTTON', Order.ATOMIC) || 'nil';
@@ -4683,19 +4892,19 @@ export default function App() {
       // Animation
       luaGenerator.forBlock['animation_load'] = function(block: any) {
         const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.ATOMIC) || 'nil';
-        const id = luaGenerator.valueToCode(block, 'ID', Order.ATOMIC) || '0';
+        const id = luaGenerator.valueToCode(block, 'ANIM_ID', Order.ATOMIC) || '0';
         return [`${humanoid}:LoadAnimation(Instance.new("Animation", {AnimationId = "rbxassetid://" .. ${id}}))`, Order.ATOMIC];
       };
       luaGenerator.forBlock['animation_play'] = function(block: any) {
-        const track = luaGenerator.valueToCode(block, 'TRACK', Order.ATOMIC) || 'nil';
+        const track = luaGenerator.valueToCode(block, 'ANIM_TRACK', Order.ATOMIC) || 'nil';
         return `${track}:Play()\n`;
       };
       luaGenerator.forBlock['animation_stop'] = function(block: any) {
-        const track = luaGenerator.valueToCode(block, 'TRACK', Order.ATOMIC) || 'nil';
+        const track = luaGenerator.valueToCode(block, 'ANIM_TRACK', Order.ATOMIC) || 'nil';
         return `${track}:Stop()\n`;
       };
       luaGenerator.forBlock['animation_adjust_speed'] = function(block: any) {
-        const track = luaGenerator.valueToCode(block, 'TRACK', Order.ATOMIC) || 'nil';
+        const track = luaGenerator.valueToCode(block, 'ANIM_TRACK', Order.ATOMIC) || 'nil';
         const speed = luaGenerator.valueToCode(block, 'SPEED', Order.ATOMIC) || '1';
         return `${track}:AdjustSpeed(${speed})\n`;
       };
@@ -4733,11 +4942,11 @@ export default function App() {
         return [`workspace:Raycast(${origin}, Vector3.new(0, -${distance}, 0))`, Order.ATOMIC];
       };
       luaGenerator.forBlock['raycast_get_hit_object'] = function(block: any) {
-        const result = luaGenerator.valueToCode(block, 'RESULT', Order.ATOMIC) || 'nil';
+        const result = luaGenerator.valueToCode(block, 'RAYCAST_RESULT', Order.ATOMIC) || 'nil';
         return [`${result} and ${result}.Instance`, Order.ATOMIC];
       };
       luaGenerator.forBlock['raycast_get_hit_position'] = function(block: any) {
-        const result = luaGenerator.valueToCode(block, 'RESULT', Order.ATOMIC) || 'nil';
+        const result = luaGenerator.valueToCode(block, 'RAYCAST_RESULT', Order.ATOMIC) || 'nil';
         return [`${result} and ${result}.Position`, Order.ATOMIC];
       };
 
@@ -4748,7 +4957,7 @@ export default function App() {
       luaGenerator.forBlock['pathfinding_compute'] = function(block: any) {
         const path = luaGenerator.valueToCode(block, 'PATH', Order.ATOMIC) || 'nil';
         const start = luaGenerator.valueToCode(block, 'START', Order.ATOMIC) || 'Vector3.new(0,0,0)';
-        const finish = luaGenerator.valueToCode(block, 'FINISH', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        const finish = luaGenerator.valueToCode(block, 'END', Order.ATOMIC) || 'Vector3.new(0,0,0)';
         return `${path}:ComputeAsync(${start}, ${finish})\n`;
       };
       luaGenerator.forBlock['pathfinding_move_to'] = function(block: any) {
@@ -4777,9 +4986,9 @@ export default function App() {
         return [`game:GetService("TeleportService"):ReserveServer(${placeId})`, Order.ATOMIC];
       };
       luaGenerator.forBlock['teleport_async'] = function(block: any) {
-        const player = luaGenerator.valueToCode(block, 'PLAYER', Order.ATOMIC) || 'nil';
+        const players = luaGenerator.valueToCode(block, 'PLAYERS', Order.ATOMIC) || '{}';
         const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
-        return `game:GetService("TeleportService"):TeleportAsync(${placeId}, {${player}})\n`;
+        return `game:GetService("TeleportService"):TeleportAsync(${placeId}, ${players})\n`;
       };
 
       // Collection
@@ -4801,15 +5010,19 @@ export default function App() {
       // RunService
       luaGenerator.forBlock['runservice_heartbeat'] = function(block: any) {
         const statements = luaGenerator.statementToCode(block, 'DO');
-        return `game:GetService("RunService").Heartbeat:Connect(function(step)\n${statements}end)\n`;
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _deltaTime').replace('var. ', '');
+        return `game:GetService("RunService").Heartbeat:Connect(function(${varName})\n${statements}end)\n`;
       };
       luaGenerator.forBlock['runservice_stepped'] = function(block: any) {
         const statements = luaGenerator.statementToCode(block, 'DO');
-        return `game:GetService("RunService").Stepped:Connect(function(time, step)\n${statements}end)\n`;
+        const varTime = (block.getFieldValue('VAR_TIME') || 'var. _time').replace('var. ', '');
+        const varDelta = (block.getFieldValue('VAR_DELTA') || 'var. _deltaTime').replace('var. ', '');
+        return `game:GetService("RunService").Stepped:Connect(function(${varTime}, ${varDelta})\n${statements}end)\n`;
       };
       luaGenerator.forBlock['runservice_renderstep'] = function(block: any) {
         const statements = luaGenerator.statementToCode(block, 'DO');
-        return `game:GetService("RunService").RenderStepped:Connect(function(step)\n${statements}end)\n`;
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _deltaTime').replace('var. ', '');
+        return `game:GetService("RunService").RenderStepped:Connect(function(${varName})\n${statements}end)\n`;
       };
 
       // Lighting
@@ -4818,11 +5031,11 @@ export default function App() {
         return `game:GetService("Lighting").Brightness = ${value}\n`;
       };
       luaGenerator.forBlock['lighting_set_time'] = function(block: any) {
-        const value = luaGenerator.valueToCode(block, 'VALUE', Order.ATOMIC) || '""';
-        return `game:GetService("Lighting").TimeOfDay = ${value}\n`;
+        const time = block.getFieldValue('TIME') || '12:00:00';
+        return `game:GetService("Lighting").TimeOfDay = "${time}"\n`;
       };
       luaGenerator.forBlock['lighting_change_sky'] = function(block: any) {
-        const id = luaGenerator.valueToCode(block, 'ID', Order.ATOMIC) || '0';
+        const id = luaGenerator.valueToCode(block, 'SKY_ID', Order.ATOMIC) || '0';
         return `local sky = game:GetService("Lighting"):FindFirstChildOfClass("Sky") or Instance.new("Sky", game:GetService("Lighting"))\nsky.SkyboxBk = "rbxassetid://" .. ${id}\nsky.SkyboxDn = "rbxassetid://" .. ${id}\nsky.SkyboxFt = "rbxassetid://" .. ${id}\nsky.SkyboxLf = "rbxassetid://" .. ${id}\nsky.SkyboxRt = "rbxassetid://" .. ${id}\nsky.SkyboxUp = "rbxassetid://" .. ${id}\n`;
       };
       luaGenerator.forBlock['lighting_set_ambient'] = function(block: any) {
@@ -4849,13 +5062,6 @@ export default function App() {
         const parent = luaGenerator.valueToCode(block, 'PARENT', Order.ATOMIC) || 'workspace';
         return `Instance.new("${type}", ${parent})\n`;
       };
-
-      // Services
-      SERVICES_LIST.forEach(service => {
-        luaGenerator.forBlock[`service_${service.toLowerCase()}`] = function() {
-          return [`game:GetService("${service}")`, Order.ATOMIC];
-        };
-      });
 
       // Placeholders
       luaGenerator.forBlock['placeholder_string'] = function() { return ['""', Order.ATOMIC]; };
@@ -5912,11 +6118,6 @@ export default function App() {
               }
             }
           ];
-        } else if (cat.name === 'Services') {
-          blocks = SERVICES_LIST.map(service => ({
-            kind: 'block',
-            type: `service_${service.toLowerCase()}`
-          }));
         } else if (cat.name === 'Events') {
           blocks = [
             { kind: 'block', type: 'event_game_start' },
@@ -6425,7 +6626,7 @@ export default function App() {
         colour: '#2a2a2a',
         snap: true,
       },
-      renderer: 'zelos',
+      renderer: 'custom_zelos',
       theme: customTheme,
     });
 
@@ -6478,7 +6679,11 @@ export default function App() {
                         blockName = fallbackText.replace(/\?/g, '[ ]').trim();
                       }
                     }
-                    tempBlock.dispose(false);
+                    try {
+                      tempBlock.dispose(false);
+                    } catch (e) {
+                      console.warn("Error disposing temp block:", e);
+                    }
                   }
                 }
               } catch (e) {
@@ -6526,13 +6731,6 @@ export default function App() {
       Blockly.Xml.domToWorkspace(xml, workspace.current!);
     }
 
-    // Onboarding logic
-    const hasSeenGuide = localStorage.getItem('blocklua_has_seen_guide');
-    if (!hasSeenGuide) {
-      setShowGuide(true);
-      localStorage.setItem('blocklua_has_seen_guide', 'true');
-    }
-
     const handleResize = () => {
       if (workspace.current) {
         Blockly.svgResize(workspace.current);
@@ -6543,7 +6741,12 @@ export default function App() {
     return () => {
       window.removeEventListener('resize', handleResize);
       if (workspace.current) {
-        workspace.current.dispose();
+        try {
+          workspace.current.dispose();
+        } catch (e) {
+          console.warn("Error disposing workspace:", e);
+        }
+        workspace.current = null;
       }
     };
   }, []);
@@ -6676,68 +6879,6 @@ export default function App() {
     <div 
       className={`flex flex-col h-screen w-screen bg-[#1e1e1e] overflow-hidden font-sans text-gray-200 no-select ${enableEffects ? 'effects-enabled' : ''}`}
     >
-      <AnimatePresence>
-        {showTutorial && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[5000] origin-top-left"
-            onClick={nextTutorialStep}
-          >
-            <motion.div 
-              key={tutorialStep}
-              initial={{ opacity: 0, y: 20, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className={`absolute bg-[#1a1a1a] border border-[#4c97ff]/50 rounded-2xl p-6 shadow-2xl shadow-[#4c97ff]/20 max-w-sm pointer-events-auto
-                ${tutorialSteps[tutorialStep].position === 'center' ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}
-                ${tutorialSteps[tutorialStep].position === 'left' ? 'top-1/2 left-[320px] -translate-y-1/2' : ''}
-                ${tutorialSteps[tutorialStep].position === 'top' ? 'top-[80px] left-1/2 -translate-x-1/2' : ''}
-                ${tutorialSteps[tutorialStep].position === 'top-right' ? 'top-[80px] right-[20px]' : ''}
-              `}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 bg-[#4c97ff] rounded-xl flex items-center justify-center">
-                  <Info className="text-white" size={18} />
-                </div>
-                <h3 className="text-lg font-black text-white">{tutorialSteps[tutorialStep].title}</h3>
-              </div>
-              
-              <div className="text-gray-300 text-sm leading-relaxed mb-6 min-h-[60px]">
-                {/* Typewriter effect for text */}
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  {tutorialSteps[tutorialStep].text}
-                </motion.span>
-              </div>
-
-              <div className="flex items-center justify-between mt-4 border-t border-white/10 pt-4">
-                <div className="flex gap-1">
-                  {tutorialSteps.map((_, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`h-1.5 rounded-full transition-all ${idx === tutorialStep ? 'w-6 bg-[#4c97ff]' : 'w-1.5 bg-gray-600'}`}
-                    />
-                  ))}
-                </div>
-                <button 
-                  onClick={nextTutorialStep}
-                  className="px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition-colors"
-                >
-                  {tutorialStep === tutorialSteps.length - 1 ? (currentLang === 'vi' ? 'Bắt đầu' : 'Start') : (currentLang === 'vi' ? 'Tiếp tục' : 'Next')}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <AnimatePresence>
         {(showMenu || showSettings) && (
           <div 
@@ -6924,6 +7065,13 @@ export default function App() {
               <Code2 size={14} />
               CODES
             </button>
+            <button 
+              onClick={() => { setShowBlockInfoModal(true); }}
+              className={`px-6 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 text-gray-500 hover:text-gray-300`}
+            >
+              <Info size={14} />
+              {currentLang === 'vi' ? 'THÔNG TIN KHỐI' : 'BLOCK INFO'}
+            </button>
           </div>
         </div>
 
@@ -6996,7 +7144,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {showGuide && (
+          {showBlockInfoModal && (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -7007,49 +7155,186 @@ export default function App() {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-[#2b2b2b] border border-white/10 rounded-3xl p-8 max-w-2xl w-full shadow-2xl max-h-[80vh] overflow-y-auto"
+                className="bg-[#1e1e1e] border border-white/10 rounded-3xl w-[90vw] max-w-5xl h-[85vh] shadow-2xl flex flex-col overflow-hidden"
               >
-                <div className="w-16 h-16 bg-[#0fbd8c]/10 rounded-2xl flex items-center justify-center mb-6">
-                  <BookOpen className="text-[#0fbd8c]" size={32} />
+                <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-[#4c97ff]/20 rounded-xl flex items-center justify-center">
+                      <Info className="text-[#4c97ff]" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-white tracking-tight">
+                        {currentLang === 'vi' ? 'THÔNG TIN CÁC KHỐI LỆNH' : 'BLOCK INFORMATION'}
+                      </h3>
+                      <p className="text-xs text-gray-400 font-bold tracking-widest uppercase mt-1">
+                        {currentLang === 'vi' ? 'Tất cả các khối lệnh trong BlockLua' : 'All blocks in BlockLua'}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setShowBlockInfoModal(false);
+                      setSelectedBlockInfo(null);
+                    }}
+                    className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
-                <h3 className="text-2xl font-black text-white mb-4 tracking-tight">
-                  {currentLang === 'vi' ? 'HƯỚNG DẪN SỬ DỤNG' : 'USER GUIDE'}
-                </h3>
-                <div className="text-gray-400 mb-8 space-y-6">
-                  <section>
-                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-[#4c97ff] rounded-full" />
-                      {currentLang === 'vi' ? 'Kéo và Thả Khối' : 'Drag and Drop Blocks'}
-                    </h4>
-                    <p>{currentLang === 'vi' 
-                      ? 'Chọn các khối từ danh mục bên trái và kéo chúng vào không gian làm việc. Các khối sẽ tự động khớp nối với nhau.'
-                      : 'Select blocks from the categories on the left and drag them into the workspace. Blocks will automatically snap together.'}</p>
-                  </section>
-                  <section>
-                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-[#4c97ff] rounded-full" />
-                      {currentLang === 'vi' ? 'Xem Mã Nguồn' : 'View Source Code'}
-                    </h4>
-                    <p>{currentLang === 'vi' 
-                      ? 'Nhấn vào nút "CODES" ở thanh trên cùng để xem mã Luau được tạo ra từ các khối của bạn.'
-                      : 'Click the "CODES" button in the top bar to view the Luau code generated from your blocks.'}</p>
-                  </section>
-                  <section>
-                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-[#4c97ff] rounded-full" />
-                      {currentLang === 'vi' ? 'Xuất Mã' : 'Export Code'}
-                    </h4>
-                    <p>{currentLang === 'vi' 
-                      ? 'Sử dụng nút "EXPORT" để tải xuống tệp mã nguồn hoặc sao chép mã trực tiếp vào Roblox Studio.'
-                      : 'Use the "EXPORT" button to download the source code file or copy the code directly into Roblox Studio.'}</p>
-                  </section>
+                
+                <div className="flex-1 flex overflow-hidden">
+                  {/* Sidebar with categories and blocks */}
+                  <div className="w-1/3 border-r border-white/10 flex flex-col bg-[#1a1a1a]">
+                    <div className="p-4 border-b border-white/5">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                        <input 
+                          type="text" 
+                          placeholder={currentLang === 'vi' ? "Tìm kiếm khối lệnh..." : "Search blocks..."}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-[#4c97ff]/50 transition-colors"
+                          onChange={(e) => {
+                            const val = e.target.value.toLowerCase();
+                            const buttons = document.querySelectorAll('.block-info-btn');
+                            buttons.forEach(btn => {
+                              const text = btn.textContent?.toLowerCase() || '';
+                              if (text.includes(val)) {
+                                (btn as HTMLElement).style.display = 'flex';
+                              } else {
+                                (btn as HTMLElement).style.display = 'none';
+                              }
+                            });
+                            
+                            const categories = document.querySelectorAll('.block-info-category');
+                            categories.forEach(cat => {
+                              const visibleButtons = cat.querySelectorAll('.block-info-btn[style="display: flex;"], .block-info-btn:not([style*="display: none"])');
+                              if (visibleButtons.length === 0) {
+                                (cat as HTMLElement).style.display = 'none';
+                              } else {
+                                (cat as HTMLElement).style.display = 'block';
+                              }
+                            });
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                      {CATEGORIES.map(cat => {
+                        const catBlocks = allBlocks.filter(b => b.category === cat.name);
+                        if (catBlocks.length === 0) return null;
+                        const catColor = getCategoryColor(cat.name);
+                        
+                        return (
+                          <div key={cat.name} className="mb-6 block-info-category">
+                            <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest px-2 mb-3 flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: catColor }}></div>
+                              {cat.name}
+                            </h4>
+                            <div className="space-y-1">
+                              {catBlocks.map(block => (
+                                <button
+                                  key={block.type}
+                                  onClick={() => setSelectedBlockInfo(block)}
+                                  className={`block-info-btn w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all flex items-center gap-3 ${selectedBlockInfo?.type === block.type ? 'bg-white/10 text-white shadow-md' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}
+                                >
+                                  <div 
+                                    className="w-4 h-4 rounded-sm flex-shrink-0 shadow-sm" 
+                                    style={{ backgroundColor: catColor }}
+                                  ></div>
+                                  <span className="truncate font-medium">{block.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  
+                  {/* Main content area for selected block */}
+                  <div className="flex-1 bg-[#222222] p-8 overflow-y-auto custom-scrollbar">
+                    {selectedBlockInfo ? (
+                      <div className="max-w-2xl mx-auto">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div 
+                            className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-sm"
+                            style={{ backgroundColor: getCategoryColor(selectedBlockInfo.category) }}
+                          >
+                            {selectedBlockInfo.category}
+                          </div>
+                          <div className="text-gray-500 text-sm font-mono bg-black/20 px-2 py-1 rounded">{selectedBlockInfo.type}</div>
+                        </div>
+                        
+                        <h2 className="text-3xl font-black text-white mb-8">{selectedBlockInfo.name}</h2>
+                        
+                        {/* Visual representation of the block */}
+                        <div className="bg-[#1a1a1a] border border-white/5 rounded-3xl p-8 mb-8 flex items-center justify-center min-h-[200px] shadow-inner relative overflow-hidden">
+                          <div className="absolute inset-0 opacity-10" style={{ 
+                            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+                            backgroundSize: '24px 24px'
+                          }}></div>
+                          
+                          <div className="relative z-10 w-full h-[150px]">
+                            <BlocklyPreview blockType={selectedBlockInfo.type} />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-8">
+                          <div>
+                            <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                              <Info className="text-[#4c97ff]" size={20} />
+                              {currentLang === 'vi' ? 'Chức năng' : 'Function'}
+                            </h3>
+                            <p className="text-gray-300 leading-relaxed bg-white/5 p-5 rounded-2xl border border-white/5 shadow-sm">
+                              {getBlockDescription(selectedBlockInfo, currentLang)}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                              <Code2 className="text-[#4c97ff]" size={20} />
+                              {currentLang === 'vi' ? 'Cách sử dụng' : 'How to use'}
+                            </h3>
+                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 shadow-inner">
+                              <ul className="list-disc list-inside text-gray-300 space-y-4">
+                                <li>
+                                  {currentLang === 'vi' 
+                                    ? `Kéo khối lệnh từ thanh công cụ bên trái (nhóm `
+                                    : `Drag the block from the left toolbox (`}
+                                  <span className="font-bold text-white">{selectedBlockInfo.category}</span>
+                                  {currentLang === 'vi' ? `).` : ` category).`}
+                                </li>
+                                <li>
+                                  {currentLang === 'vi' 
+                                    ? `Ghép nối với các khối lệnh khác để tạo thành một kịch bản hoàn chỉnh.`
+                                    : `Connect it with other blocks to form a complete script.`}
+                                </li>
+                                <li>
+                                  {currentLang === 'vi' 
+                                    ? `Điền các thông số cần thiết (nếu có) vào các ô trống trên khối lệnh.`
+                                    : `Fill in the required parameters (if any) in the empty slots on the block.`}
+                                </li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-center">
+                        <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                          <Layers className="text-gray-600" size={48} />
+                        </div>
+                        <h3 className="text-xl font-black text-white mb-2 tracking-tight">
+                          {currentLang === 'vi' ? 'CHỌN MỘT KHỐI LỆNH' : 'SELECT A BLOCK'}
+                        </h3>
+                        <p className="text-gray-500 max-w-sm">
+                          {currentLang === 'vi' 
+                            ? 'Nhấn vào một khối lệnh ở danh sách bên trái để xem thông tin chi tiết, hình ảnh minh họa và cách sử dụng.'
+                            : 'Click on a block in the list on the left to view detailed information, illustrations, and usage instructions.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <button 
-                  onClick={() => setShowGuide(false)}
-                  className="w-full py-3 rounded-2xl bg-[#0fbd8c] hover:bg-[#0da67b] text-white font-black transition-all"
-                >
-                  {currentLang === 'vi' ? 'TÔI ĐÃ HIỂU' : 'I UNDERSTAND'}
-                </button>
               </motion.div>
             </motion.div>
           )}
@@ -7177,7 +7462,7 @@ local function sync()
         Children = {}
     }
 
-    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterGui", "StarterPlayer", "Lighting", "SoundService", "Players", "Teams", "Chat", "LocalizationService", "TestService"}
+    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterGui", "StarterPlayer", "Lighting", "SoundService", "Players", "Teams", "Chat", "LocalizationService", "TextChatService", "TestService"}
     for _, serviceName in ipairs(services) do
         local success, service = pcall(function() return game:GetService(serviceName) end)
         if success and service then
@@ -7286,7 +7571,7 @@ local function sync()
         Children = {}
     }
 
-    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterGui", "StarterPlayer", "Lighting", "SoundService", "Players", "Teams", "Chat", "LocalizationService", "TestService"}
+    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterGui", "StarterPlayer", "Lighting", "SoundService", "Players", "Teams", "Chat", "LocalizationService", "TextChatService", "TestService"}
     for _, serviceName in ipairs(services) do
         local success, service = pcall(function() return game:GetService(serviceName) end)
         if success and service then
@@ -7433,6 +7718,37 @@ sync() -- Initial sync on load`;
           <div 
             ref={blocklyDiv} 
             className="absolute top-0 left-0 w-full h-full" 
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes('application/blocklua-instance')) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+              }
+            }}
+            onDrop={(e) => {
+              const instancePath = e.dataTransfer.getData('application/blocklua-instance');
+              if (instancePath && workspace.current) {
+                e.preventDefault();
+                
+                // Get drop coordinates relative to the workspace
+                const rect = blocklyDiv.current!.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Convert to workspace coordinates
+                const metrics = workspace.current.getMetrics();
+                const scale = workspace.current.scale;
+                
+                const workspaceX = (x - metrics.absoluteLeft) / scale;
+                const workspaceY = (y - metrics.absoluteTop) / scale;
+                
+                // Create the block
+                const block = workspace.current.newBlock('world_instance');
+                block.setFieldValue(instancePath, 'INSTANCE');
+                block.initSvg();
+                block.render();
+                block.moveBy(workspaceX, workspaceY);
+              }
+            }}
           />
           
           <div className="absolute bottom-6 right-6 z-50 flex gap-2">
@@ -7710,6 +8026,118 @@ sync() -- Initial sync on load`;
             </motion.div>
           </div>
         )}
+
+        {mouseButtonTarget && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setMouseButtonTarget(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-[400px] flex flex-col gap-4 z-10"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Mouse Button</h3>
+                <button onClick={() => setMouseButtonTarget(null)} className="text-gray-400 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Left", value: "MouseButton1" },
+                  { label: "Right", value: "MouseButton2" },
+                  { label: "Middle", value: "MouseButton3" }
+                ].map(btn => (
+                  <button
+                    key={btn.value}
+                    onClick={() => handleMouseButtonSelect(btn.value)}
+                    className="px-3 py-2 bg-white/5 hover:bg-[#ffab19] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-center"
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {cameraTypeTarget && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setCameraTypeTarget(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-[400px] flex flex-col gap-4 z-10"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Camera Type</h3>
+                <button onClick={() => setCameraTypeTarget(null)} className="text-gray-400 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {["Custom", "Scriptable", "Fixed", "Attach", "Watch"].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => handleCameraTypeSelect(type)}
+                    className="px-3 py-2 bg-white/5 hover:bg-[#ffab19] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-center"
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {effectTypeTarget && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setEffectTypeTarget(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-[400px] flex flex-col gap-4 z-10"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Effect Type</h3>
+                <button onClick={() => setEffectTypeTarget(null)} className="text-gray-400 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {["Explosion", "Fire", "Smoke", "Sparkles"].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => handleEffectTypeSelect(type)}
+                    className="px-3 py-2 bg-white/5 hover:bg-[#ffab19] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-center"
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
 
@@ -7780,8 +8208,6 @@ sync() -- Initial sync on load`;
           color: #000000 !important;
           opacity: 1 !important;
           margin-left: 10px !important;
-          /* Subtle outline instead of heavy stroke */
-          text-shadow: 0.2px 0.2px 0px #000;
         }
 
         .blocklyTreeSelected {
@@ -7949,7 +8375,7 @@ sync() -- Initial sync on load`;
           fill: #ffffff !important; /* Labels on the block stay white */
         }
         
-        /* FORCE black text inside the boxes (dropdowns/inputs) */
+        /* FORCE white text inside the boxes (dropdowns/inputs) */
         .blocklyEditableText .blocklyText,
         .blocklyFieldDropdown .blocklyText,
         .blocklyDropdownText,
@@ -7958,8 +8384,9 @@ sync() -- Initial sync on load`;
         .blocklyFieldDropdown text,
         .blocklyEditableText tspan,
         .blocklyFieldDropdown tspan {
-          fill: #000000 !important;
-          color: #000000 !important;
+          fill: #ffffff !important;
+          color: #ffffff !important;
+          stroke: none !important;
         }
         
         /* Category Label Styling */
@@ -7970,21 +8397,19 @@ sync() -- Initial sync on load`;
           color: #ffffff !important;
         }
         
-        /* Change the boxes to a Light Gray (darker than white, but light enough for black text) */
+        /* Change the boxes to a dark transparent color for white text */
         .blocklyFieldRect,
         .blocklyEditableText rect,
         .blocklyFieldDropdown rect {
-          fill: #e0e0e0 !important; /* Light gray background */
+          fill: rgba(0, 0, 0, 0.3) !important; /* Dark transparent background */
           fill-opacity: 1 !important;
-          stroke: #4c97ff !important;
-          stroke-width: 1px !important;
           rx: 4px !important;
           ry: 4px !important;
         }
         
-        /* Dropdown arrow fix - black arrow on light gray box */
+        /* Dropdown arrow fix - white arrow on dark box */
         .blocklyDropdownIcon {
-          fill: #000000 !important;
+          fill: #ffffff !important;
         }
 
         /* Input field when editing */
@@ -7994,10 +8419,8 @@ sync() -- Initial sync on load`;
           color: #ffffff !important;
           background-color: #333333 !important;
           font-family: sans-serif !important;
-          border: 1px solid #555 !important;
-          border-radius: 4px !important;
-          padding: 2px 4px !important;
-          border: 1px solid #4c97ff !important;
+          border: none !important;
+          outline: none !important;
         }
         /* Hide scrollbars for flyout */
         .blocklyFlyoutScrollbar {
@@ -8039,27 +8462,25 @@ sync() -- Initial sync on load`;
         .goog-menuitem,
         .goog-menuitem-content,
         .blocklyDropdownMenuText {
-          color: #000000 !important;
-          fill: #000000 !important;
+          color: #ffffff !important;
+          fill: #ffffff !important;
           font-family: "Inter", sans-serif !important;
           font-size: 14px !important;
         }
         
-        /* Ensure the dropdown background is white or light */
+        /* Ensure the dropdown background is dark */
         .blocklyWidgetDiv .goog-menu,
         .blocklyDropDownDiv {
-          background-color: #ffffff !important;
-          border: 1px solid #ccc !important;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
-          color: #000000 !important;
+          background-color: #252525 !important;
+          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.5) !important;
+          color: #ffffff !important;
         }
 
         /* Styling for the dropdown field on the block itself */
         .blocklyFieldRect {
-          fill: #ffffff !important;
+          fill: rgba(0, 0, 0, 0.3) !important;
           fill-opacity: 1 !important;
-          stroke: #4c97ff !important;
-          stroke-width: 2px !important;
           rx: 4px !important;
           ry: 4px !important;
         }

@@ -1,3 +1,4 @@
+import { getCategoryColor } from './colors';
 import * as Blockly from 'blockly';
 
 export const defineCustomBlocks = () => {
@@ -8,7 +9,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("String").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -18,7 +19,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Number").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -27,7 +28,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("SOUND").setCheck("Instance").appendField("Play sound");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -36,7 +37,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("SOUND").setCheck("Instance").appendField("Stop sound");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -45,7 +46,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("SOUND").setCheck("Instance").appendField("Pause sound");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -55,7 +56,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Boolean").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -65,7 +66,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Boolean").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -75,7 +76,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Number").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -85,7 +86,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("VALUE").setCheck("Number").appendField("to");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
       this.setInputsInline(true);
     }
   };
@@ -97,7 +98,7 @@ export const defineCustomBlocks = () => {
       this.setInputsInline(true);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#6600FF");
+      this.setColour(getCategoryColor('Sound'));
     }
   };
 
@@ -108,7 +109,7 @@ export const defineCustomBlocks = () => {
           .appendField("Instance")
           .appendField(new Blockly.FieldDropdown([["game.Workspace", "game.Workspace"], ["game.ReplicatedStorage", "game.ReplicatedStorage"]]), "INSTANCE");
       this.setOutput(true, "Instance");
-      this.setColour("#4C97FF");
+      this.setColour(getCategoryColor('Instance'));
       this.setInputsInline(true);
     }
   };
@@ -119,7 +120,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("do");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FF4B4B");
+      this.setColour(getCategoryColor('RemoteEvent'));
       this.setInputsInline(true);
     }
   };
@@ -132,7 +133,7 @@ export const defineCustomBlocks = () => {
           .appendField(new Blockly.FieldTextInput("comment"), "TEXT");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FF4B4B");
+      this.setColour(getCategoryColor('Comment'));
       this.setInputsInline(true);
     }
   };
@@ -145,7 +146,7 @@ export const defineCustomBlocks = () => {
           .appendField("print");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FF8C1A");
+      this.setColour(getCategoryColor('Debug'));
       this.setInputsInline(true);
     }
   };
@@ -157,7 +158,7 @@ export const defineCustomBlocks = () => {
           .appendField("warn");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FF8C1A");
+      this.setColour(getCategoryColor('Debug'));
       this.setInputsInline(true);
     }
   };
@@ -169,7 +170,7 @@ export const defineCustomBlocks = () => {
           .appendField(new Blockly.FieldTextInput("print('hello')"), "CODE");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FF8C1A");
+      this.setColour(getCategoryColor('Debug'));
       this.setInputsInline(true);
     }
   };
@@ -181,7 +182,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("DATA").setCheck(null).appendField("with data");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#CF63CF");
+      this.setColour(getCategoryColor('RemoteEvent'));
       this.setInputsInline(true);
     }
   };
@@ -193,7 +194,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("then");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Logic'));
       this.setInputsInline(true);
     }
   };
@@ -202,7 +203,7 @@ export const defineCustomBlocks = () => {
     init: function() {
       this.appendValueInput("BOOL").setCheck("Boolean").appendField("not");
       this.setOutput(true, "Boolean");
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Logic'));
       this.setInputsInline(true);
     }
   };
@@ -213,7 +214,7 @@ export const defineCustomBlocks = () => {
         this.appendValueInput("A").setCheck(null);
         this.appendValueInput("B").setCheck(null).appendField(label);
         this.setOutput(true, "Boolean");
-        this.setColour("#FFCC00");
+        this.setColour(getCategoryColor('Logic'));
         this.setInputsInline(true);
       }
     };
@@ -228,7 +229,7 @@ export const defineCustomBlocks = () => {
     init: function() {
       this.appendDummyInput().appendField("true");
       this.setOutput(true, "Boolean");
-      this.setColour("#CF63CF");
+      this.setColour(getCategoryColor('Logic'));
       this.setInputsInline(true);
     }
   };
@@ -237,7 +238,7 @@ export const defineCustomBlocks = () => {
     init: function() {
       this.appendDummyInput().appendField("false");
       this.setOutput(true, "Boolean");
-      this.setColour("#CF63CF");
+      this.setColour(getCategoryColor('Logic'));
       this.setInputsInline(true);
     }
   };
@@ -248,7 +249,7 @@ export const defineCustomBlocks = () => {
         this.appendValueInput("A").setCheck("Boolean");
         this.appendValueInput("B").setCheck("Boolean").appendField(label);
         this.setOutput(true, "Boolean");
-        this.setColour("#FFCC00");
+        this.setColour(getCategoryColor('Logic'));
         this.setInputsInline(true);
       }
     };
@@ -263,7 +264,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("SECONDS").setCheck("Number").appendField("wait");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Loops'));
       this.setInputsInline(true);
     }
   };
@@ -274,7 +275,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("do");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Loops'));
       this.setInputsInline(true);
     }
   };
@@ -285,7 +286,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("CONDITION").setCheck("Boolean").appendField("until");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Loops'));
       this.setInputsInline(true);
     }
   };
@@ -296,7 +297,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("do");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Loops'));
       this.setInputsInline(true);
     }
   };
@@ -307,7 +308,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").appendField("do");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Loops'));
       this.setInputsInline(true);
     }
   };
@@ -317,7 +318,7 @@ export const defineCustomBlocks = () => {
       this.appendDummyInput().appendField("break");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Loops'));
       this.setInputsInline(true);
     }
   };
@@ -328,7 +329,7 @@ export const defineCustomBlocks = () => {
       this.appendDummyInput().appendField("get player by name");
       this.appendValueInput("NAME").setCheck("String");
       this.setOutput(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Player'));
       this.setInputsInline(true);
     }
   };
@@ -341,7 +342,7 @@ export const defineCustomBlocks = () => {
       this.appendValueInput("REASON").setCheck("String");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Player'));
       this.setInputsInline(true);
     }
   };
@@ -353,7 +354,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Player'));
       this.setInputsInline(true);
     }
   };
@@ -365,7 +366,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Player'));
       this.setInputsInline(true);
     }
   };
@@ -375,7 +376,7 @@ export const defineCustomBlocks = () => {
       this.appendDummyInput().appendField("user id of");
       this.appendValueInput("PLAYER").setCheck(null);
       this.setOutput(true, "Number");
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Player'));
       this.setInputsInline(true);
     }
   };
@@ -387,7 +388,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Player'));
       this.setInputsInline(true);
     }
   };
@@ -400,7 +401,7 @@ export const defineCustomBlocks = () => {
       this.appendStatementInput("DO").setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
-      this.setColour("#FFCC00");
+      this.setColour(getCategoryColor('Player'));
       this.setInputsInline(true);
     }
   };

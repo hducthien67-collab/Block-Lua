@@ -95,8 +95,12 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
   const hasChildren = instance.Children.length > 0;
   const isSelected = selectedId === instance.id;
 
-  const isProtected = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterplayer', 'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'].includes(instance.id.toLowerCase());
-  const isService = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterplayer', 'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'].includes(instance.id.toLowerCase());
+  const isProtected = [
+    'workspace', 'players', 'lighting', 'materialservice', 'networkclient', 
+    'replicatedfirst', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 
+    'starterpack', 'startergui', 'starterplayer', 'teams', 'soundservice', 'textchatservice',
+    'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'
+  ].includes(instance.id.toLowerCase());
 
   // Concise path: game.Workspace.Part -> Workspace.Part
   const fullPath = currentPath ? (currentPath === 'game' ? instance.Name : `${currentPath}.${instance.Name}`) : instance.Name;
@@ -108,9 +112,45 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
     setIsRenaming(false);
   };
 
+  if (instance.id === 'game') {
+    return (
+      <div className="select-none">
+        {instance.Children
+          .filter(child => {
+            // Only show core services and their children
+            const allowedServices = [
+              'workspace', 'players', 'lighting', 'materialservice', 'networkclient', 
+              'replicatedfirst', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 
+              'starterpack', 'startergui', 'starterplayer', 'teams', 'soundservice', 'textchatservice',
+              'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain'
+            ];
+            return allowedServices.includes(child.id.toLowerCase());
+          })
+          .map(child => (
+            <ExplorerTree 
+              key={child.id} 
+              instance={child} 
+              onSelect={onSelect} 
+              onToggleExpand={onToggleExpand}
+              onAddChild={onAddChild}
+              onRename={onRename}
+              onDelete={onDelete}
+              currentPath="game"
+              selectedId={selectedId}
+            />
+          ))}
+      </div>
+    );
+  }
+
   return (
     <div className="select-none">
       <div 
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('application/blocklua-instance', fullPath);
+          e.dataTransfer.effectAllowed = 'copy';
+        }}
         className={`flex items-center py-1 px-2 cursor-pointer hover:bg-[#3f3f3f] group ${isSelected ? 'bg-[#4d4d4d]' : ''}`}
         onClick={(e) => {
           e.stopPropagation();
@@ -200,7 +240,12 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
           {instance.Children
             .filter(child => {
               // Only show core services and their children
-              const allowedServices = ['workspace', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 'startergui', 'starterplayer', 'lighting', 'soundservice', 'startercharacterscripts', 'starterplayerscripts', 'players', 'teams', 'chat', 'localizationService', 'testservice'];
+              const allowedServices = [
+                'workspace', 'players', 'lighting', 'materialservice', 'networkclient', 
+                'replicatedfirst', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 
+                'starterpack', 'startergui', 'starterplayer', 'teams', 'soundservice', 'textchatservice',
+                'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain'
+              ];
               if (instance.id === 'game') {
                 return allowedServices.includes(child.id.toLowerCase());
               }
