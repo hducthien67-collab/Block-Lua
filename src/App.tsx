@@ -7803,9 +7803,8 @@ sync() -- Initial sync on load`}
                   </pre>
                   <button 
                     onClick={() => {
-                      const publicUrl = (window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-');
                       const code = `local HttpService = game:GetService("HttpService")
-local BASE_URL = "\${publicUrl}"
+local BASE_URL = "${baseUrl}"
 local URL = BASE_URL .. "/api/sync"
 local EXPORT_URL = BASE_URL .. "/api/export"
 local EXPORT_TREE_URL = BASE_URL .. "/api/export_tree"
