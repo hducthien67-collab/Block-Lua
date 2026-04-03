@@ -235,10 +235,8 @@ export const ROBLOX_CLASSES: RobloxClass[] = [
   { name: 'BindableFunction', category: 'Scripting', icon: 'SignalMedium', color: '#FF4500' },
   { name: 'LocalScript', category: 'Scripting', icon: 'FileCode2', color: '#FF4B4B' },
   { name: 'ModuleScript', category: 'Scripting', icon: 'FileJson', color: '#FFD700' },
-  { name: 'RemoteEvent', category: 'Scripting', icon: 'Zap', color: '#FF4500' },
   { name: 'RemoteFunction', category: 'Scripting', icon: 'ZapOff', color: '#FF4500' },
   { name: 'Script', category: 'Scripting', icon: 'FileCode', color: '#00A2FF' },
-  { name: 'UnreliableRemoteEvent', category: 'Scripting', icon: 'Zap', color: '#FF4500' },
 
   // 25. Misc Objects
   { name: 'Wire', category: 'Misc', icon: 'Spline', color: '#AAAAAA' },
@@ -349,7 +347,7 @@ export const OBJECT_CATEGORIES = [
   { name: '20. Styling System', classes: ['StyleDerive', 'StyleLink', 'StyleQuery', 'StyleRule', 'StyleSheet'] },
   { name: '21. World / Simulation', classes: ['WorldModel'] },
   { name: '22. Seats / Teams', classes: ['Seat', 'VehicleSeat', 'Team'] },
-  { name: '23. Scripting / Networking', classes: ['Actor', 'BindableEvent', 'BindableFunction', 'LocalScript', 'ModuleScript', 'RemoteEvent', 'RemoteFunction', 'Script', 'UnreliableRemoteEvent'] },
+  { name: '23. Scripting / Networking', classes: ['Actor', 'BindableEvent', 'BindableFunction', 'LocalScript', 'ModuleScript', 'RemoteFunction', 'Script'] },
   { name: '24. Misc Objects', classes: ['Wire', 'VideoDisplay', 'VideoPlayer', 'Weld', 'HapticEffect', 'Path2D', 'PathfindingLink', 'PathfindingModifier', 'MaterialVariant', 'SurfaceAppearance', 'TerrainDetail', 'Texture', 'Decal', 'ArcHandles', 'Handles', 'SurfaceSelection', 'BoxHandleAdornment', 'SphereHandleAdornment'] },
   { name: 'Services', classes: ['Workspace', 'Players', 'Lighting', 'MaterialService', 'NetworkClient', 'ReplicatedFirst', 'ReplicatedStorage', 'ServerScriptService', 'ServerStorage', 'StarterGui', 'StarterPack', 'StarterPlayer', 'Teams', 'SoundService', 'TextChatService', 'Chat', 'LocalizationService'] },
 ];

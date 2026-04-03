@@ -54,10 +54,11 @@ import {
 import { useExplorer } from './explorer';
 import { ExplorerTree, getIcon } from './components/Explorer/Explorer';
 import { InsertObjectMenu } from './components/Explorer/InsertObjectMenu';
-import { defineCustomBlocks } from './blocks';
+import * as blocks from './blocks';
 import { defineCustomGenerators } from './generators';
 import { toolbox } from './toolbox';
 import { getCategoryColor } from './colors';
+import { serviceGroups } from './serviceBlocks';
 
 const CATEGORIES = [
   { name: 'Comment' },
@@ -66,7 +67,6 @@ const CATEGORIES = [
   { name: 'Math' },
   { name: 'Text' },
   { name: 'Sound' },
-  { name: 'RemoteEvent' },
   { name: 'Values' },
   { name: 'Variables' },
   { name: 'Lists' },
@@ -77,27 +77,92 @@ const CATEGORIES = [
   { name: 'Character' },
   { name: 'Model' },
   { name: 'Gui' },
-  { name: 'Player' },
-  { name: 'Clickdetector' },
+  { name: 'ClickDetector' },
   { name: 'Marketplace' },
   { name: 'Tweening' },
   { name: 'Client' },
   { name: 'Server' },
   { name: 'Leaderstats' },
-  { name: 'Functions' },
   { name: 'Datastore' },
+  { name: 'Functions' },
   { name: 'Events' },
+  { name: 'Animation' },
   { name: 'Input' },
   { name: 'Camera' },
-  { name: 'Animation' },
-  { name: 'Physics' },
-  { name: 'Raycast' },
-  { name: 'Pathfinding' },
-  { name: 'Teleport' },
-  { name: 'Collection' },
-  { name: 'RunService' },
-  { name: 'Lighting' },
   { name: 'Effects' },
+  { name: 'AdService' },
+  { name: 'AnalyticsService' },
+  { name: 'AnimationClipProvider' },
+  { name: 'AssetService' },
+  { name: 'AvatarEditorService' },
+  { name: 'BadgeService' },
+  { name: 'BrowserService' },
+  { name: 'ChangeHistoryService' },
+  { name: 'Chat' },
+  { name: 'CollectionService' },
+  { name: 'ContentProvider' },
+  { name: 'ContextActionService' },
+  { name: 'ControllerService' },
+  { name: 'CoreGui' },
+  { name: 'CorePackages' },
+  { name: 'CSGDictionaryService' },
+  { name: 'DataStoreService' },
+  { name: 'Debris' },
+  { name: 'DebuggerManager' },
+  { name: 'DeviceService' },
+  { name: 'FriendService' },
+  { name: 'GamepadService' },
+  { name: 'Geometry' },
+  { name: 'GroupService' },
+  { name: 'GuiService' },
+  { name: 'HapticService' },
+  { name: 'HttpService' },
+  { name: 'InsertService' },
+  { name: 'JointsService' },
+  { name: 'KeyframeSequenceProvider' },
+  { name: 'LanguageService' },
+  { name: 'Lighting' },
+  { name: 'LocalizationService' },
+  { name: 'LogService' },
+  { name: 'LuaSettings' },
+  { name: 'MarketplaceService' },
+  { name: 'MaterialService' },
+  { name: 'MemoryStoreService' },
+  { name: 'MessagingService' },
+  { name: 'NetworkClient' },
+  { name: 'NetworkServer' },
+  { name: 'NotificationService' },
+  { name: 'PathfindingService' },
+  { name: 'PhysicsService' },
+  { name: 'Players' },
+  { name: 'PluginDebugService' },
+  { name: 'PluginGuiService' },
+  { name: 'PointsService' },
+  { name: 'PolicyService' },
+  { name: 'ProximityPromptService' },
+  { name: 'ReplicatedFirst' },
+  { name: 'ReplicatedStorage' },
+  { name: 'RunService' },
+  { name: 'ScriptContext' },
+  { name: 'Selection' },
+  { name: 'ServerScriptService' },
+  { name: 'ServerStorage' },
+  { name: 'SoundService' },
+  { name: 'StarterGui' },
+  { name: 'StarterPack' },
+  { name: 'StarterPlayer' },
+  { name: 'Stats' },
+  { name: 'StudioData' },
+  { name: 'Teams' },
+  { name: 'TeleportService' },
+  { name: 'TestService' },
+  { name: 'TextChatService' },
+  { name: 'TextService' },
+  { name: 'TweenService' },
+  { name: 'UserGameSettings' },
+  { name: 'UserInputService' },
+  { name: 'VRService' },
+  { name: 'Workspace' },
 ].map((cat) => ({
   ...cat,
   color: getCategoryColor(cat.name)
@@ -221,8 +286,8 @@ const getBlockDescription = (block: any, lang: string) => {
   }
   
   return lang === 'vi' 
-    ? `Khối lệnh này thuộc nhóm ${block.category}. Nó được sử dụng để thực hiện các thao tác liên quan đến ${block.name} trong trò chơi Roblox của bạn.`
-    : `This block belongs to the ${block.category} category. It is used to perform operations related to ${block.name} in your Roblox game.`;
+    ? `Khối lệnh này thuộc nhóm ${block.category.length > 13 ? block.category.substring(0, 13) + '...' : block.category}. Nó được sử dụng để thực hiện các thao tác liên quan đến ${block.name} trong trò chơi Roblox của bạn.`
+    : `This block belongs to the ${block.category.length > 13 ? block.category.substring(0, 13) + '...' : block.category} category. It is used to perform operations related to ${block.name} in your Roblox game.`;
 };
 
 export default function App() {
@@ -312,96 +377,11 @@ export default function App() {
   }, [sidebarWidth, view]);
 
   // Bridge for Blockly to open Explorer
-  const [easingStyleTarget, setEasingStyleTarget] = useState<string | null>(null);
-  const [easingDirectionTarget, setEasingDirectionTarget] = useState<string | null>(null);
-  const [clientKeyTarget, setClientKeyTarget] = useState<string | null>(null);
-  const [mouseButtonTarget, setMouseButtonTarget] = useState<string | null>(null);
-  const [cameraTypeTarget, setCameraTypeTarget] = useState<string | null>(null);
-  const [effectTypeTarget, setEffectTypeTarget] = useState<string | null>(null);
-
   useEffect(() => {
     (window as any).openInstanceSelector = (blockId: string) => {
       setSelectorTarget(blockId);
     };
-    (window as any).openEasingStyleSelector = (blockId: string) => {
-      setEasingStyleTarget(blockId);
-    };
-    (window as any).openEasingDirectionSelector = (blockId: string) => {
-      setEasingDirectionTarget(blockId);
-    };
-    (window as any).openClientKeySelector = (blockId: string) => {
-      setClientKeyTarget(blockId);
-    };
-    (window as any).openMouseButtonSelector = (blockId: string) => {
-      setMouseButtonTarget(blockId);
-    };
-    (window as any).openCameraTypeSelector = (blockId: string) => {
-      setCameraTypeTarget(blockId);
-    };
-    (window as any).openEffectTypeSelector = (blockId: string) => {
-      setEffectTypeTarget(blockId);
-    };
   }, []);
-
-  const handleEasingStyleSelect = (style: string) => {
-    if (easingStyleTarget && workspace.current) {
-      const block = workspace.current.getBlockById(easingStyleTarget);
-      if (block) {
-        block.setFieldValue(style, 'STYLE');
-      }
-      setEasingStyleTarget(null);
-    }
-  };
-
-  const handleEasingDirectionSelect = (direction: string) => {
-    if (easingDirectionTarget && workspace.current) {
-      const block = workspace.current.getBlockById(easingDirectionTarget);
-      if (block) {
-        block.setFieldValue(direction, 'DIRECTION');
-      }
-      setEasingDirectionTarget(null);
-    }
-  };
-
-  const handleClientKeySelect = (key: string) => {
-    if (clientKeyTarget && workspace.current) {
-      const block = workspace.current.getBlockById(clientKeyTarget);
-      if (block) {
-        block.setFieldValue(key, 'KEY_NAME');
-      }
-      setClientKeyTarget(null);
-    }
-  };
-
-  const handleMouseButtonSelect = (button: string) => {
-    if (mouseButtonTarget && workspace.current) {
-      const block = workspace.current.getBlockById(mouseButtonTarget);
-      if (block) {
-        block.setFieldValue(button, 'BUTTON');
-      }
-      setMouseButtonTarget(null);
-    }
-  };
-
-  const handleCameraTypeSelect = (type: string) => {
-    if (cameraTypeTarget && workspace.current) {
-      const block = workspace.current.getBlockById(cameraTypeTarget);
-      if (block) {
-        block.setFieldValue(type, 'TYPE');
-      }
-      setCameraTypeTarget(null);
-    }
-  };
-
-  const handleEffectTypeSelect = (type: string) => {
-    if (effectTypeTarget && workspace.current) {
-      const block = workspace.current.getBlockById(effectTypeTarget);
-      if (block) {
-        block.setFieldValue(type, 'TYPE');
-      }
-      setEffectTypeTarget(null);
-    }
-  };
 
   // Poll for Roblox Studio sync
   useEffect(() => {
@@ -550,16 +530,41 @@ export default function App() {
 
     // Custom field for clickable variable labels
     class FieldClickableVarLabel extends Blockly.FieldLabel {
+      constructor(value: string, classNames?: string) {
+        super(value, classNames);
+        this.EDITABLE = true;
+        this.SERIALIZABLE = true;
+      }
+      init() {
+        super.init();
+        if (this.textElement_) {
+          this.textElement_.style.pointerEvents = 'auto';
+          this.textElement_.style.cursor = 'pointer';
+        }
+      }
+      isClickable() {
+        return true;
+      }
       showEditor_() {
-        const workspace = this.getSourceBlock()?.workspace;
+        let workspace = this.getSourceBlock()?.workspace;
         if (!workspace) return;
+        
+        if ((workspace as any).isFlyout) {
+          workspace = (workspace as any).targetWorkspace;
+          if (!workspace) return;
+        }
         
         const text = this.getText();
         const cleanText = text.replace('var. ', '').trim();
         
+        let blockType = 'var_' + cleanText.replace(/^_/, '');
+        if (!Blockly.Blocks[blockType]) {
+          blockType = 'var_reporter';
+        }
+        
         Blockly.Events.setGroup(true);
         try {
-          const newBlock = workspace.newBlock('var_reporter');
+          const newBlock = workspace.newBlock(blockType);
           if (newBlock) {
             newBlock.setFieldValue(cleanText, 'NAME');
             // Set color based on the text
@@ -587,9 +592,7 @@ export default function App() {
       return new FieldClickableVarLabel(name, "scratch-var-label");
     };
 
-    // Define custom blocks to match the image
-    defineCustomBlocks();
-    defineCustomGenerators();
+      // Define custom blocks to match the image
 
       // Comment Category
       Blockly.Blocks['comment'] = {
@@ -1493,7 +1496,7 @@ export default function App() {
       Blockly.Blocks['variables_create'] = {
         init: function() {
           this.appendDummyInput()
-              .appendField("var. create")
+              .appendField("variable create")
               .appendField(new Blockly.FieldTextInput("x"), "VAR")
               .appendField("with value");
           this.appendValueInput("VALUE").setCheck(null);
@@ -1844,13 +1847,13 @@ export default function App() {
       Blockly.Blocks['variables_set_custom'] = {
         init: function() {
           this.appendDummyInput()
-              .appendField("var. set")
+              .appendField("variable set")
               .appendField(new Blockly.FieldTextInput("x"), "VAR")
               .appendField("to");
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Variables'));
           this.setInputsInline(true);
           addVariableAutocomplete(this, "VAR");
         }
@@ -1859,13 +1862,13 @@ export default function App() {
       Blockly.Blocks['variables_change_custom'] = {
         init: function() {
           this.appendDummyInput()
-              .appendField("var. change")
+              .appendField("variable change")
               .appendField(new Blockly.FieldTextInput("x"), "VAR")
               .appendField("by");
           this.appendValueInput("VALUE").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Variables'));
           this.setInputsInline(true);
           addVariableAutocomplete(this, "VAR");
         }
@@ -1874,10 +1877,10 @@ export default function App() {
       Blockly.Blocks['variables_get_custom'] = {
         init: function() {
           this.appendDummyInput()
-              .appendField("var.")
+              .appendField("variable")
               .appendField(new Blockly.FieldTextInput("x"), "VAR");
           this.setOutput(true, null);
-          this.setColour("#ff661a");
+          this.setColour(getCategoryColor('Variables'));
           addVariableAutocomplete(this, "VAR");
         }
       };
@@ -1915,13 +1918,24 @@ export default function App() {
       createVarReporter('var_input', 'var. _input');
       createVarReporter('var_mouse_input', 'var. _mouse_input');
       createVarReporter('var_touch_input', 'var. _touch_input');
-      createVarReporter('var_player', 'var. _player');
-      createVarReporter('var_click_detector', 'var. _click_detector');
-      createVarReporter('var_productid', 'var. _productid');
-      createVarReporter('var_key_input', 'var. _key_input');
-      createVarReporter('var_received_data', 'var. _received_data');
-      createVarReporter('var_data', 'var. _data');
-      createVarReporter('var_value', 'var. _value');
+      createVarReporter('var_player', 'var. player');
+      createVarReporter('var_click_detector', 'var. click_detector');
+      createVarReporter('var_productid', 'var. productid');
+      createVarReporter('var_key_input', 'var. key_input');
+      createVarReporter('var_received_data', 'var. received_data');
+      createVarReporter('var_data', 'var. data');
+      createVarReporter('var_value', 'var. value');
+      createVarReporter('var_character', 'var. character');
+      createVarReporter('var_otherPart', 'var. otherPart');
+      createVarReporter('var_child', 'var. child');
+      createVarReporter('var_property', 'var. property');
+      createVarReporter('var_active', 'var. active');
+      createVarReporter('var_speed', 'var. speed');
+      createVarReporter('var_deltaTime', 'var. deltaTime');
+      createVarReporter('var_time', 'var. time');
+      createVarReporter('var_message', 'var. message');
+      createVarReporter('var_attributeName', 'var. attributeName');
+      createVarReporter('var_animTrack', 'var. _animTrack');
 
       // Lists Category
       Blockly.Blocks['lists_empty'] = {
@@ -2812,19 +2826,25 @@ export default function App() {
       };
       Blockly.Blocks['tween_info_create'] = {
         init: function() {
-          const styleField = new Blockly.FieldTextInput("Sine");
-          (styleField as any).showEditor_ = () => {
-            if ((window as any).openEasingStyleSelector) {
-              (window as any).openEasingStyleSelector(this.id);
-            }
-          };
+          const styleField = new Blockly.FieldDropdown([
+            ["Linear", "Linear"],
+            ["Sine", "Sine"],
+            ["Back", "Back"],
+            ["Quad", "Quad"],
+            ["Quart", "Quart"],
+            ["Quint", "Quint"],
+            ["Bounce", "Bounce"],
+            ["Elastic", "Elastic"],
+            ["Exponential", "Exponential"],
+            ["Circular", "Circular"],
+            ["Cubic", "Cubic"]
+          ]);
 
-          const directionField = new Blockly.FieldTextInput("Out");
-          (directionField as any).showEditor_ = () => {
-            if ((window as any).openEasingDirectionSelector) {
-              (window as any).openEasingDirectionSelector(this.id);
-            }
-          };
+          const directionField = new Blockly.FieldDropdown([
+            ["In", "In"],
+            ["Out", "Out"],
+            ["InOut", "InOut"]
+          ]);
 
           this.appendDummyInput().appendField("tween info: time");
           this.appendValueInput("TIME").setCheck("Number");
@@ -2958,12 +2978,19 @@ export default function App() {
       };
       Blockly.Blocks['client_key_is'] = {
         init: function() {
-          const keyField = new Blockly.FieldTextInput("Space");
-          (keyField as any).showEditor_ = () => {
-            if ((window as any).openClientKeySelector) {
-              (window as any).openClientKeySelector(this.id);
-            }
-          };
+          const keyField = new Blockly.FieldDropdown([
+            ["Space", "Space"], ["W", "W"], ["A", "A"], ["S", "S"], ["D", "D"],
+            ["Q", "Q"], ["E", "E"], ["R", "R"], ["T", "T"], ["Y", "Y"],
+            ["U", "U"], ["I", "I"], ["O", "O"], ["P", "P"], ["F", "F"],
+            ["G", "G"], ["H", "H"], ["J", "J"], ["K", "K"], ["L", "L"],
+            ["Z", "Z"], ["X", "X"], ["C", "C"], ["V", "V"], ["B", "B"],
+            ["N", "N"], ["M", "M"], ["Up", "Up"], ["Down", "Down"],
+            ["Left", "Left"], ["Right", "Right"], ["Return", "Return"],
+            ["Escape", "Escape"], ["Tab", "Tab"], ["LeftShift", "LeftShift"],
+            ["RightShift", "RightShift"], ["LeftControl", "LeftControl"],
+            ["RightControl", "RightControl"], ["LeftAlt", "LeftAlt"],
+            ["RightAlt", "RightAlt"]
+          ]);
 
           this.appendDummyInput().appendField("if key");
           this.appendValueInput("KEY").setCheck(null);
@@ -3227,148 +3254,26 @@ export default function App() {
         }
       };
 
-      // Events Category
-      Blockly.Blocks['event_game_start'] = {
-        init: function() {
-          this.appendDummyInput().appendField("when game start");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Events'));
-        }
-      };
-      Blockly.Blocks['event_player_join'] = {
-        init: function() {
-          this.appendDummyInput()
-              .appendField("when player join")
-              .appendField(createVarLabel("var. _player", getCategoryColor('Events')), "VAR_LABEL");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Events'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['event_touched'] = {
-        init: function() {
-          this.appendDummyInput().appendField("when");
-          this.appendValueInput("PART").setCheck(null);
-          this.appendDummyInput()
-              .appendField("is touched")
-              .appendField(createVarLabel("var. _otherPart", getCategoryColor('Events')), "VAR_LABEL");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Events'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['event_clicked'] = {
-        init: function() {
-          this.appendDummyInput().appendField("when");
-          this.appendValueInput("CLICK_DETECTOR").setCheck(null);
-          this.appendDummyInput()
-              .appendField("is clicked")
-              .appendField(createVarLabel("var. _player", getCategoryColor('Events')), "VAR_LABEL");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Events'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['event_value_changed'] = {
-        init: function() {
-          this.appendDummyInput().appendField("when value of");
-          this.appendValueInput("VALUE").setCheck(null);
-          this.appendDummyInput()
-              .appendField("changed")
-              .appendField(createVarLabel("var. _newValue", getCategoryColor('Events')), "VAR_LABEL");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Events'));
-          this.setInputsInline(true);
-        }
-      };
-
-      // Input Category
-      Blockly.Blocks['input_key_pressed'] = {
-        init: function() {
-          this.appendDummyInput().appendField("when key");
-          this.appendDummyInput().appendField(new Blockly.FieldTextInput("Space"), "KEY");
-          this.appendDummyInput().appendField("is pressed");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Input'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['input_mouse_click'] = {
-        init: function() {
-          const buttonField = new Blockly.FieldTextInput("MouseButton1");
-          (buttonField as any).showEditor_ = () => {
-            if ((window as any).openMouseButtonSelector) {
-              (window as any).openMouseButtonSelector(this.id);
-            }
-          };
-
-          this.appendDummyInput().appendField("when mouse");
-          this.appendDummyInput().appendField(buttonField, "BUTTON");
-          this.appendDummyInput().appendField("click");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Input'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['input_touch'] = {
-        init: function() {
-          this.appendDummyInput()
-              .appendField("when screen is touched")
-              .appendField(createVarLabel("var. _touchPosition", getCategoryColor('Input')), "VAR_LABEL");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Input'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['input_button_pressed'] = {
-        init: function() {
-          this.appendDummyInput().appendField("when button");
-          this.appendValueInput("BUTTON").setCheck(null);
-          this.appendDummyInput().appendField("is pressed");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Input'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['input_mouse_position'] = {
-        init: function() {
-          this.appendDummyInput().appendField("get mouse position");
-          this.setOutput(true, "Vector2");
-          this.setColour(getCategoryColor('Input'));
-        }
-      };
-
       // Camera Category
+      Blockly.Blocks['camera_get_current'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Get Current Camera");
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Camera'));
+        }
+      };
       Blockly.Blocks['camera_set_type'] = {
         init: function() {
-          const typeField = new Blockly.FieldTextInput("Custom");
-          (typeField as any).showEditor_ = () => {
-            if ((window as any).openCameraTypeSelector) {
-              (window as any).openCameraTypeSelector(this.id);
-            }
-          };
-
-          this.appendDummyInput()
-              .appendField("set camera type to")
-              .appendField(typeField, "TYPE");
+          this.appendDummyInput().appendField("set camera type to")
+              .appendField(new Blockly.FieldDropdown([
+                ["Fixed", "Fixed"],
+                ["Watch", "Watch"],
+                ["Attach", "Attach"],
+                ["Track", "Track"],
+                ["Follow", "Follow"],
+                ["Custom", "Custom"],
+                ["Scriptable", "Scriptable"]
+              ]), "TYPE");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour(getCategoryColor('Camera'));
@@ -3377,7 +3282,7 @@ export default function App() {
       };
       Blockly.Blocks['camera_set_subject'] = {
         init: function() {
-          this.appendDummyInput().appendField("set camera subject to");
+          this.appendDummyInput().appendField("Set Camera Subject");
           this.appendValueInput("SUBJECT").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -3385,10 +3290,59 @@ export default function App() {
           this.setInputsInline(true);
         }
       };
+      Blockly.Blocks['camera_set_cframe'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Set Camera CFrame");
+          this.appendValueInput("CFRAME").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Camera'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['camera_get_cframe'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Get Camera CFrame");
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Camera'));
+        }
+      };
       Blockly.Blocks['camera_move'] = {
         init: function() {
-          this.appendDummyInput().appendField("move camera to");
+          this.appendDummyInput().appendField("Move Camera To");
           this.appendValueInput("POSITION").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Camera'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['camera_look_at'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Camera Look At");
+          this.appendValueInput("TARGET").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Camera'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['camera_shake'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Shake Camera");
+          this.appendValueInput("INTENSITY").setCheck("Number");
+          this.appendDummyInput().appendField("Duration");
+          this.appendValueInput("DURATION").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Camera'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['camera_zoom'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Zoom Camera");
+          this.appendValueInput("DISTANCE").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour(getCategoryColor('Camera'));
@@ -3397,7 +3351,7 @@ export default function App() {
       };
       Blockly.Blocks['camera_set_fov'] = {
         init: function() {
-          this.appendDummyInput().appendField("set camera FOV to");
+          this.appendDummyInput().appendField("Set Field Of View");
           this.appendValueInput("FOV").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
@@ -3405,348 +3359,517 @@ export default function App() {
           this.setInputsInline(true);
         }
       };
-
-      // Animation Category
-      Blockly.Blocks['animation_load'] = {
+      Blockly.Blocks['camera_get_fov'] = {
         init: function() {
-          this.appendDummyInput().appendField("load animation");
-          this.appendValueInput("ANIM_ID").setCheck("String");
-          this.appendDummyInput().appendField("to");
-          this.appendValueInput("HUMANOID").setCheck(null);
-          this.setOutput(true, null);
-          this.setColour(getCategoryColor('Animation'));
-          this.setInputsInline(true);
+          this.appendDummyInput().appendField("Get Field Of View");
+          this.setOutput(true, "Number");
+          this.setColour(getCategoryColor('Camera'));
         }
       };
-      Blockly.Blocks['animation_play'] = {
+      Blockly.Blocks['camera_follow_player'] = {
         init: function() {
-          this.appendDummyInput().appendField("play animation");
-          this.appendValueInput("ANIM_TRACK").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Animation'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['animation_stop'] = {
-        init: function() {
-          this.appendDummyInput().appendField("stop animation");
-          this.appendValueInput("ANIM_TRACK").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Animation'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['animation_adjust_speed'] = {
-        init: function() {
-          this.appendDummyInput().appendField("set animation");
-          this.appendValueInput("ANIM_TRACK").setCheck(null);
-          this.appendDummyInput().appendField("speed to");
-          this.appendValueInput("SPEED").setCheck("Number");
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Animation'));
-          this.setInputsInline(true);
-        }
-      };
-
-      // Physics Category
-      Blockly.Blocks['physics_apply_force'] = {
-        init: function() {
-          this.appendDummyInput().appendField("apply force");
-          this.appendValueInput("FORCE").setCheck(null);
-          this.appendDummyInput().appendField("to");
-          this.appendValueInput("PART").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Physics'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['physics_set_velocity'] = {
-        init: function() {
-          this.appendDummyInput().appendField("set velocity of");
-          this.appendValueInput("PART").setCheck(null);
-          this.appendDummyInput().appendField("to");
-          this.appendValueInput("VELOCITY").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Physics'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['physics_enable'] = {
-        init: function() {
-          this.appendDummyInput().appendField("enable physics for");
-          this.appendValueInput("PART").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Physics'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['physics_set_mass'] = {
-        init: function() {
-          this.appendDummyInput().appendField("set mass of");
-          this.appendValueInput("PART").setCheck(null);
-          this.appendDummyInput().appendField("to");
-          this.appendValueInput("MASS").setCheck("Number");
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Physics'));
-          this.setInputsInline(true);
-        }
-      };
-
-      // Raycast Category
-      Blockly.Blocks['raycast_forward'] = {
-        init: function() {
-          this.appendDummyInput().appendField("raycast forward from");
-          this.appendValueInput("ORIGIN").setCheck(null);
-          this.appendDummyInput().appendField("distance");
-          this.appendValueInput("DISTANCE").setCheck("Number");
-          this.setOutput(true, null);
-          this.setColour(getCategoryColor('Raycast'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['raycast_down'] = {
-        init: function() {
-          this.appendDummyInput().appendField("raycast down from");
-          this.appendValueInput("ORIGIN").setCheck(null);
-          this.appendDummyInput().appendField("distance");
-          this.appendValueInput("DISTANCE").setCheck("Number");
-          this.setOutput(true, null);
-          this.setColour(getCategoryColor('Raycast'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['raycast_get_hit_object'] = {
-        init: function() {
-          this.appendDummyInput().appendField("get hit object from");
-          this.appendValueInput("RAYCAST_RESULT").setCheck(null);
-          this.setOutput(true, null);
-          this.setColour(getCategoryColor('Raycast'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['raycast_get_hit_position'] = {
-        init: function() {
-          this.appendDummyInput().appendField("get hit position from");
-          this.appendValueInput("RAYCAST_RESULT").setCheck(null);
-          this.setOutput(true, "Vector3");
-          this.setColour(getCategoryColor('Raycast'));
-          this.setInputsInline(true);
-        }
-      };
-
-      // Pathfinding Category
-      Blockly.Blocks['pathfinding_create'] = {
-        init: function() {
-          this.appendDummyInput().appendField("create path");
-          this.setOutput(true, null);
-          this.setColour(getCategoryColor('Pathfinding'));
-        }
-      };
-      Blockly.Blocks['pathfinding_compute'] = {
-        init: function() {
-          this.appendDummyInput().appendField("compute path from");
-          this.appendValueInput("START").setCheck(null);
-          this.appendDummyInput().appendField("to");
-          this.appendValueInput("END").setCheck(null);
-          this.appendDummyInput().appendField("using");
-          this.appendValueInput("PATH").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Pathfinding'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['pathfinding_move_to'] = {
-        init: function() {
-          this.appendDummyInput().appendField("move");
-          this.appendValueInput("HUMANOID").setCheck(null);
-          this.appendDummyInput().appendField("to waypoint");
-          this.appendValueInput("WAYPOINT").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Pathfinding'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['pathfinding_stop'] = {
-        init: function() {
-          this.appendDummyInput().appendField("stop pathfinding for");
-          this.appendValueInput("HUMANOID").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Pathfinding'));
-          this.setInputsInline(true);
-        }
-      };
-
-      // Teleport Category
-      Blockly.Blocks['teleport_player'] = {
-        init: function() {
-          this.appendDummyInput().appendField("teleport player");
+          this.appendDummyInput().appendField("Camera Follow Player");
           this.appendValueInput("PLAYER").setCheck(null);
-          this.appendDummyInput().appendField("to place");
-          this.appendValueInput("PLACE_ID").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Teleport'));
+          this.setColour(getCategoryColor('Camera'));
           this.setInputsInline(true);
         }
       };
-      Blockly.Blocks['teleport_players'] = {
+      Blockly.Blocks['camera_scriptable'] = {
         init: function() {
-          this.appendDummyInput().appendField("teleport players");
-          this.appendValueInput("PLAYERS").setCheck("Array");
-          this.appendDummyInput().appendField("to place");
-          this.appendValueInput("PLACE_ID").setCheck("Number");
+          this.appendDummyInput().appendField("Camera Scriptable Mode");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Teleport'));
-          this.setInputsInline(true);
+          this.setColour(getCategoryColor('Camera'));
         }
       };
-      Blockly.Blocks['teleport_reserve_server'] = {
+      Blockly.Blocks['camera_reset'] = {
         init: function() {
-          this.appendValueInput("PLACE_ID").setCheck("Number").appendField("reserve server for place");
-          this.setOutput(true, "String");
-          this.setColour(getCategoryColor('Teleport'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['teleport_async'] = {
-        init: function() {
-          this.appendDummyInput().appendField("teleport async to place");
-          this.appendValueInput("PLACE_ID").setCheck("Number");
-          this.appendDummyInput().appendField("with players");
-          this.appendValueInput("PLAYERS").setCheck("Array");
+          this.appendDummyInput().appendField("Reset Camera");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Teleport'));
-          this.setInputsInline(true);
+          this.setColour(getCategoryColor('Camera'));
         }
       };
 
-      // Collection Category
-      Blockly.Blocks['collection_add_tag'] = {
+      // Effects Category
+      Blockly.Blocks['effects_create_particle'] = {
         init: function() {
-          this.appendDummyInput().appendField("add tag");
-          this.appendValueInput("TAG").setCheck("String");
-          this.appendDummyInput().appendField("to");
+          this.appendDummyInput().appendField("Create Particle");
+          this.appendValueInput("PARENT").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_emit_particles'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Emit Particles");
+          this.appendValueInput("COUNT").setCheck("Number");
+          this.appendDummyInput().appendField("From");
+          this.appendValueInput("PARTICLE_EMITTER").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_stop_particles'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Stop Particles");
+          this.appendValueInput("PARTICLE_EMITTER").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_create_explosion'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Create Explosion");
+          this.appendValueInput("POSITION").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_create_highlight'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Create Highlight");
+          this.appendValueInput("PARENT").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_enable_highlight'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Enable Highlight");
+          this.appendValueInput("HIGHLIGHT").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_disable_highlight'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Disable Highlight");
+          this.appendValueInput("HIGHLIGHT").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_create_beam'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Create Beam");
+          this.appendValueInput("PARENT").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_create_trail'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Create Trail");
+          this.appendValueInput("PARENT").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_play_sound'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Play Sound");
+          this.appendValueInput("SOUND").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_stop_sound'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Stop Sound");
+          this.appendValueInput("SOUND").setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_set_sound_volume'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Set Sound Volume");
+          this.appendValueInput("SOUND").setCheck(null);
+          this.appendDummyInput().appendField("To");
+          this.appendValueInput("VOLUME").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_set_sound_pitch'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Set Sound Pitch");
+          this.appendValueInput("SOUND").setCheck(null);
+          this.appendDummyInput().appendField("To");
+          this.appendValueInput("PITCH").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_create_tween'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Create Tween");
           this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("With Info");
+          this.appendValueInput("INFO").setCheck(null);
+          this.appendDummyInput().appendField("Goals");
+          this.appendValueInput("GOALS").setCheck(null);
+          this.setOutput(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_play_tween'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Play Tween");
+          this.appendValueInput("TWEEN").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Collection'));
+          this.setColour(getCategoryColor('Effects'));
           this.setInputsInline(true);
         }
       };
-      Blockly.Blocks['collection_remove_tag'] = {
+      Blockly.Blocks['effects_stop_tween'] = {
         init: function() {
-          this.appendDummyInput().appendField("remove tag");
-          this.appendValueInput("TAG").setCheck("String");
-          this.appendDummyInput().appendField("from");
-          this.appendValueInput("INSTANCE").setCheck(null);
+          this.appendDummyInput().appendField("Stop Tween");
+          this.appendValueInput("TWEEN").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Collection'));
+          this.setColour(getCategoryColor('Effects'));
           this.setInputsInline(true);
         }
       };
-      Blockly.Blocks['collection_get_tagged'] = {
+      Blockly.Blocks['effects_camera_shake'] = {
         init: function() {
-          this.appendDummyInput().appendField("get objects with tag");
-          this.appendValueInput("TAG").setCheck("String");
-          this.setOutput(true, "Array");
-          this.setColour(getCategoryColor('Collection'));
-          this.setInputsInline(true);
-        }
-      };
-
-      // RunService Category
-      Blockly.Blocks['runservice_heartbeat'] = {
-        init: function() {
-          this.appendDummyInput()
-              .appendField("on heartbeat")
-              .appendField(createVarLabel("var. _deltaTime", getCategoryColor('RunService')), "VAR_LABEL");
-          this.appendStatementInput("DO").setCheck(null);
+          this.appendDummyInput().appendField("Camera Shake Effect");
+          this.appendValueInput("INTENSITY").setCheck("Number");
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('RunService'));
+          this.setColour(getCategoryColor('Effects'));
           this.setInputsInline(true);
         }
       };
-      Blockly.Blocks['runservice_stepped'] = {
+      Blockly.Blocks['effects_flash_screen'] = {
         init: function() {
-          this.appendDummyInput()
-              .appendField("on stepped")
-              .appendField(createVarLabel("var. _time", getCategoryColor('RunService')), "VAR_TIME")
-              .appendField(", ")
-              .appendField(createVarLabel("var. _deltaTime", getCategoryColor('RunService')), "VAR_DELTA");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('RunService'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['runservice_renderstep'] = {
-        init: function() {
-          this.appendDummyInput()
-              .appendField("on render step")
-              .appendField(createVarLabel("var. _deltaTime", getCategoryColor('RunService')), "VAR_LABEL");
-          this.appendStatementInput("DO").setCheck(null);
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('RunService'));
-          this.setInputsInline(true);
-        }
-      };
-
-      // Lighting Category
-      Blockly.Blocks['lighting_set_brightness'] = {
-        init: function() {
-          this.appendDummyInput().appendField("set brightness to");
-          this.appendValueInput("VALUE").setCheck("Number");
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Lighting'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['lighting_set_time'] = {
-        init: function() {
-          this.appendDummyInput()
-              .appendField("set time of day to")
-              .appendField(new Blockly.FieldTextInput("12:00:00"), "TIME");
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Lighting'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['lighting_change_sky'] = {
-        init: function() {
-          this.appendDummyInput().appendField("change sky texture to");
-          this.appendValueInput("SKY_ID").setCheck("String");
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Lighting'));
-          this.setInputsInline(true);
-        }
-      };
-      Blockly.Blocks['lighting_set_ambient'] = {
-        init: function() {
-          this.appendDummyInput().appendField("set ambient color to");
+          this.appendDummyInput().appendField("Flash Screen");
           this.appendValueInput("COLOR").setCheck(null);
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
-          this.setColour(getCategoryColor('Lighting'));
+          this.setColour(getCategoryColor('Effects'));
           this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_blur'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Blur Effect");
+          this.appendValueInput("SIZE").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      Blockly.Blocks['effects_color_correction'] = {
+        init: function() {
+          this.appendDummyInput().appendField("Color Correction");
+          this.appendValueInput("SATURATION").setCheck("Number");
+          this.appendDummyInput().appendField("Contrast");
+          this.appendValueInput("CONTRAST").setCheck("Number");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Effects'));
+          this.setInputsInline(true);
+        }
+      };
+      // Input Category
+      Blockly.Blocks['input_key_pressed'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Key Pressed")
+              .appendField(new Blockly.FieldTextInput("Space"), "KEY")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+          
+          // Add autocomplete
+          const keys = ["Space", "W", "A", "S", "D", "E", "Q", "R", "F", "LeftShift", "LeftControl", "LeftAlt", "Return"];
+          blocks.addAutocomplete(this, 'KEY', keys);
+        }
+      };
+      Blockly.Blocks['input_key_released'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Key Released")
+              .appendField(new Blockly.FieldTextInput("Space"), "KEY")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+          
+          // Add autocomplete
+          const keys = ["Space", "W", "A", "S", "D", "E", "Q", "R", "F", "LeftShift", "LeftControl", "LeftAlt", "Return"];
+          blocks.addAutocomplete(this, 'KEY', keys);
+        }
+      };
+       Blockly.Blocks['input_mouse_button_down'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Mouse Button Down")
+              .appendField(new Blockly.FieldTextInput("Left"), "BUTTON")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+          
+          // Add autocomplete
+          const buttons = ["Left", "Right", "Middle"];
+          blocks.addAutocomplete(this, 'BUTTON', buttons);
+        }
+      };
+      Blockly.Blocks['input_mouse_button_up'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Mouse Button Up")
+              .appendField(new Blockly.FieldTextInput("Left"), "BUTTON")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+          
+          // Add autocomplete
+          const buttons = ["Left", "Right", "Middle"];
+          blocks.addAutocomplete(this, 'BUTTON', buttons);
+        }
+      };
+
+      Blockly.Blocks['input_mouse_move'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Mouse Move")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_mouse_position'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Mouse Position");
+          this.setOutput(true, "Vector2");
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_is_key_down'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Is Key Down")
+              .appendField(new Blockly.FieldDropdown([
+                ["Space", "Space"], ["W", "W"], ["A", "A"], ["S", "S"], ["D", "D"],
+                ["E", "E"], ["Q", "Q"], ["R", "R"], ["F", "F"], ["Shift", "LeftShift"],
+                ["Ctrl", "LeftControl"], ["Alt", "LeftAlt"], ["Enter", "Return"]
+              ]), "KEY");
+          this.setOutput(true, "Boolean");
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_get_keys_pressed'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Get Keys Pressed");
+          this.setOutput(true, "Array");
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_touch_started'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Touch Started")
+              .appendField(createVarLabel("var. _touch", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_touch_ended'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Touch Ended")
+              .appendField(createVarLabel("var. _touch", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_touch_moved'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Touch Moved")
+              .appendField(createVarLabel("var. _touch", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_gamepad_button_pressed'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Gamepad Button Pressed")
+              .appendField(new Blockly.FieldDropdown([
+                ["Button A", "ButtonA"], ["Button B", "ButtonB"], ["Button X", "ButtonX"], ["Button Y", "ButtonY"],
+                ["DPad Up", "DPadUp"], ["DPad Down", "DPadDown"], ["DPad Left", "DPadLeft"], ["DPad Right", "DPadRight"],
+                ["L1", "ButtonL1"], ["R1", "ButtonR1"], ["L2", "ButtonL2"], ["R2", "ButtonR2"]
+              ]), "BUTTON")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+      Blockly.Blocks['input_gamepad_button_released'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Gamepad Button Released")
+              .appendField(new Blockly.FieldDropdown([
+                ["Button A", "ButtonA"], ["Button B", "ButtonB"], ["Button X", "ButtonX"], ["Button Y", "ButtonY"],
+                ["DPad Up", "DPadUp"], ["DPad Down", "DPadDown"], ["DPad Left", "DPadLeft"], ["DPad Right", "DPadRight"],
+                ["L1", "ButtonL1"], ["R1", "ButtonR1"], ["L2", "ButtonL2"], ["R2", "ButtonR2"]
+              ]), "BUTTON")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_began'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Input Began")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_ended'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Input Ended")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_changed'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Input Changed")
+              .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
+              .appendField("do");
+          this.appendStatementInput("DO")
+              .setCheck(null);
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_lock_mouse'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Lock Mouse");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_unlock_mouse'] = {
+        init: function() {
+          this.appendDummyInput()
+              .appendField("Unlock Mouse");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
+        }
+      };
+
+      Blockly.Blocks['input_set_mouse_icon'] = {
+        init: function() {
+          this.appendValueInput("ICON")
+              .setCheck("String")
+              .appendField("Set Mouse Icon");
+          this.setPreviousStatement(true, null);
+          this.setNextStatement(true, null);
+          this.setColour(getCategoryColor('Input'));
         }
       };
 
@@ -3785,12 +3908,12 @@ export default function App() {
       };
       Blockly.Blocks['effects_spawn'] = {
         init: function() {
-          const typeField = new Blockly.FieldTextInput("Explosion");
-          (typeField as any).showEditor_ = () => {
-            if ((window as any).openEffectTypeSelector) {
-              (window as any).openEffectTypeSelector(this.id);
-            }
-          };
+          const typeField = new Blockly.FieldDropdown([
+            ["Explosion", "Explosion"],
+            ["Sparkles", "Sparkles"],
+            ["Fire", "Fire"],
+            ["Smoke", "Smoke"]
+          ]);
 
           this.appendDummyInput()
               .appendField("spawn effect")
@@ -3991,7 +4114,7 @@ export default function App() {
         return [varName, Order.ATOMIC];
       };
 
-      ['var_count', 'var_child', 'var_descendant', 'var_instance', 'var_clone', 'var_touched_part', 'var_climb_speed', 'var_humanoid', 'var_character_model', 'var_new_health', 'var_reached_goal', 'var_input', 'var_mouse_input', 'var_touch_input', 'var_player', 'var_click_detector', 'var_productid', 'var_key_input', 'var_received_data', 'var_data', 'var_value'].forEach(type => {
+      ['var_count', 'var_child', 'var_descendant', 'var_instance', 'var_clone', 'var_touched_part', 'var_climb_speed', 'var_humanoid', 'var_character_model', 'var_new_health', 'var_reached_goal', 'var_input', 'var_mouse_input', 'var_touch_input', 'var_player', 'var_click_detector', 'var_productid', 'var_key_input', 'var_received_data', 'var_data', 'var_value', 'var_character', 'var_otherPart', 'var_property', 'var_active', 'var_speed', 'var_deltaTime', 'var_time', 'var_message', 'var_attributeName'].forEach(type => {
         luaGenerator.forBlock[type] = varReporterGenerator;
       });
 
@@ -4817,61 +4940,10 @@ export default function App() {
         return 'pcall(function()\n  ' + ds + ':SetAsync(' + player + '.UserId, ' + val + ')\nend)\n';
       };
 
-      // Events
-      luaGenerator.forBlock['event_game_start'] = function(block: any) {
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        return `-- Game Start Event\n${statements}`;
-      };
-      luaGenerator.forBlock['event_player_join'] = function(block: any) {
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
-        return `game.Players.PlayerAdded:Connect(function(${varName})\n${statements}end)\n`;
-      };
-      luaGenerator.forBlock['event_touched'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'script.Parent';
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _otherPart').replace('var. ', '');
-        return `${instance}.Touched:Connect(function(${varName})\n${statements}end)\n`;
-      };
-      luaGenerator.forBlock['event_clicked'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'CLICK_DETECTOR', Order.ATOMIC) || 'script.Parent';
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _player').replace('var. ', '');
-        return `${instance}.MouseClick:Connect(function(${varName})\n${statements}end)\n`;
-      };
-      luaGenerator.forBlock['event_value_changed'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'VALUE', Order.ATOMIC) || 'script.Parent';
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _newValue').replace('var. ', '');
-        return `${instance}.Changed:Connect(function(${varName})\n${statements}end)\n`;
-      };
-
-      // Input
-      luaGenerator.forBlock['input_key_pressed'] = function(block: any) {
-        const key = block.getFieldValue('KEY');
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        return `game:GetService("UserInputService").InputBegan:Connect(function(input, processed)\n  if not processed and input.KeyCode == Enum.KeyCode.${key} then\n${statements}  end\nend)\n`;
-      };
-      luaGenerator.forBlock['input_mouse_click'] = function(block: any) {
-        const button = block.getFieldValue('BUTTON');
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        return `game:GetService("UserInputService").InputBegan:Connect(function(input, processed)\n  if not processed and input.UserInputType == Enum.UserInputType.${button} then\n${statements}  end\nend)\n`;
-      };
-      luaGenerator.forBlock['input_touch'] = function(block: any) {
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touchPosition').replace('var. ', '');
-        return `game:GetService("UserInputService").TouchTapInWorld:Connect(function(${varName}, _processed)\n  if not _processed then\n${statements}  end\nend)\n`;
-      };
-      luaGenerator.forBlock['input_button_pressed'] = function(block: any) {
-        const button = luaGenerator.valueToCode(block, 'BUTTON', Order.ATOMIC) || 'nil';
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        return `${button}.MouseButton1Click:Connect(function()\n${statements}end)\n`;
-      };
-      luaGenerator.forBlock['input_mouse_position'] = function() {
-        return ['game:GetService("UserInputService"):GetMouseLocation()', Order.ATOMIC];
-      };
-
       // Camera
+      luaGenerator.forBlock['camera_get_current'] = function() {
+        return ['workspace.CurrentCamera', Order.ATOMIC];
+      };
       luaGenerator.forBlock['camera_set_type'] = function(block: any) {
         const type = block.getFieldValue('TYPE');
         return `workspace.CurrentCamera.CameraType = Enum.CameraType.${type}\n`;
@@ -4880,170 +4952,246 @@ export default function App() {
         const subject = luaGenerator.valueToCode(block, 'SUBJECT', Order.ATOMIC) || 'nil';
         return `workspace.CurrentCamera.CameraSubject = ${subject}\n`;
       };
+      luaGenerator.forBlock['camera_set_cframe'] = function(block: any) {
+        const cframe = luaGenerator.valueToCode(block, 'CFRAME', Order.ATOMIC) || 'CFrame.new()';
+        return `workspace.CurrentCamera.CFrame = ${cframe}\n`;
+      };
+      luaGenerator.forBlock['camera_get_cframe'] = function() {
+        return ['workspace.CurrentCamera.CFrame', Order.ATOMIC];
+      };
       luaGenerator.forBlock['camera_move'] = function(block: any) {
         const position = luaGenerator.valueToCode(block, 'POSITION', Order.ATOMIC) || 'Vector3.new(0,0,0)';
         return `workspace.CurrentCamera.CFrame = CFrame.new(${position})\n`;
+      };
+      luaGenerator.forBlock['camera_look_at'] = function(block: any) {
+        const target = luaGenerator.valueToCode(block, 'TARGET', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        return `workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, ${target})\n`;
+      };
+      luaGenerator.forBlock['camera_shake'] = function(block: any) {
+        const intensity = luaGenerator.valueToCode(block, 'INTENSITY', Order.ATOMIC) || '1';
+        return `local cam = workspace.CurrentCamera\nlocal pos = cam.CFrame.Position\nlocal rot = cam.CFrame - pos\ncam.CFrame = CFrame.new(pos + Vector3.new(math.random(-${intensity}, ${intensity}), math.random(-${intensity}, ${intensity}), math.random(-${intensity}, ${intensity}))) * rot\n`;
+      };
+      luaGenerator.forBlock['camera_zoom'] = function(block: any) {
+        const distance = luaGenerator.valueToCode(block, 'DISTANCE', Order.ATOMIC) || '10';
+        return `workspace.CurrentCamera.FieldOfView = workspace.CurrentCamera.FieldOfView - ${distance}\n`;
       };
       luaGenerator.forBlock['camera_set_fov'] = function(block: any) {
         const fov = luaGenerator.valueToCode(block, 'FOV', Order.ATOMIC) || '70';
         return `workspace.CurrentCamera.FieldOfView = ${fov}\n`;
       };
-
-      // Animation
-      luaGenerator.forBlock['animation_load'] = function(block: any) {
-        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.ATOMIC) || 'nil';
-        const id = luaGenerator.valueToCode(block, 'ANIM_ID', Order.ATOMIC) || '0';
-        return [`${humanoid}:LoadAnimation(Instance.new("Animation", {AnimationId = "rbxassetid://" .. ${id}}))`, Order.ATOMIC];
+      luaGenerator.forBlock['camera_get_fov'] = function() {
+        return ['workspace.CurrentCamera.FieldOfView', Order.ATOMIC];
       };
-      luaGenerator.forBlock['animation_play'] = function(block: any) {
-        const track = luaGenerator.valueToCode(block, 'ANIM_TRACK', Order.ATOMIC) || 'nil';
-        return `${track}:Play()\n`;
-      };
-      luaGenerator.forBlock['animation_stop'] = function(block: any) {
-        const track = luaGenerator.valueToCode(block, 'ANIM_TRACK', Order.ATOMIC) || 'nil';
-        return `${track}:Stop()\n`;
-      };
-      luaGenerator.forBlock['animation_adjust_speed'] = function(block: any) {
-        const track = luaGenerator.valueToCode(block, 'ANIM_TRACK', Order.ATOMIC) || 'nil';
-        const speed = luaGenerator.valueToCode(block, 'SPEED', Order.ATOMIC) || '1';
-        return `${track}:AdjustSpeed(${speed})\n`;
-      };
-
-      // Physics
-      luaGenerator.forBlock['physics_apply_force'] = function(block: any) {
-        const part = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'nil';
-        const force = luaGenerator.valueToCode(block, 'FORCE', Order.ATOMIC) || 'Vector3.new(0,0,0)';
-        return `${part}:ApplyImpulse(${force})\n`;
-      };
-      luaGenerator.forBlock['physics_set_velocity'] = function(block: any) {
-        const part = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'nil';
-        const velocity = luaGenerator.valueToCode(block, 'VELOCITY', Order.ATOMIC) || 'Vector3.new(0,0,0)';
-        return `${part}.AssemblyLinearVelocity = ${velocity}\n`;
-      };
-      luaGenerator.forBlock['physics_enable'] = function(block: any) {
-        const part = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'nil';
-        return `${part}.Anchored = false\n`;
-      };
-      luaGenerator.forBlock['physics_set_mass'] = function(block: any) {
-        const part = luaGenerator.valueToCode(block, 'PART', Order.ATOMIC) || 'nil';
-        const mass = luaGenerator.valueToCode(block, 'MASS', Order.ATOMIC) || '1';
-        return `-- Mass is read-only, setting density instead\nlocal props = Instance.new("PhysicalProperties", {Density = ${mass}})\n${part}.CustomPhysicalProperties = props\n`;
-      };
-
-      // Raycast
-      luaGenerator.forBlock['raycast_forward'] = function(block: any) {
-        const origin = luaGenerator.valueToCode(block, 'ORIGIN', Order.ATOMIC) || 'Vector3.new(0,0,0)';
-        const distance = luaGenerator.valueToCode(block, 'DISTANCE', Order.ATOMIC) || '10';
-        return [`workspace:Raycast(${origin}, workspace.CurrentCamera.CFrame.LookVector * ${distance})`, Order.ATOMIC];
-      };
-      luaGenerator.forBlock['raycast_down'] = function(block: any) {
-        const origin = luaGenerator.valueToCode(block, 'ORIGIN', Order.ATOMIC) || 'Vector3.new(0,0,0)';
-        const distance = luaGenerator.valueToCode(block, 'DISTANCE', Order.ATOMIC) || '10';
-        return [`workspace:Raycast(${origin}, Vector3.new(0, -${distance}, 0))`, Order.ATOMIC];
-      };
-      luaGenerator.forBlock['raycast_get_hit_object'] = function(block: any) {
-        const result = luaGenerator.valueToCode(block, 'RAYCAST_RESULT', Order.ATOMIC) || 'nil';
-        return [`${result} and ${result}.Instance`, Order.ATOMIC];
-      };
-      luaGenerator.forBlock['raycast_get_hit_position'] = function(block: any) {
-        const result = luaGenerator.valueToCode(block, 'RAYCAST_RESULT', Order.ATOMIC) || 'nil';
-        return [`${result} and ${result}.Position`, Order.ATOMIC];
-      };
-
-      // Pathfinding
-      luaGenerator.forBlock['pathfinding_create'] = function() {
-        return ['game:GetService("PathfindingService"):CreatePath()', Order.ATOMIC];
-      };
-      luaGenerator.forBlock['pathfinding_compute'] = function(block: any) {
-        const path = luaGenerator.valueToCode(block, 'PATH', Order.ATOMIC) || 'nil';
-        const start = luaGenerator.valueToCode(block, 'START', Order.ATOMIC) || 'Vector3.new(0,0,0)';
-        const finish = luaGenerator.valueToCode(block, 'END', Order.ATOMIC) || 'Vector3.new(0,0,0)';
-        return `${path}:ComputeAsync(${start}, ${finish})\n`;
-      };
-      luaGenerator.forBlock['pathfinding_move_to'] = function(block: any) {
-        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.ATOMIC) || 'nil';
-        const waypoint = luaGenerator.valueToCode(block, 'WAYPOINT', Order.ATOMIC) || 'nil';
-        return `${humanoid}:MoveTo(${waypoint}.Position)\n`;
-      };
-      luaGenerator.forBlock['pathfinding_stop'] = function(block: any) {
-        const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.ATOMIC) || 'nil';
-        return `${humanoid}:MoveTo(${humanoid}.Parent.PrimaryPart.Position)\n`;
-      };
-
-      // Teleport
-      luaGenerator.forBlock['teleport_player'] = function(block: any) {
+      luaGenerator.forBlock['camera_follow_player'] = function(block: any) {
         const player = luaGenerator.valueToCode(block, 'PLAYER', Order.ATOMIC) || 'nil';
-        const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
-        return `game:GetService("TeleportService"):Teleport(${placeId}, ${player})\n`;
+        return `workspace.CurrentCamera.CameraSubject = ${player}.Character:FindFirstChild("Humanoid")\nworkspace.CurrentCamera.CameraType = Enum.CameraType.Follow\n`;
       };
-      luaGenerator.forBlock['teleport_players'] = function(block: any) {
-        const players = luaGenerator.valueToCode(block, 'PLAYERS', Order.ATOMIC) || '{}';
-        const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
-        return `game:GetService("TeleportService"):TeleportPartyAsync(${placeId}, ${players})\n`;
+      luaGenerator.forBlock['camera_scriptable'] = function() {
+        return `workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable\n`;
       };
-      luaGenerator.forBlock['teleport_reserve_server'] = function(block: any) {
-        const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
-        return [`game:GetService("TeleportService"):ReserveServer(${placeId})`, Order.ATOMIC];
-      };
-      luaGenerator.forBlock['teleport_async'] = function(block: any) {
-        const players = luaGenerator.valueToCode(block, 'PLAYERS', Order.ATOMIC) || '{}';
-        const placeId = luaGenerator.valueToCode(block, 'PLACE_ID', Order.ATOMIC) || '0';
-        return `game:GetService("TeleportService"):TeleportAsync(${placeId}, ${players})\n`;
+      luaGenerator.forBlock['camera_reset'] = function() {
+        return `workspace.CurrentCamera.CameraType = Enum.CameraType.Custom\nworkspace.CurrentCamera.CameraSubject = game.Players.LocalPlayer.Character:FindFirstChild("Humanoid")\n`;
       };
 
-      // Collection
-      luaGenerator.forBlock['collection_add_tag'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
-        const tag = luaGenerator.valueToCode(block, 'TAG', Order.ATOMIC) || '""';
-        return `game:GetService("CollectionService"):AddTag(${instance}, ${tag})\n`;
-      };
-      luaGenerator.forBlock['collection_remove_tag'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
-        const tag = luaGenerator.valueToCode(block, 'TAG', Order.ATOMIC) || '""';
-        return `game:GetService("CollectionService"):RemoveTag(${instance}, ${tag})\n`;
-      };
-      luaGenerator.forBlock['collection_get_tagged'] = function(block: any) {
-        const tag = luaGenerator.valueToCode(block, 'TAG', Order.ATOMIC) || '""';
-        return [`game:GetService("CollectionService"):GetTagged(${tag})`, Order.ATOMIC];
+      // Input
+      luaGenerator.forBlock['input_key_pressed'] = function(block: any) {
+        const key = block.getFieldValue('KEY');
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputBegan:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed and ${varName}.KeyCode == Enum.KeyCode.${key} then\n${doCode}  end\nend)\n`;
       };
 
-      // RunService
-      luaGenerator.forBlock['runservice_heartbeat'] = function(block: any) {
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _deltaTime').replace('var. ', '');
-        return `game:GetService("RunService").Heartbeat:Connect(function(${varName})\n${statements}end)\n`;
-      };
-      luaGenerator.forBlock['runservice_stepped'] = function(block: any) {
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        const varTime = (block.getFieldValue('VAR_TIME') || 'var. _time').replace('var. ', '');
-        const varDelta = (block.getFieldValue('VAR_DELTA') || 'var. _deltaTime').replace('var. ', '');
-        return `game:GetService("RunService").Stepped:Connect(function(${varTime}, ${varDelta})\n${statements}end)\n`;
-      };
-      luaGenerator.forBlock['runservice_renderstep'] = function(block: any) {
-        const statements = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _deltaTime').replace('var. ', '');
-        return `game:GetService("RunService").RenderStepped:Connect(function(${varName})\n${statements}end)\n`;
+      luaGenerator.forBlock['input_key_released'] = function(block: any) {
+        const key = block.getFieldValue('KEY');
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputEnded:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed and ${varName}.KeyCode == Enum.KeyCode.${key} then\n${doCode}  end\nend)\n`;
       };
 
-      // Lighting
-      luaGenerator.forBlock['lighting_set_brightness'] = function(block: any) {
-        const value = luaGenerator.valueToCode(block, 'VALUE', Order.ATOMIC) || '1';
-        return `game:GetService("Lighting").Brightness = ${value}\n`;
+      luaGenerator.forBlock['input_mouse_button_down'] = function(block: any) {
+        const button = block.getFieldValue('BUTTON');
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputBegan:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed and ${varName}.UserInputType == Enum.UserInputType.${button} then\n${doCode}  end\nend)\n`;
       };
-      luaGenerator.forBlock['lighting_set_time'] = function(block: any) {
-        const time = block.getFieldValue('TIME') || '12:00:00';
-        return `game:GetService("Lighting").TimeOfDay = "${time}"\n`;
+
+      luaGenerator.forBlock['input_mouse_button_up'] = function(block: any) {
+        const button = block.getFieldValue('BUTTON');
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputEnded:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed and ${varName}.UserInputType == Enum.UserInputType.${button} then\n${doCode}  end\nend)\n`;
       };
-      luaGenerator.forBlock['lighting_change_sky'] = function(block: any) {
-        const id = luaGenerator.valueToCode(block, 'SKY_ID', Order.ATOMIC) || '0';
-        return `local sky = game:GetService("Lighting"):FindFirstChildOfClass("Sky") or Instance.new("Sky", game:GetService("Lighting"))\nsky.SkyboxBk = "rbxassetid://" .. ${id}\nsky.SkyboxDn = "rbxassetid://" .. ${id}\nsky.SkyboxFt = "rbxassetid://" .. ${id}\nsky.SkyboxLf = "rbxassetid://" .. ${id}\nsky.SkyboxRt = "rbxassetid://" .. ${id}\nsky.SkyboxUp = "rbxassetid://" .. ${id}\n`;
+
+      luaGenerator.forBlock['input_mouse_move'] = function(block: any) {
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputChanged:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed and ${varName}.UserInputType == Enum.UserInputType.MouseMovement then\n${doCode}  end\nend)\n`;
       };
-      luaGenerator.forBlock['lighting_set_ambient'] = function(block: any) {
-        const color = luaGenerator.valueToCode(block, 'COLOR', Order.ATOMIC) || 'Color3.new(1,1,1)';
-        return `game:GetService("Lighting").Ambient = ${color}\n`;
+
+      luaGenerator.forBlock['input_mouse_position'] = function(block: any) {
+        return ['game:GetService("UserInputService"):GetMouseLocation()', Order.ATOMIC];
+      };
+
+      luaGenerator.forBlock['input_is_key_down'] = function(block: any) {
+        const key = block.getFieldValue('KEY');
+        return [`game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.${key})`, Order.ATOMIC];
+      };
+
+      luaGenerator.forBlock['input_get_keys_pressed'] = function(block: any) {
+        return ['game:GetService("UserInputService"):GetKeysPressed()', Order.ATOMIC];
+      };
+
+      luaGenerator.forBlock['input_touch_started'] = function(block: any) {
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touch').replace('var. ', '');
+        return `game:GetService("UserInputService").TouchStarted:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed then\n${doCode}  end\nend)\n`;
+      };
+
+      luaGenerator.forBlock['input_touch_ended'] = function(block: any) {
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touch').replace('var. ', '');
+        return `game:GetService("UserInputService").TouchEnded:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed then\n${doCode}  end\nend)\n`;
+      };
+
+      luaGenerator.forBlock['input_touch_moved'] = function(block: any) {
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _touch').replace('var. ', '');
+        return `game:GetService("UserInputService").TouchMoved:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed then\n${doCode}  end\nend)\n`;
+      };
+
+      luaGenerator.forBlock['input_gamepad_button_pressed'] = function(block: any) {
+        const button = block.getFieldValue('BUTTON');
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputBegan:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed and ${varName}.KeyCode == Enum.KeyCode.${button} then\n${doCode}  end\nend)\n`;
+      };
+
+      luaGenerator.forBlock['input_gamepad_button_released'] = function(block: any) {
+        const button = block.getFieldValue('BUTTON');
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputEnded:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed and ${varName}.KeyCode == Enum.KeyCode.${button} then\n${doCode}  end\nend)\n`;
+      };
+
+      luaGenerator.forBlock['input_began'] = function(block: any) {
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputBegan:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed then\n${doCode}  end\nend)\n`;
+      };
+
+      luaGenerator.forBlock['input_ended'] = function(block: any) {
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputEnded:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed then\n${doCode}  end\nend)\n`;
+      };
+
+      luaGenerator.forBlock['input_changed'] = function(block: any) {
+        const doCode = luaGenerator.statementToCode(block, 'DO');
+        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _input').replace('var. ', '');
+        return `game:GetService("UserInputService").InputChanged:Connect(function(${varName}, gameProcessed)\n  if not gameProcessed then\n${doCode}  end\nend)\n`;
+      };
+
+      luaGenerator.forBlock['input_lock_mouse'] = function(block: any) {
+        return `game:GetService("UserInputService").MouseBehavior = Enum.MouseBehavior.LockCenter\n`;
+      };
+
+      luaGenerator.forBlock['input_unlock_mouse'] = function(block: any) {
+        return `game:GetService("UserInputService").MouseBehavior = Enum.MouseBehavior.Default\n`;
+      };
+
+      luaGenerator.forBlock['input_set_mouse_icon'] = function(block: any) {
+        const icon = luaGenerator.valueToCode(block, 'ICON', Order.ATOMIC) || '""';
+        return `game:GetService("UserInputService").MouseIconEnabled = true\ngame:GetService("UserInputService").MouseIcon = ${icon}\n`;
       };
 
       // Effects
+      luaGenerator.forBlock['effects_create_particle'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.ATOMIC) || 'workspace';
+        return [`Instance.new("ParticleEmitter", ${parent})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['effects_emit_particles'] = function(block: any) {
+        const count = luaGenerator.valueToCode(block, 'COUNT', Order.ATOMIC) || '10';
+        const emitter = luaGenerator.valueToCode(block, 'PARTICLE_EMITTER', Order.ATOMIC) || 'nil';
+        return `${emitter}:Emit(${count})\n`;
+      };
+      luaGenerator.forBlock['effects_stop_particles'] = function(block: any) {
+        const emitter = luaGenerator.valueToCode(block, 'PARTICLE_EMITTER', Order.ATOMIC) || 'nil';
+        return `${emitter}.Enabled = false\n`;
+      };
+      luaGenerator.forBlock['effects_create_explosion'] = function(block: any) {
+        const position = luaGenerator.valueToCode(block, 'POSITION', Order.ATOMIC) || 'Vector3.new(0,0,0)';
+        return `local exp = Instance.new("Explosion")\nexp.Position = ${position}\nexp.Parent = workspace\n`;
+      };
+      luaGenerator.forBlock['effects_create_highlight'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.ATOMIC) || 'workspace';
+        return [`Instance.new("Highlight", ${parent})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['effects_enable_highlight'] = function(block: any) {
+        const highlight = luaGenerator.valueToCode(block, 'HIGHLIGHT', Order.ATOMIC) || 'nil';
+        return `${highlight}.Enabled = true\n`;
+      };
+      luaGenerator.forBlock['effects_disable_highlight'] = function(block: any) {
+        const highlight = luaGenerator.valueToCode(block, 'HIGHLIGHT', Order.ATOMIC) || 'nil';
+        return `${highlight}.Enabled = false\n`;
+      };
+      luaGenerator.forBlock['effects_create_beam'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.ATOMIC) || 'workspace';
+        return [`Instance.new("Beam", ${parent})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['effects_create_trail'] = function(block: any) {
+        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.ATOMIC) || 'workspace';
+        return [`Instance.new("Trail", ${parent})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['effects_play_sound'] = function(block: any) {
+        const sound = luaGenerator.valueToCode(block, 'SOUND', Order.ATOMIC) || 'nil';
+        return `${sound}:Play()\n`;
+      };
+      luaGenerator.forBlock['effects_stop_sound'] = function(block: any) {
+        const sound = luaGenerator.valueToCode(block, 'SOUND', Order.ATOMIC) || 'nil';
+        return `${sound}:Stop()\n`;
+      };
+      luaGenerator.forBlock['effects_set_sound_volume'] = function(block: any) {
+        const sound = luaGenerator.valueToCode(block, 'SOUND', Order.ATOMIC) || 'nil';
+        const volume = luaGenerator.valueToCode(block, 'VOLUME', Order.ATOMIC) || '0.5';
+        return `${sound}.Volume = ${volume}\n`;
+      };
+      luaGenerator.forBlock['effects_set_sound_pitch'] = function(block: any) {
+        const sound = luaGenerator.valueToCode(block, 'SOUND', Order.ATOMIC) || 'nil';
+        const pitch = luaGenerator.valueToCode(block, 'PITCH', Order.ATOMIC) || '1';
+        return `${sound}.PlaybackSpeed = ${pitch}\n`;
+      };
+      luaGenerator.forBlock['effects_create_tween'] = function(block: any) {
+        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
+        const info = luaGenerator.valueToCode(block, 'INFO', Order.ATOMIC) || 'TweenInfo.new()';
+        const goals = luaGenerator.valueToCode(block, 'GOALS', Order.ATOMIC) || '{}';
+        return [`game:GetService("TweenService"):Create(${instance}, ${info}, ${goals})`, Order.ATOMIC];
+      };
+      luaGenerator.forBlock['effects_play_tween'] = function(block: any) {
+        const tween = luaGenerator.valueToCode(block, 'TWEEN', Order.ATOMIC) || 'nil';
+        return `${tween}:Play()\n`;
+      };
+      luaGenerator.forBlock['effects_stop_tween'] = function(block: any) {
+        const tween = luaGenerator.valueToCode(block, 'TWEEN', Order.ATOMIC) || 'nil';
+        return `${tween}:Cancel()\n`;
+      };
+      luaGenerator.forBlock['effects_camera_shake'] = function(block: any) {
+        const intensity = luaGenerator.valueToCode(block, 'INTENSITY', Order.ATOMIC) || '1';
+        return `local cam = workspace.CurrentCamera\nlocal pos = cam.CFrame.Position\nlocal rot = cam.CFrame - pos\ncam.CFrame = CFrame.new(pos + Vector3.new(math.random(-${intensity}, ${intensity}), math.random(-${intensity}, ${intensity}), math.random(-${intensity}, ${intensity}))) * rot\n`;
+      };
+      luaGenerator.forBlock['effects_flash_screen'] = function(block: any) {
+        const color = luaGenerator.valueToCode(block, 'COLOR', Order.ATOMIC) || 'Color3.new(1,1,1)';
+        return `local gui = Instance.new("ScreenGui", game.Players.LocalPlayer.PlayerGui)\nlocal frame = Instance.new("Frame", gui)\nframe.Size = UDim2.new(1,0,1,0)\nframe.BackgroundColor3 = ${color}\ngame:GetService("Debris"):AddItem(gui, 0.1)\n`;
+      };
+      luaGenerator.forBlock['effects_blur'] = function(block: any) {
+        const size = luaGenerator.valueToCode(block, 'SIZE', Order.ATOMIC) || '10';
+        return `local blur = Instance.new("BlurEffect", workspace.CurrentCamera)\nblur.Size = ${size}\n`;
+      };
+      luaGenerator.forBlock['effects_color_correction'] = function(block: any) {
+        const saturation = luaGenerator.valueToCode(block, 'SATURATION', Order.ATOMIC) || '0';
+        const contrast = luaGenerator.valueToCode(block, 'CONTRAST', Order.ATOMIC) || '0';
+        return `local cc = Instance.new("ColorCorrectionEffect", workspace.CurrentCamera)\ncc.Saturation = ${saturation}\ncc.Contrast = ${contrast}\n`;
+      };
+
       luaGenerator.forBlock['effects_emit'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.ATOMIC) || 'nil';
         const count = luaGenerator.valueToCode(block, 'COUNT', Order.ATOMIC) || '10';
@@ -5880,7 +6028,7 @@ export default function App() {
               inputs: { PLAYER: { shadow: { type: 'placeholder_player' } } }
             }
           ];
-        } else if (cat.name === 'Clickdetector') {
+        } else if (cat.name === 'ClickDetector') {
           blocks = [
             { 
               kind: 'block', 
@@ -6123,53 +6271,92 @@ export default function App() {
             { kind: 'block', type: 'event_game_start' },
             { 
               kind: 'block', 
-              type: 'event_player_join' 
-            },
-            { 
-              kind: 'block', 
-              type: 'event_touched',
-              inputs: { PART: { shadow: { type: 'placeholder_instance' } } }
-            },
-            { 
-              kind: 'block', 
               type: 'event_clicked',
               inputs: { CLICK_DETECTOR: { shadow: { type: 'placeholder_instance' } } }
             },
             { 
               kind: 'block', 
               type: 'event_value_changed',
-              inputs: { VALUE: { shadow: { type: 'placeholder_any' } } }
-            }
-          ];
-        } else if (cat.name === 'Input') {
-          blocks = [
-            { kind: 'block', type: 'input_key_pressed' },
-            { kind: 'block', type: 'input_mouse_click' },
-            { kind: 'block', type: 'input_touch' },
-            { 
-              kind: 'block', 
-              type: 'input_button_pressed',
-              inputs: { BUTTON: { shadow: { type: 'placeholder_instance' } } }
+              inputs: { VALUE: { shadow: { type: 'placeholder_instance' } } }
             },
-            { kind: 'block', type: 'input_mouse_position' }
-          ];
-        } else if (cat.name === 'Camera') {
-          blocks = [
-            { kind: 'block', type: 'camera_set_type' },
+            { kind: 'block', type: 'event_game_loaded' },
+            { kind: 'block', type: 'event_player_joined' },
+            { kind: 'block', type: 'event_player_left' },
+            { kind: 'block', type: 'event_character_added' },
+            { kind: 'block', type: 'event_character_removing' },
             { 
               kind: 'block', 
-              type: 'camera_set_subject',
-              inputs: { SUBJECT: { shadow: { type: 'placeholder_instance' } } }
+              type: 'event_touched',
+              inputs: { INSTANCE: { shadow: { type: 'world_me' } } }
             },
             { 
               kind: 'block', 
-              type: 'camera_move',
-              inputs: { POSITION: { shadow: { type: 'placeholder_vector3' } } }
+              type: 'event_touch_ended',
+              inputs: { INSTANCE: { shadow: { type: 'world_me' } } }
             },
             { 
               kind: 'block', 
-              type: 'camera_set_fov',
-              inputs: { FOV: { shadow: { type: 'placeholder_number' } } }
+              type: 'event_child_added',
+              inputs: { INSTANCE: { shadow: { type: 'world_workspace' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_child_removed',
+              inputs: { INSTANCE: { shadow: { type: 'world_workspace' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_property_changed',
+              inputs: { INSTANCE: { shadow: { type: 'world_me' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_remote_event_fired',
+              inputs: { REMOTE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_remote_function_called',
+              inputs: { REMOTE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_proximity_prompt_triggered',
+              inputs: { PROMPT: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_tool_equipped',
+              inputs: { TOOL: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_tool_unequipped',
+              inputs: { TOOL: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_humanoid_died',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_humanoid_jumping',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'event_humanoid_running',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { kind: 'block', type: 'event_heartbeat' },
+            { kind: 'block', type: 'event_render_stepped' },
+            { kind: 'block', type: 'event_stepped' },
+            { kind: 'block', type: 'event_chat_message_received' },
+            { 
+              kind: 'block', 
+              type: 'event_attribute_changed',
+              inputs: { INSTANCE: { shadow: { type: 'world_me' } } }
             }
           ];
         } else if (cat.name === 'Animation') {
@@ -6194,206 +6381,191 @@ export default function App() {
             },
             { 
               kind: 'block', 
+              type: 'animation_pause',
+              inputs: { ANIM_TRACK: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
               type: 'animation_adjust_speed',
               inputs: { 
                 ANIM_TRACK: { shadow: { type: 'placeholder_any' } },
                 SPEED: { shadow: { type: 'placeholder_number' } }
               }
-            }
-          ];
-        } else if (cat.name === 'Physics') {
-          blocks = [
+            },
             { 
               kind: 'block', 
-              type: 'physics_apply_force',
+              type: 'animation_adjust_weight',
               inputs: { 
-                FORCE: { shadow: { type: 'placeholder_vector3' } },
-                PART: { shadow: { type: 'placeholder_instance' } }
+                ANIM_TRACK: { shadow: { type: 'placeholder_any' } },
+                WEIGHT: { shadow: { type: 'placeholder_number' } }
               }
             },
             { 
               kind: 'block', 
-              type: 'physics_set_velocity',
-              inputs: { 
-                PART: { shadow: { type: 'placeholder_instance' } },
-                VELOCITY: { shadow: { type: 'placeholder_vector3' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'physics_enable',
-              inputs: { PART: { shadow: { type: 'placeholder_instance' } } }
-            },
-            { 
-              kind: 'block', 
-              type: 'physics_set_mass',
-              inputs: { 
-                PART: { shadow: { type: 'placeholder_instance' } },
-                MASS: { shadow: { type: 'placeholder_number' } }
-              }
-            }
-          ];
-        } else if (cat.name === 'Raycast') {
-          blocks = [
-            { 
-              kind: 'block', 
-              type: 'raycast_forward',
-              inputs: { 
-                ORIGIN: { shadow: { type: 'placeholder_vector3' } },
-                DISTANCE: { shadow: { type: 'placeholder_number' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'raycast_down',
-              inputs: { 
-                ORIGIN: { shadow: { type: 'placeholder_vector3' } },
-                DISTANCE: { shadow: { type: 'placeholder_number' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'raycast_get_hit_object',
-              inputs: { RAYCAST_RESULT: { shadow: { type: 'placeholder_any' } } }
-            },
-            { 
-              kind: 'block', 
-              type: 'raycast_get_hit_position',
-              inputs: { RAYCAST_RESULT: { shadow: { type: 'placeholder_any' } } }
-            }
-          ];
-        } else if (cat.name === 'Pathfinding') {
-          blocks = [
-            { kind: 'block', type: 'pathfinding_create' },
-            { 
-              kind: 'block', 
-              type: 'pathfinding_compute',
-              inputs: { 
-                START: { shadow: { type: 'placeholder_vector3' } },
-                END: { shadow: { type: 'placeholder_vector3' } },
-                PATH: { shadow: { type: 'placeholder_any' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'pathfinding_move_to',
-              inputs: { 
-                HUMANOID: { shadow: { type: 'placeholder_humanoid' } },
-                WAYPOINT: { shadow: { type: 'placeholder_any' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'pathfinding_stop',
+              type: 'animation_get_playing',
               inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'animation_stopped_event',
+              inputs: { ANIM_TRACK: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'animation_played_event',
+              inputs: { HUMANOID: { shadow: { type: 'placeholder_humanoid' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'animation_set_priority',
+              inputs: { ANIM_TRACK: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'animation_get_length',
+              inputs: { ANIM_TRACK: { shadow: { type: 'placeholder_any' } } }
+            },
+            { 
+              kind: 'block', 
+              type: 'animation_is_playing',
+              inputs: { ANIM_TRACK: { shadow: { type: 'placeholder_any' } } }
             }
           ];
-        } else if (cat.name === 'Teleport') {
+        } else if (cat.name === 'Input') {
           blocks = [
-            { 
-              kind: 'block', 
-              type: 'teleport_player',
-              inputs: { 
-                PLAYER: { shadow: { type: 'placeholder_player' } },
-                PLACE_ID: { shadow: { type: 'placeholder_number' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'teleport_players',
-              inputs: { 
-                PLAYERS: { shadow: { type: 'placeholder_any' } },
-                PLACE_ID: { shadow: { type: 'placeholder_number' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'teleport_reserve_server',
-              inputs: { PLACE_ID: { shadow: { type: 'placeholder_number' } } }
-            },
-            { 
-              kind: 'block', 
-              type: 'teleport_async',
-              inputs: { 
-                PLACE_ID: { shadow: { type: 'placeholder_number' } },
-                PLAYERS: { shadow: { type: 'placeholder_any' } }
-              }
-            }
+            { kind: 'block', type: 'input_key_pressed' },
+            { kind: 'block', type: 'input_key_released' },
+            { kind: 'block', type: 'input_mouse_button_down' },
+            { kind: 'block', type: 'input_mouse_button_up' },
+            { kind: 'block', type: 'input_mouse_move' },
+            { kind: 'block', type: 'input_mouse_position' },
+            { kind: 'block', type: 'input_is_key_down' },
+            { kind: 'block', type: 'input_get_keys_pressed' },
+            { kind: 'block', type: 'input_touch_started' },
+            { kind: 'block', type: 'input_touch_ended' },
+            { kind: 'block', type: 'input_touch_moved' },
+            { kind: 'block', type: 'input_gamepad_button_pressed' },
+            { kind: 'block', type: 'input_gamepad_button_released' },
+            { kind: 'block', type: 'input_began' },
+            { kind: 'block', type: 'input_ended' },
+            { kind: 'block', type: 'input_changed' },
+            { kind: 'block', type: 'input_lock_mouse' },
+            { kind: 'block', type: 'input_unlock_mouse' },
+            { kind: 'block', type: 'input_set_mouse_icon' }
           ];
-        } else if (cat.name === 'Collection') {
+        } else if (cat.name === 'Camera') {
           blocks = [
-            { 
-              kind: 'block', 
-              type: 'collection_add_tag',
-              inputs: { 
-                TAG: { shadow: { type: 'placeholder_string' } },
-                INSTANCE: { shadow: { type: 'placeholder_instance' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'collection_remove_tag',
-              inputs: { 
-                TAG: { shadow: { type: 'placeholder_string' } },
-                INSTANCE: { shadow: { type: 'placeholder_instance' } }
-              }
-            },
-            { 
-              kind: 'block', 
-              type: 'collection_get_tagged',
-              inputs: { TAG: { shadow: { type: 'placeholder_string' } } }
-            }
-          ];
-        } else if (cat.name === 'RunService') {
-          blocks = [
-            { kind: 'block', type: 'runservice_heartbeat' },
-            { kind: 'block', type: 'runservice_stepped' },
-            { kind: 'block', type: 'runservice_renderstep' }
-          ];
-        } else if (cat.name === 'Lighting') {
-          blocks = [
-            { 
-              kind: 'block', 
-              type: 'lighting_set_brightness',
-              inputs: { VALUE: { shadow: { type: 'placeholder_number' } } }
-            },
-            { kind: 'block', type: 'lighting_set_time' },
-            { 
-              kind: 'block', 
-              type: 'lighting_change_sky',
-              inputs: { SKY_ID: { shadow: { type: 'placeholder_string' } } }
-            },
-            { 
-              kind: 'block', 
-              type: 'lighting_set_ambient',
-              inputs: { COLOR: { shadow: { type: 'placeholder_color3' } } }
-            }
+            { kind: 'block', type: 'camera_get_current' },
+            { kind: 'block', type: 'camera_set_type' },
+            { kind: 'block', type: 'camera_set_subject' },
+            { kind: 'block', type: 'camera_set_cframe' },
+            { kind: 'block', type: 'camera_get_cframe' },
+            { kind: 'block', type: 'camera_move' },
+            { kind: 'block', type: 'camera_look_at' },
+            { kind: 'block', type: 'camera_shake' },
+            { kind: 'block', type: 'camera_zoom' },
+            { kind: 'block', type: 'camera_set_fov' },
+            { kind: 'block', type: 'camera_get_fov' },
+            { kind: 'block', type: 'camera_follow_player' },
+            { kind: 'block', type: 'camera_scriptable' },
+            { kind: 'block', type: 'camera_reset' }
           ];
         } else if (cat.name === 'Effects') {
           blocks = [
+            { kind: 'block', type: 'effects_create_particle' },
+            { kind: 'block', type: 'effects_emit_particles' },
+            { kind: 'block', type: 'effects_stop_particles' },
+            { kind: 'block', type: 'effects_create_explosion' },
+            { kind: 'block', type: 'effects_create_highlight' },
+            { kind: 'block', type: 'effects_enable_highlight' },
+            { kind: 'block', type: 'effects_disable_highlight' },
+            { kind: 'block', type: 'effects_create_beam' },
+            { kind: 'block', type: 'effects_create_trail' },
+            { kind: 'block', type: 'effects_play_sound' },
+            { kind: 'block', type: 'effects_stop_sound' },
+            { kind: 'block', type: 'effects_set_sound_volume' },
+            { kind: 'block', type: 'effects_set_sound_pitch' },
+            { kind: 'block', type: 'effects_create_tween' },
+            { kind: 'block', type: 'effects_play_tween' },
+            { kind: 'block', type: 'effects_stop_tween' },
+            { kind: 'block', type: 'effects_camera_shake' },
+            { kind: 'block', type: 'effects_flash_screen' },
+            { kind: 'block', type: 'effects_blur' },
+            { kind: 'block', type: 'effects_color_correction' }
+          ];
+        } else if (serviceGroups.includes(cat.name)) {
+          const serviceName = cat.name;
+          blocks = [
+            { kind: 'label', text: 'Methods / Blocks' },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_getservice` },
             { 
               kind: 'block', 
-              type: 'effects_emit',
+              type: `rbx_${serviceName.toLowerCase()}_method_findfirstchild`,
+              inputs: { NAME: { shadow: { type: 'placeholder_string' } } }
+            },
+            { 
+              kind: 'block', 
+              type: `rbx_${serviceName.toLowerCase()}_method_waitforchild`,
+              inputs: { NAME: { shadow: { type: 'placeholder_string' } } }
+            },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_getchildren` },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_getdescendants` },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_clone` },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_destroy` },
+            { 
+              kind: 'block', 
+              type: `rbx_${serviceName.toLowerCase()}_method_setattribute`,
               inputs: { 
-                COUNT: { shadow: { type: 'placeholder_number' } },
-                INSTANCE: { shadow: { type: 'placeholder_instance' } }
+                NAME: { shadow: { type: 'placeholder_string' } },
+                VALUE: { shadow: { type: 'placeholder_any' } }
               }
             },
             { 
               kind: 'block', 
-              type: 'effects_enable',
-              inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
+              type: `rbx_${serviceName.toLowerCase()}_method_getattribute`,
+              inputs: { NAME: { shadow: { type: 'placeholder_string' } } }
+            },
+            { kind: 'label', text: 'Properties / Blocks' },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_property_get_name` },
+            { 
+              kind: 'block', 
+              type: `rbx_${serviceName.toLowerCase()}_property_set_name`,
+              inputs: { VALUE: { shadow: { type: 'placeholder_string' } } }
+            },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_property_get_parent` },
+            { 
+              kind: 'block', 
+              type: `rbx_${serviceName.toLowerCase()}_property_set_parent`,
+              inputs: { VALUE: { shadow: { type: 'placeholder_instance' } } }
+            },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_property_get_classname` },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_property_get_archivable` },
+            { 
+              kind: 'block', 
+              type: `rbx_${serviceName.toLowerCase()}_property_set_archivable`,
+              inputs: { VALUE: { shadow: { type: 'placeholder_boolean' } } }
+            },
+            { kind: 'label', text: 'Events / Blocks' },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_childadded` },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_childremoved` },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_descendantadded` },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_descendantremoving` },
+            { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_changed` },
+            { kind: 'label', text: 'Child Objects / Blocks' },
+            { 
+              kind: 'block', 
+              type: `rbx_${serviceName.toLowerCase()}_child_create_instance`,
+              inputs: { CLASS: { shadow: { type: 'placeholder_string' } } }
             },
             { 
               kind: 'block', 
-              type: 'effects_disable',
+              type: `rbx_${serviceName.toLowerCase()}_child_parent_object_to_service`,
               inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
-            },
-            { 
-              kind: 'block', 
-              type: 'effects_spawn',
-              inputs: { PARENT: { shadow: { type: 'placeholder_instance' } } }
             }
+          ];
+        } else if (cat.name === 'Optimization') {
+          blocks = [
+            { kind: 'label', text: 'Coming Soon...' }
           ];
         } else {
           blocks = [
@@ -6403,7 +6575,7 @@ export default function App() {
 
         return {
           kind: 'category',
-          name: cat.name,
+          name: cat.name.length > 13 ? cat.name.substring(0, 13) + '...' : cat.name,
           colour: cat.color,
           cssConfig: {
             'row': `scratch-category-row scratch-cat-${cat.name.toLowerCase().replace(/\s/g, '-')}`,
@@ -6601,6 +6773,9 @@ export default function App() {
       },
     });
 
+    blocks.defineCustomBlocks();
+    defineCustomGenerators();
+
     workspace.current = Blockly.inject(blocklyDiv.current, {
       toolbox: toolbox,
       trashcan: false,
@@ -6644,10 +6819,17 @@ export default function App() {
       }
     };
 
-    // Extract all blocks for search
+    // Debounced updateCode
+    let updateTimeout: any;
+    const debouncedUpdateCode = () => {
+      clearTimeout(updateTimeout);
+      updateTimeout = setTimeout(updateCode, 200);
+    };
+
+    // Extract all blocks for search - Optimized
     const extractedBlocks: { type: string, name: string, category: string, blockDef: any }[] = [];
     
-    // Disable events while creating temporary blocks
+    // Only extract if we haven't already
     Blockly.Events.disable();
     try {
       toolbox.contents.forEach((cat: any) => {
@@ -6721,7 +6903,7 @@ export default function App() {
       }
 
       if (e.isUiEvent) return;
-      updateCode();
+      debouncedUpdateCode();
     });
 
     // Initial load from localStorage
@@ -7227,7 +7409,7 @@ export default function App() {
                           <div key={cat.name} className="mb-6 block-info-category">
                             <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest px-2 mb-3 flex items-center gap-2">
                               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: catColor }}></div>
-                              {cat.name}
+                              {cat.name.length > 13 ? cat.name.substring(0, 13) + '...' : cat.name}
                             </h4>
                             <div className="space-y-1">
                               {catBlocks.map(block => (
@@ -7259,7 +7441,7 @@ export default function App() {
                             className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-sm"
                             style={{ backgroundColor: getCategoryColor(selectedBlockInfo.category) }}
                           >
-                            {selectedBlockInfo.category}
+                            {selectedBlockInfo.category.length > 13 ? selectedBlockInfo.category.substring(0, 13) + '...' : selectedBlockInfo.category}
                           </div>
                           <div className="text-gray-500 text-sm font-mono bg-black/20 px-2 py-1 rounded">{selectedBlockInfo.type}</div>
                         </div>
@@ -7419,18 +7601,19 @@ export default function App() {
                       <ol className="list-decimal pl-5 space-y-1 text-gray-300">
                         <li>Create a <strong>Script</strong> (e.g., in ServerStorage).</li>
                         <li>Paste the code below into it.</li>
-                        <li>Right-click the Script and select <strong>Save as Local Plugin...</strong></li>
-                        <li>Go to the <strong>Plugins</strong> tab in Roblox Studio and click the new <strong>Sync Explorer</strong> button anytime!</li>
+                        <li>Right-click the Script, choose <strong>Save as Local Plugin...</strong></li>
+                        <li>Go to the <strong>Plugins</strong> tab in Roblox Studio, you'll see a <strong>Sync Explorer</strong> button!</li>
                       </ol>
                     </>
                   )}
                 </div>
-                <div className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 relative group mb-2">
-                  <pre className="text-xs text-gray-300 font-mono overflow-y-auto whitespace-pre-wrap max-h-64 custom-scrollbar">
+                <div className="relative group">
+                  <pre className="bg-[#1e1e1e] p-6 rounded-xl overflow-x-auto text-sm font-mono text-gray-300 border border-white/5 shadow-inner max-h-64 custom-scrollbar">
 {`local HttpService = game:GetService("HttpService")
-local BASE_URL = "${(window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-')}"
+local BASE_URL = "\${(window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-')}"
 local URL = BASE_URL .. "/api/sync"
 local EXPORT_URL = BASE_URL .. "/api/export"
+local EXPORT_TREE_URL = BASE_URL .. "/api/export_tree"
 
 local toolbar = plugin:CreateToolbar("BlockLua")
 local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
@@ -7452,7 +7635,6 @@ local function serializeInstance(instance, path)
 end
 
 local function sync()
-    print("Syncing with BlockLua...")
     local root = {
         id = "game",
         Name = "game",
@@ -7470,19 +7652,12 @@ local function sync()
         end
     end
 
-    local success, response = pcall(function()
-        return HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)
+    pcall(function()
+        HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)
     end)
-
-    if success then
-        print("Successfully synced with BlockLua!")
-    else
-        warn("Failed to sync: " .. tostring(response))
-    end
 end
 
 local function pollScripts()
-    print("Checking for script updates...")
     local success, response = pcall(function()
         return HttpService:GetAsync(EXPORT_URL)
     end)
@@ -7491,7 +7666,6 @@ local function pollScripts()
         local data = HttpService:JSONDecode(response)
         if data and data.script then
             local scriptData = data.script
-            print("Received script for " .. scriptData.path)
             
             local parent = game
             local parts = string.split(scriptData.path, ".")
@@ -7501,7 +7675,6 @@ local function pollScripts()
                     if nextParent then
                         parent = nextParent
                     else
-                        warn("Could not find " .. part)
                         break
                     end
                 end
@@ -7511,35 +7684,119 @@ local function pollScripts()
             newScript.Name = scriptData.type
             newScript.Source = scriptData.code
             newScript.Parent = parent
-            print("Created " .. scriptData.type .. " in " .. parent.Name)
-        else
-            print("No new scripts to sync.")
         end
-    else
-        warn("Failed to poll scripts: " .. tostring(response))
+    end
+end
+
+local function applyNode(webNode, parentInstance)
+    local instance
+    
+    if webNode.id and not string.find(webNode.id, "-") then
+        local parts = string.split(webNode.id, ".")
+        local current = game
+        local found = true
+        for i, part in ipairs(parts) do
+            if i > 1 then
+                local nextChild = current:FindFirstChild(part)
+                if nextChild then
+                    current = nextChild
+                else
+                    found = false
+                    break
+                end
+            end
+        end
+        if found and current ~= game then
+            instance = current
+        end
+    end
+    
+    if not instance and parentInstance then
+        for _, child in ipairs(parentInstance:GetChildren()) do
+            if child.Name == webNode.Name and child.ClassName == webNode.ClassName then
+                instance = child
+                break
+            end
+        end
+    end
+    
+    if not instance and parentInstance then
+        local success, newInst = pcall(function() return Instance.new(webNode.ClassName) end)
+        if success and newInst then
+            instance = newInst
+            instance.Name = webNode.Name
+            instance.Parent = parentInstance
+        end
+    end
+    
+    if instance then
+        if instance.Name ~= webNode.Name then
+            pcall(function() instance.Name = webNode.Name end)
+        end
+        
+        if parentInstance and instance.Parent ~= parentInstance then
+            pcall(function() instance.Parent = parentInstance end)
+        end
+        
+        if webNode.Properties and webNode.Properties.Source then
+            pcall(function() instance.Source = webNode.Properties.Source end)
+        end
+        
+        if webNode.Children then
+            for _, childNode in ipairs(webNode.Children) do
+                applyNode(childNode, instance)
+            end
+        end
+    end
+end
+
+local function pollTree()
+    local success, response = pcall(function()
+        return HttpService:GetAsync(EXPORT_TREE_URL)
+    end)
+    
+    if success then
+        local data = HttpService:JSONDecode(response)
+        if data and data.tree then
+            local webTree = data.tree
+            if webTree.Children then
+                for _, childNode in ipairs(webTree.Children) do
+                    local success, service = pcall(function() return game:GetService(childNode.ClassName) end)
+                    if success and service then
+                        if childNode.Children then
+                            for _, grandChild in ipairs(childNode.Children) do
+                                applyNode(grandChild, service)
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 end
 
 syncButton.Click:Connect(function()
     sync()
-    pollScripts()
 end)
 
-print("BlockLua Sync Plugin Loaded. Click the 'Sync Explorer' button in the toolbar to sync.")
-sync() -- Initial sync on load
-`}
+task.spawn(function()
+    while true do
+        task.wait(2)
+        pollScripts()
+        pollTree()
+    end
+end)
+
+sync() -- Initial sync on load`}
                   </pre>
                   <button 
                     onClick={() => {
-                      let origin = window.location.origin;
-                      if (!origin || origin === 'null') {
-                        origin = window.location.href.split('/').slice(0, 3).join('/');
-                      }
-                      const publicUrl = origin.replace('ais-dev-', 'ais-pre-');
+                      const publicUrl = (window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-');
                       const code = `local HttpService = game:GetService("HttpService")
-local BASE_URL = "${publicUrl}"
+local BASE_URL = "\${publicUrl}"
 local URL = BASE_URL .. "/api/sync"
 local EXPORT_URL = BASE_URL .. "/api/export"
+local EXPORT_TREE_URL = BASE_URL .. "/api/export_tree"
 
 local toolbar = plugin:CreateToolbar("BlockLua")
 local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
@@ -7561,7 +7818,6 @@ local function serializeInstance(instance, path)
 end
 
 local function sync()
-    print("Syncing with BlockLua...")
     local root = {
         id = "game",
         Name = "game",
@@ -7579,19 +7835,12 @@ local function sync()
         end
     end
 
-    local success, response = pcall(function()
-        return HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)
+    pcall(function()
+        HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)
     end)
-
-    if success then
-        print("Successfully synced with BlockLua!")
-    else
-        warn("Failed to sync: " .. tostring(response))
-    end
 end
 
 local function pollScripts()
-    print("Checking for script updates...")
     local success, response = pcall(function()
         return HttpService:GetAsync(EXPORT_URL)
     end)
@@ -7600,7 +7849,6 @@ local function pollScripts()
         local data = HttpService:JSONDecode(response)
         if data and data.script then
             local scriptData = data.script
-            print("Received script for " .. scriptData.path)
             
             local parent = game
             local parts = string.split(scriptData.path, ".")
@@ -7610,7 +7858,6 @@ local function pollScripts()
                     if nextParent then
                         parent = nextParent
                     else
-                        warn("Could not find " .. part)
                         break
                     end
                 end
@@ -7620,21 +7867,109 @@ local function pollScripts()
             newScript.Name = scriptData.type
             newScript.Source = scriptData.code
             newScript.Parent = parent
-            print("Created " .. scriptData.type .. " in " .. parent.Name)
-        else
-            print("No new scripts to sync.")
         end
-    else
-        warn("Failed to poll scripts: " .. tostring(response))
+    end
+end
+
+local function applyNode(webNode, parentInstance)
+    local instance
+    
+    if webNode.id and not string.find(webNode.id, "-") then
+        local parts = string.split(webNode.id, ".")
+        local current = game
+        local found = true
+        for i, part in ipairs(parts) do
+            if i > 1 then
+                local nextChild = current:FindFirstChild(part)
+                if nextChild then
+                    current = nextChild
+                else
+                    found = false
+                    break
+                end
+            end
+        end
+        if found and current ~= game then
+            instance = current
+        end
+    end
+    
+    if not instance and parentInstance then
+        for _, child in ipairs(parentInstance:GetChildren()) do
+            if child.Name == webNode.Name and child.ClassName == webNode.ClassName then
+                instance = child
+                break
+            end
+        end
+    end
+    
+    if not instance and parentInstance then
+        local success, newInst = pcall(function() return Instance.new(webNode.ClassName) end)
+        if success and newInst then
+            instance = newInst
+            instance.Name = webNode.Name
+            instance.Parent = parentInstance
+        end
+    end
+    
+    if instance then
+        if instance.Name ~= webNode.Name then
+            pcall(function() instance.Name = webNode.Name end)
+        end
+        
+        if parentInstance and instance.Parent ~= parentInstance then
+            pcall(function() instance.Parent = parentInstance end)
+        end
+        
+        if webNode.Properties and webNode.Properties.Source then
+            pcall(function() instance.Source = webNode.Properties.Source end)
+        end
+        
+        if webNode.Children then
+            for _, childNode in ipairs(webNode.Children) do
+                applyNode(childNode, instance)
+            end
+        end
+    end
+end
+
+local function pollTree()
+    local success, response = pcall(function()
+        return HttpService:GetAsync(EXPORT_TREE_URL)
+    end)
+    
+    if success then
+        local data = HttpService:JSONDecode(response)
+        if data and data.tree then
+            local webTree = data.tree
+            if webTree.Children then
+                for _, childNode in ipairs(webTree.Children) do
+                    local success, service = pcall(function() return game:GetService(childNode.ClassName) end)
+                    if success and service then
+                        if childNode.Children then
+                            for _, grandChild in ipairs(childNode.Children) do
+                                applyNode(grandChild, service)
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 end
 
 syncButton.Click:Connect(function()
     sync()
-    pollScripts()
 end)
 
-print("BlockLua Sync Plugin Loaded. Click the 'Sync Explorer' button in the toolbar to sync.")
+task.spawn(function()
+    while true do
+        task.wait(2)
+        pollScripts()
+        pollTree()
+    end
+end)
+
 sync() -- Initial sync on load`;
                       navigator.clipboard.writeText(code);
                       alert(currentLang === 'vi' ? 'Đã sao chép!' : 'Copied!');
@@ -7693,7 +8028,9 @@ sync() -- Initial sync on load`;
                         </div>
                         <ChevronRight size={14} className="text-gray-600 group-hover:text-white transition-all transform group-hover:translate-x-1 flex-shrink-0" />
                       </div>
-                      <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">{block.category}</span>
+                      <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">
+                        {block.category.length > 13 ? block.category.substring(0, 13) + '...' : block.category}
+                      </span>
                     </div>
                   );
                 })}
@@ -7843,16 +8180,41 @@ sync() -- Initial sync on load`;
             <Layers className="text-[#4c97ff]" size={16} />
             <span className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Explorer</span>
           </div>
-          {selectorTarget === 'export' && (
-            <div className="flex items-center gap-1 px-2 py-0.5 bg-red-500/20 rounded text-[9px] font-bold text-red-400 animate-pulse">
-              SELECT TARGET...
-            </div>
-          )}
-          {selectorTarget && selectorTarget !== 'export' && (
-            <div className="flex items-center gap-1 px-2 py-0.5 bg-[#4c97ff]/20 rounded text-[9px] font-bold text-[#4c97ff] animate-pulse">
-              SELECTING...
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {selectorTarget === 'export' && (
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-red-500/20 rounded text-[9px] font-bold text-red-400 animate-pulse">
+                SELECT TARGET...
+              </div>
+            )}
+            {selectorTarget && selectorTarget !== 'export' && (
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-[#4c97ff]/20 rounded text-[9px] font-bold text-[#4c97ff] animate-pulse">
+                SELECTING...
+              </div>
+            )}
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/export_tree', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tree: explorer })
+                  });
+                  if (res.ok) {
+                    showToast(currentLang === 'vi' ? 'Đã gửi yêu cầu lưu Explorer về Roblox Studio!' : 'Sent Explorer save request to Roblox Studio!');
+                  } else {
+                    showToast(currentLang === 'vi' ? 'Lỗi khi gửi yêu cầu lưu!' : 'Error sending save request!');
+                  }
+                } catch (e) {
+                  console.error(e);
+                  showToast(currentLang === 'vi' ? 'Lỗi khi gửi yêu cầu lưu!' : 'Error sending save request!');
+                }
+              }}
+              className="p-1.5 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-[#4c97ff]"
+              title={currentLang === 'vi' ? 'Lưu Explorer về Roblox Studio' : 'Save Explorer to Roblox Studio'}
+            >
+              <Save size={14} />
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-auto p-1 custom-scrollbar">
           <ExplorerTree 
@@ -7901,242 +8263,6 @@ sync() -- Initial sync on load`;
               setShowInsertObjectFor(null);
             }}
           />
-        )}
-      </AnimatePresence>
-
-      {/* Easing Style Selector Modal */}
-      <AnimatePresence>
-        {easingStyleTarget && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setEasingStyleTarget(null)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-96 flex flex-col gap-4 z-10"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Easing Style</h3>
-                <button onClick={() => setEasingStyleTarget(null)} className="text-gray-400 hover:text-white">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {['Linear', 'Sine', 'Back', 'Quad', 'Quart', 'Quint', 'Bounce', 'Elastic', 'Exponential', 'Circular', 'Cubic'].map(style => (
-                  <button
-                    key={style}
-                    onClick={() => handleEasingStyleSelect(style)}
-                    className="px-4 py-2 bg-white/5 hover:bg-[#4c97ff] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-left"
-                  >
-                    {style}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Easing Direction Selector Modal */}
-      <AnimatePresence>
-        {easingDirectionTarget && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setEasingDirectionTarget(null)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-80 flex flex-col gap-4 z-10"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Easing Direction</h3>
-                <button onClick={() => setEasingDirectionTarget(null)} className="text-gray-400 hover:text-white">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                {['In', 'Out', 'InOut'].map(direction => (
-                  <button
-                    key={direction}
-                    onClick={() => handleEasingDirectionSelect(direction)}
-                    className="px-4 py-2 bg-white/5 hover:bg-[#4c97ff] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-left"
-                  >
-                    {direction}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Client Key Selector Modal */}
-      <AnimatePresence>
-        {clientKeyTarget && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setClientKeyTarget(null)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-[600px] max-h-[80vh] flex flex-col gap-4 z-10"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Key</h3>
-                <button onClick={() => setClientKeyTarget(null)} className="text-gray-400 hover:text-white">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-2 overflow-y-auto custom-scrollbar pr-2">
-                {[
-                  "Space", "W", "A", "S", "D", "E", "Q", "F", "G", "R", "T", "Y", "U", "I", "O", "P", "H", "J", "K", "L", "Z", "X", "C", "V", "B", "N", "M",
-                  "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
-                  "Up", "Down", "Left", "Right",
-                  "LeftShift", "RightShift", "LeftControl", "RightControl", "LeftAlt", "RightAlt",
-                  "Return", "Backspace", "Tab", "Escape",
-                  "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"
-                ].map(key => (
-                  <button
-                    key={key}
-                    onClick={() => handleClientKeySelect(key)}
-                    className="px-3 py-2 bg-white/5 hover:bg-[#ffab19] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-center"
-                  >
-                    {key}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {mouseButtonTarget && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setMouseButtonTarget(null)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-[400px] flex flex-col gap-4 z-10"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Mouse Button</h3>
-                <button onClick={() => setMouseButtonTarget(null)} className="text-gray-400 hover:text-white">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Left", value: "MouseButton1" },
-                  { label: "Right", value: "MouseButton2" },
-                  { label: "Middle", value: "MouseButton3" }
-                ].map(btn => (
-                  <button
-                    key={btn.value}
-                    onClick={() => handleMouseButtonSelect(btn.value)}
-                    className="px-3 py-2 bg-white/5 hover:bg-[#ffab19] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-center"
-                  >
-                    {btn.label}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {cameraTypeTarget && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setCameraTypeTarget(null)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-[400px] flex flex-col gap-4 z-10"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Camera Type</h3>
-                <button onClick={() => setCameraTypeTarget(null)} className="text-gray-400 hover:text-white">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {["Custom", "Scriptable", "Fixed", "Attach", "Watch"].map(type => (
-                  <button
-                    key={type}
-                    onClick={() => handleCameraTypeSelect(type)}
-                    className="px-3 py-2 bg-white/5 hover:bg-[#ffab19] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-center"
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {effectTypeTarget && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setEffectTypeTarget(null)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative bg-[#252525] border border-white/10 rounded-xl shadow-2xl p-6 w-[400px] flex flex-col gap-4 z-10"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-white tracking-widest uppercase">Select Effect Type</h3>
-                <button onClick={() => setEffectTypeTarget(null)} className="text-gray-400 hover:text-white">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {["Explosion", "Fire", "Smoke", "Sparkles"].map(type => (
-                  <button
-                    key={type}
-                    onClick={() => handleEffectTypeSelect(type)}
-                    className="px-3 py-2 bg-white/5 hover:bg-[#ffab19] text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-colors text-center"
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
         )}
       </AnimatePresence>
     </div>

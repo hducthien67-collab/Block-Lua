@@ -40,7 +40,8 @@ import {
   Package,
   Trash2,
   Edit2,
-  Check
+  Check,
+  MessagesSquare
 } from 'lucide-react';
 import { RobloxInstance } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -101,6 +102,9 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
     'starterpack', 'startergui', 'starterplayer', 'teams', 'soundservice', 'textchatservice',
     'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'
   ].includes(instance.id.toLowerCase());
+
+  // Special case for TextChatService to be non-deletable and have specific icon
+  const isNonDeletable = isProtected || instance.id.toLowerCase() === 'textchatservice';
 
   // Concise path: game.Workspace.Part -> Workspace.Part
   const fullPath = currentPath ? (currentPath === 'game' ? instance.Name : `${currentPath}.${instance.Name}`) : instance.Name;
@@ -169,7 +173,7 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
           )}
         </div>
         <div className="mr-1.5">
-          {getIcon(instance.ClassName)}
+          {instance.id.toLowerCase() === 'textchatservice' ? <MessagesSquare className="w-3.5 h-3.5 text-cyan-400" /> : getIcon(instance.ClassName)}
         </div>
         
         {isRenaming ? (
@@ -207,29 +211,29 @@ export const ExplorerTree: React.FC<ExplorerProps> = ({
             >
               <Plus className="w-3 h-3 text-gray-400" />
             </button>
-            {!isProtected && (
-              <>
-                <button 
-                  className="p-0.5 hover:bg-[#555] rounded"
-                  title="Rename"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsRenaming(true);
-                  }}
-                >
-                  <Edit2 className="w-3 h-3 text-gray-400" />
-                </button>
-                <button 
-                  className="p-0.5 hover:bg-red-500/20 rounded"
-                  title="Delete"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(instance.id);
-                  }}
-                >
-                  <Trash2 className="w-3 h-3 text-red-400" />
-                </button>
-              </>
+            {!isNonDeletable && (
+              <button 
+                className="p-0.5 hover:bg-[#555] rounded"
+                title="Rename"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsRenaming(true);
+                }}
+              >
+                <Edit2 className="w-3 h-3 text-gray-400" />
+              </button>
+            )}
+            {!isNonDeletable && (
+              <button 
+                className="p-0.5 hover:bg-red-500/20 rounded"
+                title="Delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(instance.id);
+                }}
+              >
+                <Trash2 className="w-3 h-3 text-red-400" />
+              </button>
             )}
           </div>
         )}

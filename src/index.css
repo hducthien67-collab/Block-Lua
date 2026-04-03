@@ -1,4 +1,20 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden !important;
+  background-color: #000000;
+  position: fixed;
+}
+
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
 
 /* Force white text on all Blockly blocks (labels only) */
 .blocklyText,
@@ -43,6 +59,25 @@
   ry: 4px !important;
 }
 
+.faded-placeholder-text {
+  fill-opacity: 0.5 !important;
+  font-style: italic !important;
+}
+
+/* Fix toolbox width */
+.blocklyToolboxDiv {
+  max-width: 180px !important;
+  width: 180px !important;
+  overflow-x: hidden !important;
+}
+
+.blocklyTreeLabel {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 150px !important;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -64,7 +99,139 @@
   animation: panelFadeIn 0.15s ease-out;
 }
 
+/* Fix Blockly Context Menu */
+.blocklyWidgetDiv .blocklyContextMenu {
+  background-color: #252526 !important;
+  border: 1px solid #454545 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  padding: 4px 0 !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.blocklyMenuItem {
+  padding: 6px 12px !important;
+  color: #cccccc !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  transition: background-color 0.1s, color 0.1s !important;
+}
+
+.blocklyMenuItem:hover {
+  background-color: #37373d !important;
+  color: #ffffff !important;
+}
+
+.blocklyMenuItemDisabled {
+  opacity: 0.4 !important;
+  cursor: default !important;
+}
+
+.blocklyMenuItemHighlight {
+  background-color: #37373d !important;
+}
+
+.blocklyMenuItemContent {
+  color: inherit !important;
+}
+
+.blocklyMenuItemShortcut {
+  color: #888888 !important;
+  margin-left: 12px !important;
+}
+
+/* Fix Blockly Dropdown Menu */
+.blocklyDropDownDiv {
+  background-color: #1a1a1a !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+  padding: 6px !important;
+  backdrop-filter: blur(10px);
+}
+
+.blocklyDropDownContent {
+  max-height: 350px !important;
+  overflow-y: auto !important;
+  padding: 4px !important;
+}
+
+/* Style the dropdown items */
+.blocklyDropDownDiv .goog-menuitem {
+  padding: 8px 16px !important;
+  color: #cccccc !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+  margin-bottom: 2px !important;
+  transition: all 0.2s !important;
+  cursor: pointer !important;
+}
+
+.blocklyDropDownDiv .goog-menuitem-highlight,
+.blocklyDropDownDiv .goog-menuitem-hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.blocklyDropDownDiv .goog-menuitem-content {
+  color: inherit !important;
+}
+
+/* Custom scrollbar for dropdown */
+.blocklyDropDownDiv .blocklyDropDownContent::-webkit-scrollbar {
+  width: 4px;
+}
+
+.blocklyDropDownDiv .blocklyDropDownContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.blocklyDropDownDiv .blocklyDropDownContent::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
 @keyframes panelFadeIn {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Toolbox Category Styling */
+.blocklyTreeRow {
+  height: 36px !important;
+  line-height: 36px !important;
+  margin: 2px 8px !important;
+  border-radius: 8px !important;
+  padding-left: 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border: 1px solid transparent !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.blocklyTreeRow:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  transform: translateX(2px);
+}
+
+.blocklyTreeSelected {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+.blocklyTreeLabel {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  margin-left: 8px !important;
+}
+
+/* Hide default Blockly tree icons if any */
+.blocklyTreeIcon {
+  display: none !important;
 }

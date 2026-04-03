@@ -45,6 +45,7 @@ async function startServer() {
   });
 
   let pendingScript: any = null;
+  let pendingTree: any = null;
 
   // Endpoint to queue a script export
   app.post("/api/export", (req, res) => {
@@ -65,6 +66,27 @@ async function startServer() {
   app.get("/api/export", (req, res) => {
     res.json({ script: pendingScript });
     pendingScript = null; // Clear after reading
+  });
+
+  // Endpoint to queue a tree export (from web to game)
+  app.post("/api/export_tree", (req, res) => {
+    try {
+      if (req.body && req.body.tree) {
+        pendingTree = req.body.tree;
+        res.json({ success: true, message: "Tree queued for export" });
+      } else {
+        res.status(400).json({ success: false, message: "Invalid payload" });
+      }
+    } catch (error) {
+      console.error("Error queueing tree:", error);
+      res.status(500).json({ success: false, message: "Internal server error" });
+    }
+  });
+
+  // Endpoint for Roblox Studio to poll for pending tree
+  app.get("/api/export_tree", (req, res) => {
+    res.json({ tree: pendingTree });
+    pendingTree = null; // Clear after reading
   });
 
   // Vite middleware for development
