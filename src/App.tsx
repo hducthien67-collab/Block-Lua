@@ -421,6 +421,9 @@ export default function App() {
   }, [setExplorer]);
 
   const [exportScriptType, setExportScriptType] = useState<'Script' | 'LocalScript' | null>(null);
+  const [baseUrl, setBaseUrl] = useState(
+    (window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-')
+  );
 
   const handleInstanceSelect = (path: string, instanceId: string) => {
     // Keep full path as requested by user (e.g., game.Workspace.Part)
@@ -7607,10 +7610,19 @@ export default function App() {
                     </>
                   )}
                 </div>
+                <div className="mb-4">
+                  <label className="text-gray-400 text-sm block mb-1">Base URL:</label>
+                  <input 
+                    type="text" 
+                    value={baseUrl} 
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-white text-sm font-mono"
+                  />
+                </div>
                 <div className="relative group">
                   <pre className="bg-[#1e1e1e] p-6 rounded-xl overflow-x-auto text-sm font-mono text-gray-300 border border-white/5 shadow-inner max-h-64 custom-scrollbar">
 {`local HttpService = game:GetService("HttpService")
-local BASE_URL = "\${(window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-')}"
+local BASE_URL = "${baseUrl}"
 local URL = BASE_URL .. "/api/sync"
 local EXPORT_URL = BASE_URL .. "/api/export"
 local EXPORT_TREE_URL = BASE_URL .. "/api/export_tree"
