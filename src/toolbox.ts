@@ -519,7 +519,7 @@ const rawToolbox = {
   ]
 };
 
-export const toolbox = {
+export const fullToolbox = {
   ...rawToolbox,
   contents: rawToolbox.contents.map(cat => {
     const name = cat.name || '';
@@ -533,3 +533,10 @@ export const toolbox = {
     };
   })
 };
+
+export const initialToolbox = {
+  ...fullToolbox,
+  contents: fullToolbox.contents.filter(cat => ['Comment', 'Logic', 'Math'].includes(cat.name))
+};
+
+export const toolbox = initialToolbox;
