@@ -56,7 +56,7 @@ import { ExplorerTree, getIcon } from './components/Explorer/Explorer';
 import { InsertObjectMenu } from './components/Explorer/InsertObjectMenu';
 import * as blocks from './blocks';
 import { defineCustomGenerators } from './generators';
-import { fullToolbox, initialToolbox } from './toolbox';
+import { toolbox } from './toolbox';
 import { getCategoryColor } from './colors';
 import { serviceGroups } from './serviceBlocks';
 
@@ -292,17 +292,6 @@ const getBlockDescription = (block: any, lang: string) => {
 
 export default function App() {
   const { explorer, setExplorer, toggleExpand, addInstance, updateInstanceProperty, deleteInstance } = useExplorer();
-  const [currentToolbox, setCurrentToolbox] = useState(initialToolbox);
-  const addCategory = (categoryName: string) => {
-    if (currentToolbox.contents.find(c => c.name === categoryName)) return;
-    const newCategory = fullToolbox.contents.find(c => c.name === categoryName);
-    if (newCategory) {
-      const newToolbox = { ...currentToolbox, contents: [...currentToolbox.contents, newCategory] };
-      setCurrentToolbox(newToolbox);
-      workspace.current?.updateToolbox(newToolbox);
-    }
-  };
-
   const [selectedInstancePath, setSelectedInstancePath] = useState('game.Workspace');
   const [selectedInstanceId, setSelectedInstanceId] = useState('workspace');
   const blocklyDiv = useRef<HTMLDivElement>(null);
@@ -6788,7 +6777,7 @@ export default function App() {
     defineCustomGenerators();
 
     workspace.current = Blockly.inject(blocklyDiv.current, {
-      toolbox: currentToolbox,
+      toolbox: toolbox,
       trashcan: false,
       zoom: {
         controls: false,
@@ -6843,7 +6832,7 @@ export default function App() {
     // Only extract if we haven't already
     Blockly.Events.disable();
     try {
-      fullToolbox.contents.forEach((cat: any) => {
+      toolbox.contents.forEach((cat: any) => {
         if (cat.kind === 'category' && cat.contents) {
           cat.contents.forEach((item: any) => {
             if (item.kind === 'block') {
@@ -8647,40 +8636,6 @@ sync() -- Initial sync on load`;
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Category Selector */}
-      <div 
-        className="category-selector-btn"
-        onClick={() => {
-          const panel = document.querySelector('.category-panel');
-          panel?.classList.toggle('open');
-          const items = panel?.querySelectorAll('.category-item');
-          items?.forEach((item, i) => {
-            setTimeout(() => item.classList.toggle('show'), i * 30);
-          });
-        }}
-      >
-        <Layers size={24} />
-      </div>
-      <div className="category-panel">
-        {fullToolbox.contents.map((cat, i) => (
-          <div 
-            key={cat.name} 
-            className="category-item"
-            onClick={() => {
-              addCategory(cat.name);
-              // Hide modal
-              const panel = document.querySelector('.category-panel');
-              panel?.classList.remove('open');
-              const items = panel?.querySelectorAll('.category-item');
-              items?.forEach(item => item.classList.remove('show'));
-            }}
-          >
-            <div className="w-3 h-3 rounded-full" style={{ background: (cat as any).colour }} />
-            {cat.name}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
