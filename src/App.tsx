@@ -326,7 +326,6 @@ export default function App() {
   const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
   const [definedVariables, setDefinedVariables] = useState<string[]>([]);
   const [enableEffects, setEnableEffects] = useState<boolean>(true);
-  const [gameStructure, setGameStructure] = useState<any>(null);
 
   useEffect(() => {
     (window as any).gameStructure = explorer;
@@ -7187,34 +7186,6 @@ export default function App() {
                     </button>
                     <button 
                       onClick={() => {
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = '.json';
-                        input.onchange = (e) => {
-                          const file = (e.target as HTMLInputElement).files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (e) => {
-                              try {
-                                const json = JSON.parse(e.target?.result as string);
-                                setGameStructure(json);
-                                alert('Game structure imported successfully!');
-                              } catch (err) {
-                                alert('Error parsing JSON file.');
-                              }
-                            };
-                            reader.readAsText(file);
-                          }
-                        };
-                        input.click();
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
-                    >
-                      <Layers size={18} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Nhập Cấu Trúc Game' : 'Import Game Structure'}
-                    </button>
-                    <button 
-                      onClick={() => {
                         setCurrentLang(currentLang === 'vi' ? 'en' : 'vi');
                       }}
                       className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center justify-between"
@@ -7640,6 +7611,9 @@ local function serializeInstance(instance, path)
         Properties = {},
         Children = {}
     }
+    if instance:IsA("Script") or instance:IsA("LocalScript") or instance:IsA("ModuleScript") then
+        data.Properties.Source = instance.Source
+    end
     for _, child in ipairs(instance:GetChildren()) do
         table.insert(data.Children, serializeInstance(child, data.id))
     end
@@ -7822,6 +7796,9 @@ local function serializeInstance(instance, path)
         Properties = {},
         Children = {}
     }
+    if instance:IsA("Script") or instance:IsA("LocalScript") or instance:IsA("ModuleScript") then
+        data.Properties.Source = instance.Source
+    end
     for _, child in ipairs(instance:GetChildren()) do
         table.insert(data.Children, serializeInstance(child, data.id))
     end

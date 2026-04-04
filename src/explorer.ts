@@ -128,14 +128,13 @@ export const useExplorer = () => {
   }, []);
 
   const deleteInstance = useCallback((id: string) => {
+    console.log("Attempting to delete instance with id:", id);
     const removeFromChildren = (node: RobloxInstance): RobloxInstance => {
       return {
         ...node,
         Children: (node.Children || [])
           .filter(child => {
             if (child.id === id) {
-              const metadata = ROBLOX_CLASSES.find(c => c.name === child.ClassName);
-              const isService = metadata && metadata.category === 'Services';
               const isProtected = [
                 'workspace', 'players', 'lighting', 'materialservice', 'networkclient', 
                 'replicatedfirst', 'replicatedstorage', 'serverscriptservice', 'serverstorage', 
@@ -143,7 +142,12 @@ export const useExplorer = () => {
                 'startercharacterscripts', 'starterplayerscripts', 'camera', 'terrain', 'game'
               ].includes(child.id.toLowerCase());
               
-              if (isService || isProtected) return true; // Keep (don't delete)
+              if (isProtected) {
+                console.log("Instance is protected and cannot be deleted:", id);
+                return true; // Keep (don't delete)
+              }
+              
+              console.log("Instance deleted:", id);
               return false; // Delete
             }
             return true; // Keep other children
