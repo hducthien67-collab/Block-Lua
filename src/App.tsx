@@ -494,7 +494,14 @@ export default function App() {
     try {
       await signInWithPopup(auth, googleProvider);
       showToast(currentLang === 'vi' ? 'Đăng nhập thành công!' : 'Logged in successfully!', 'success');
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        showToast(currentLang === 'vi' ? 'Cửa sổ đăng nhập đã bị đóng.' : 'Login popup was closed.', 'warning');
+        return;
+      }
+      if (error.code === 'auth/cancelled-popup-request') {
+        return;
+      }
       console.error(error);
       showToast(currentLang === 'vi' ? 'Lỗi đăng nhập!' : 'Login failed!', 'error');
     }
