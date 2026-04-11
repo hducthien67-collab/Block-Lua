@@ -408,6 +408,7 @@ export default function App() {
   // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const prevUser = user;
       setUser(firebaseUser);
       setIsAuthReady(true);
 
@@ -425,6 +426,7 @@ export default function App() {
             hasSeenTutorial: false,
             createdAt: Timestamp.now()
           });
+          setShowTutorialModal(true);
         } else {
           // Sync tutorial state from cloud
           const userData = userSnap.data();
@@ -435,15 +437,18 @@ export default function App() {
           }
         }
       } else {
-        // Guest mode: check localStorage for tutorial
-        const hasSeen = localStorage.getItem('blocklua_tutorial_seen');
-        if (!hasSeen) {
-          setShowTutorialModal(true);
+        // Guest mode: only show tutorial if they haven't seen it and they didn't just log out
+        // If prevUser was defined, it means they just logged out, so don't show tutorial immediately
+        if (!prevUser) {
+          const hasSeen = localStorage.getItem('blocklua_tutorial_seen');
+          if (!hasSeen) {
+            setShowTutorialModal(true);
+          }
         }
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   // Real-time Storage Sync
   useEffect(() => {
@@ -7376,8 +7381,7 @@ export default function App() {
           </button>
           <div className="relative">
             <div 
-              onClick={() => setShowMenu(!showMenu)}
-              className="flex items-center gap-2 group cursor-pointer"
+              className="flex items-center gap-2 group"
             >
               <div className="w-6 h-6 bg-gradient-to-br from-[#4c97ff] to-[#0055ff] rounded-md flex items-center justify-center shadow-lg shadow-blue-500/20 transition-transform group-hover:rotate-12">
                 <Cpu className="text-white" size={14} />
@@ -7387,94 +7391,6 @@ export default function App() {
                 <div className="text-[9px] text-[#4c97ff] font-bold tracking-widest uppercase mt-0.5">PRO EDITION</div>
               </div>
             </div>
-
-            <AnimatePresence>
-              {showMenu && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute top-full left-0 mt-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[120] overflow-hidden py-2 origin-top-left"
-                >
-                    <button 
-                      onClick={() => {
-                        setShowInfo(true);
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
-                    >
-                      <Info size={18} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Thông Tin Hệ Thống' : 'System Information'}
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setShowSettings(true);
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
-                    >
-                      <Settings size={18} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Cài Đặt' : 'Settings'}
-                    </button>
-                  </motion.div>
-              )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {showSettings && (
-                <motion.div
-                  initial={{ opacity: 0, x: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -10, scale: 0.95 }}
-                  className="absolute top-full left-0 mt-2 w-64 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[120] overflow-hidden py-2 origin-top-left"
-                >
-                    <div className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-white/5 mb-2">
-                      {currentLang === 'vi' ? 'Cấu Hình Hệ Thống' : 'System Configuration'}
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setEnableEffects(!enableEffects);
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Sparkles size={18} className={enableEffects ? "text-[#4c97ff]" : "text-gray-500"} />
-                        {currentLang === 'vi' ? 'Hiệu Ứng' : 'Visual Effects'}
-                      </div>
-                      <div className={`w-8 h-4 rounded-full relative transition-colors ${enableEffects ? 'bg-[#4c97ff]' : 'bg-gray-700'}`}>
-                        <div className={`absolute top-1 w-2 h-2 bg-white rounded-full transition-all ${enableEffects ? 'right-1' : 'left-1'}`} />
-                      </div>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setShowSyncModal(true);
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
-                    >
-                      <RefreshCw size={18} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Đồng bộ với Roblox Studio' : 'Sync with Roblox Studio'}
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setCurrentLang(currentLang === 'vi' ? 'en' : 'vi');
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Globe size={18} className="text-[#4c97ff]" />
-                        {currentLang === 'vi' ? 'Ngôn Ngữ' : 'Language'}
-                      </div>
-                      <span className="text-[10px] font-black text-[#4c97ff]">{currentLang === 'vi' ? 'TIẾNG VIỆT' : 'ENGLISH'}</span>
-                    </button>
-                    <div className="px-4 py-3 border-t border-white/5">
-                      <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">
-                        v1.0.0
-                      </div>
-                    </div>
-                  </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5">
@@ -7492,55 +7408,26 @@ export default function App() {
               <Code2 size={14} />
               SCRIPTING
             </button>
-            <div className="relative">
-              <button 
-                onClick={() => setShowToolsMenu(!showToolsMenu)}
-                className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${showToolsMenu ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-              >
-                <Settings size={14} />
-                {currentLang === 'vi' ? 'CÔNG CỤ' : 'TOOLS'}
-              </button>
-              
-              <AnimatePresence>
-                {showToolsMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute top-full right-0 mt-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[120] overflow-hidden py-2 origin-top-right"
-                  >
-                    <button 
-                      onClick={() => { setShowControlCenter(true); setShowToolsMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left text-[10px] font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3 uppercase tracking-widest"
-                    >
-                      <LayoutDashboard size={14} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Trung tâm Lab' : 'Lab Center'}
-                    </button>
-                    <button 
-                      onClick={() => { setShowSyncModal(true); setShowToolsMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left text-[10px] font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3 uppercase tracking-widest"
-                    >
-                      <RefreshCw size={14} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Đồng bộ' : 'Sync'}
-                    </button>
-                    <button 
-                      onClick={() => { setShowExportModal(true); setShowToolsMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left text-[10px] font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3 uppercase tracking-widest"
-                    >
-                      <Download size={14} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Xuất mã' : 'Export'}
-                    </button>
-                    <button 
-                      onClick={() => { setShowTutorialModal(true); setShowTutorialModal(true); setTutorialStep(0); setShowToolsMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left text-[10px] font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3 uppercase tracking-widest"
-                    >
-                      <HelpCircle size={14} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Hướng dẫn' : 'Tutorial'}
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <button 
+              onClick={() => { 
+                if (user) {
+                  setShowControlCenter(true); 
+                } else {
+                  showToast(currentLang === 'vi' ? 'Vui lòng đăng nhập để sử dụng Trung tâm Lab!' : 'Please login to use Lab Center!', 'warning');
+                }
+              }}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${showControlCenter ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <LayoutDashboard size={14} />
+              {currentLang === 'vi' ? 'TRUNG TÂM LAB' : 'LAB CENTER'}
+            </button>
+            <button 
+              onClick={() => { setShowSyncModal(true); }}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 text-gray-500 hover:text-gray-300`}
+            >
+              <RefreshCw size={14} />
+              {currentLang === 'vi' ? 'ĐỒNG BỘ HÓA' : 'SYNC'}
+            </button>
           </div>
         </div>
 
@@ -8571,7 +8458,13 @@ sync() -- Initial sync on load`;
                         </p>
 
                         <button 
-                          onClick={checkCodeWithAI}
+                          onClick={() => {
+                            if (user) {
+                              checkCodeWithAI();
+                            } else {
+                              showToast(currentLang === 'vi' ? 'Vui lòng đăng nhập để sử dụng AI!' : 'Please login to use AI!', 'warning');
+                            }
+                          }}
                           disabled={isCheckingCode}
                           className="w-full py-5 bg-[#4c97ff] hover:bg-[#3d86f0] disabled:bg-gray-800 text-white font-black rounded-2xl transition-all shadow-2xl shadow-[#4c97ff]/20 flex items-center justify-center gap-3"
                         >
