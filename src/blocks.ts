@@ -1150,6 +1150,84 @@ export const defineCustomBlocks = () => {
   };
 
   // Placeholder blocks for inputs (Shadows)
+  Blockly.Blocks['lua_event_touched'] = {
+    init: function() {
+      this.appendValueInput("PART").setCheck("Instance").appendField("on");
+      this.appendDummyInput().appendField("touched do");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Events'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['instance_get_self'] = {
+    init: function() {
+      this.appendDummyInput().appendField("this script's parent");
+      this.setOutput(true, "Instance");
+      this.setColour(getCategoryColor('Instance'));
+    }
+  };
+
+  Blockly.Blocks['lua_humanoid_take_damage'] = {
+    init: function() {
+      this.appendValueInput("HUMANOID").setCheck("Instance").appendField("make");
+      this.appendValueInput("DAMAGE").setCheck("Number").appendField("take damage");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour("#ff3355");
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['instance_find_first_child_of_class'] = {
+    init: function() {
+      this.appendValueInput("PARENT").setCheck("Instance").appendField("find first child of class");
+      this.appendValueInput("CLASS").setCheck("String").appendField("in");
+      this.setOutput(true, "Instance");
+      this.setColour(getCategoryColor('Instance'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['lua_event_touch_other'] = {
+    init: function() {
+      this.appendDummyInput().appendField("the part that touched");
+      this.setOutput(true, "Instance");
+      this.setColour(getCategoryColor('Events'));
+    }
+  };
+
+  Blockly.Blocks['lua_event_player_added'] = {
+    init: function() {
+      this.appendDummyInput().appendField("when player added do");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Player'));
+    }
+  };
+
+  Blockly.Blocks['instance_create'] = {
+    init: function() {
+      this.appendValueInput("CLASS").setCheck("String").appendField("create new");
+      this.appendValueInput("PARENT").setCheck("Instance").appendField("in");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Instance'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['lua_event_player'] = {
+    init: function() {
+      this.appendDummyInput().appendField("the player");
+      this.setOutput(true, "Instance");
+      this.setColour(getCategoryColor('Player'));
+    }
+  };
+
   Blockly.Blocks['placeholder_string'] = {
     init: function() {
       this.appendDummyInput()

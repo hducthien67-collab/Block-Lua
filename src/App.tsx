@@ -49,7 +49,20 @@ import {
   Search,
   RefreshCw,
   Copy,
-  FileCode2
+  FileCode2,
+  Download,
+  History,
+  PlayCircle,
+  Library,
+  Smartphone,
+  LayoutDashboard,
+  HelpCircle,
+  Eye,
+  Edit3,
+  Box,
+  Wrench,
+  Music,
+  User
 } from 'lucide-react';
 import { useExplorer } from './explorer';
 import { ExplorerTree, getIcon } from './components/Explorer/Explorer';
@@ -59,6 +72,29 @@ import { defineCustomGenerators } from './generators';
 import { toolbox } from './toolbox';
 import { getCategoryColor } from './colors';
 import { serviceGroups } from './serviceBlocks';
+
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { GoogleGenAI, Type } from "@google/genai";
+import { auth, db, googleProvider, OperationType, handleFirestoreError } from './firebase';
+import { 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged, 
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  onSnapshot, 
+  query, 
+  where, 
+  Timestamp,
+  writeBatch
+} from 'firebase/firestore';
 
 const CATEGORIES = [
   { name: 'Comment' },
@@ -254,49 +290,85 @@ const BlocklyPreview = ({ blockType }: { blockType: string }) => {
 
 const getBlockDescription = (block: any, lang: string) => {
   const type = block.type.toLowerCase();
+  const name = block.name;
+  
+  // Events
   if (type.includes('event')) {
+    if (type.includes('touched')) {
+      return lang === 'vi'
+        ? `Sự kiện này kích hoạt khi một đối tượng khác chạm vào đối tượng này. Nó trả về đối tượng đã chạm vào (OtherPart). Rất hữu ích để tạo bẫy, cửa tự động hoặc vùng hồi máu.`
+        : `This event triggers when another object touches this object. It returns the object that touched it (OtherPart). Useful for creating traps, automatic doors, or healing zones.`;
+    }
+    if (type.includes('click')) {
+      return lang === 'vi'
+        ? `Sự kiện này kích hoạt khi người chơi click chuột vào đối tượng (phải có ClickDetector). Cho phép bạn tạo các nút bấm, công tắc hoặc vật phẩm có thể tương tác.`
+        : `This event triggers when a player clicks on the object (requires a ClickDetector). Allows you to create buttons, switches, or interactive items.`;
+    }
     return lang === 'vi' 
-      ? `Khối sự kiện này sẽ kích hoạt các khối lệnh bên trong nó khi sự kiện ${block.name} xảy ra.`
-      : `This event block triggers the blocks inside it when the ${block.name} event occurs.`;
-  }
-  if (type.includes('set_')) {
-    return lang === 'vi'
-      ? `Khối lệnh này dùng để thay đổi thuộc tính ${block.name.replace('set ', '')} của một đối tượng.`
-      : `This block is used to change the ${block.name.replace('set ', '')} property of an object.`;
-  }
-  if (type.includes('get_')) {
-    return lang === 'vi'
-      ? `Khối lệnh này dùng để lấy giá trị thuộc tính ${block.name.replace('get ', '')} của một đối tượng.`
-      : `This block is used to get the ${block.name.replace('get ', '')} property value of an object.`;
-  }
-  if (type.includes('math')) {
-    return lang === 'vi'
-      ? `Khối lệnh toán học này thực hiện phép tính ${block.name} và trả về kết quả.`
-      : `This math block performs the ${block.name} calculation and returns the result.`;
-  }
-  if (type.includes('logic')) {
-    return lang === 'vi'
-      ? `Khối lệnh logic này dùng để kiểm tra điều kiện ${block.name} và trả về đúng (true) hoặc sai (false).`
-      : `This logic block is used to check the ${block.name} condition and returns true or false.`;
-  }
-  if (type.includes('loops')) {
-    return lang === 'vi'
-      ? `Khối vòng lặp này sẽ lặp lại các khối lệnh bên trong nó dựa trên điều kiện ${block.name}.`
-      : `This loop block repeats the blocks inside it based on the ${block.name} condition.`;
+      ? `Sự kiện "${name}" sẽ tự động chạy đoạn mã bên trong khi điều kiện tương ứng xảy ra trong trò chơi. Đây là điểm bắt đầu của hầu hết các kịch bản.`
+      : `The "${name}" event will automatically run the code inside when the corresponding condition occurs in the game. This is the starting point for most scripts.`;
   }
   
+  // Properties (Set/Get)
+  if (type.includes('set_')) {
+    const prop = name.replace('set ', '').replace('đặt ', '');
+    return lang === 'vi'
+      ? `Khối lệnh này cho phép bạn thay đổi giá trị của thuộc tính "${prop}". Ví dụ: đổi màu sắc, độ trong suốt, hoặc vị trí của một khối Part.`
+      : `This block allows you to change the value of the "${prop}" property. For example: changing the color, transparency, or position of a Part.`;
+  }
+  if (type.includes('get_')) {
+    const prop = name.replace('get ', '').replace('lấy ', '');
+    return lang === 'vi'
+      ? `Khối lệnh này đọc giá trị hiện tại của thuộc tính "${prop}" để bạn có thể sử dụng nó trong các phép tính hoặc điều kiện khác.`
+      : `This block reads the current value of the "${prop}" property so you can use it in other calculations or conditions.`;
+  }
+  
+  // Logic
+  if (type === 'lua_if') {
+    return lang === 'vi'
+      ? `Cấu trúc điều kiện cơ bản nhất. Nếu [điều kiện] là đúng (true), thì các lệnh bên trong sẽ được thực hiện. Nếu sai, chúng sẽ bị bỏ qua.`
+      : `The most basic conditional structure. If the [condition] is true, the blocks inside will be executed. If false, they will be skipped.`;
+  }
+  
+  // Instance creation
+  if (type.includes('instance_new')) {
+    return lang === 'vi'
+      ? `Tạo ra một đối tượng mới hoàn toàn (như Part, Script, Sound) trong trò chơi. Bạn cần đặt Parent cho nó để nó xuất hiện trong thế giới.`
+      : `Creates a brand new object (like a Part, Script, Sound) in the game. You need to set its Parent for it to appear in the world.`;
+  }
+
+  // Default fallback
   return lang === 'vi' 
-    ? `Khối lệnh này thuộc nhóm ${block.category.length > 13 ? block.category.substring(0, 13) + '...' : block.category}. Nó được sử dụng để thực hiện các thao tác liên quan đến ${block.name} trong trò chơi Roblox của bạn.`
-    : `This block belongs to the ${block.category.length > 13 ? block.category.substring(0, 13) + '...' : block.category} category. It is used to perform operations related to ${block.name} in your Roblox game.`;
+    ? `Khối lệnh "${name}" thuộc nhóm ${block.category}. Nó cung cấp các chức năng chuyên sâu để điều khiển ${name.toLowerCase()} trong môi trường Roblox.`
+    : `The "${name}" block belongs to the ${block.category} category. It provides specialized functions to control ${name.toLowerCase()} within the Roblox environment.`;
+};
+
+const robloxTheme = {
+  ...vscDarkPlus,
+  'keyword': { color: '#f86d7c' }, // Pink/Red
+  'function': { color: '#f86d7c' }, // Pink/Red
+  'string': { color: '#32cd32' }, // Green
+  'number': { color: '#ff8c00' }, // Orange/Red
+  'comment': { color: '#666666' }, // Grey
+  'operator': { color: '#ffffff' },
+  'punctuation': { color: '#ffffff' },
+  'builtin': { color: '#84d6f7' }, // Light Blue
+  'class-name': { color: '#84d6f7' }, // Light Blue
+  'boolean': { color: '#ffc600' }, // Yellow
+  'constant': { color: '#ffc600' }, // Yellow (for nil)
 };
 
 export default function App() {
+  const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
   const { explorer, setExplorer, toggleExpand, addInstance, updateInstanceProperty, deleteInstance } = useExplorer();
   const [selectedInstancePath, setSelectedInstancePath] = useState('game.Workspace');
   const [selectedInstanceId, setSelectedInstanceId] = useState('workspace');
   const blocklyDiv = useRef<HTMLDivElement>(null);
   const workspace = useRef<Blockly.WorkspaceSvg | null>(null);
   const [view, setView] = useState<'blocks' | 'codes'>('blocks');
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [showCanvasModal, setShowCanvasModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [showClearModal, setShowClearModal] = useState<boolean>(false);
   const [showMenu, setShowMenu] = useState<boolean>(false);
@@ -306,9 +378,295 @@ export default function App() {
   const [showBlockInfoModal, setShowBlockInfoModal] = useState<boolean>(false);
   const [selectedBlockInfo, setSelectedBlockInfo] = useState<any>(null);
 
-  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'warning' } | null>(null);
+  const [storages, setStorages] = useState<{ id: string, name: string, time: string, data: string }[]>(
+    Array.from({ length: 10 }, (_, i) => ({
+      id: i.toString(),
+      name: `Storage ${i + 1}`,
+      time: '-',
+      data: ''
+    }))
+  );
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  const tutorials = [
+    { title: currentLang === 'vi' ? 'Chào mừng!' : 'Welcome!', content: currentLang === 'vi' ? 'Chào mừng bạn đến với BlockLua! Đây là nơi bạn có thể tạo game Roblox bằng các khối lệnh trực quan.' : 'Welcome to BlockLua! This is where you can create Roblox games using visual blocks.' },
+    { title: currentLang === 'vi' ? 'Khám phá Explorer' : 'Explore Explorer', content: currentLang === 'vi' ? 'Sử dụng bảng Explorer bên phải để quản lý các đối tượng trong game của bạn.' : 'Use the Explorer panel on the right to manage your game objects.' },
+    { title: currentLang === 'vi' ? 'Kéo thả khối lệnh' : 'Drag & Drop Blocks', content: currentLang === 'vi' ? 'Kéo các khối từ Toolbox vào Workspace để bắt đầu lập trình.' : 'Drag blocks from the Toolbox into the Workspace to start programming.' }
+  ];
+
+  const [showControlCenter, setShowControlCenter] = useState(false);
+  const [isCheckingCode, setIsCheckingCode] = useState(false);
+  const [aiResult, setAiResult] = useState<{ status: string, message: string, details: string, line: number | null } | null>(null);
+
+  // Firebase State
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      setIsAuthReady(true);
+
+      if (firebaseUser) {
+        // Ensure user document exists
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            photoURL: firebaseUser.photoURL,
+            hasSeenTutorial: false,
+            createdAt: Timestamp.now()
+          });
+        } else {
+          // Sync tutorial state from cloud
+          const userData = userSnap.data();
+          if (userData.hasSeenTutorial) {
+            setShowTutorialModal(false);
+          } else {
+            setShowTutorialModal(true);
+          }
+        }
+      } else {
+        // Guest mode: check localStorage for tutorial
+        const hasSeen = localStorage.getItem('blocklua_tutorial_seen');
+        if (!hasSeen) {
+          setShowTutorialModal(true);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time Storage Sync
+  useEffect(() => {
+    if (!user) {
+      // Load from localStorage for guests
+      const saved = localStorage.getItem('blocklua_storages');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length === 10) {
+            setStorages(parsed);
+          }
+        } catch (e) { console.error(e); }
+      }
+      return;
+    }
+
+    // Sync from Firestore for logged-in users
+    const slotsRef = collection(db, 'users', user.uid, 'slots');
+    const unsubscribe = onSnapshot(slotsRef, (snapshot) => {
+      const newStorages = [...storages];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const index = data.slotIndex;
+        if (index >= 0 && index < 10) {
+          newStorages[index] = {
+            id: index.toString(),
+            name: data.name || `Storage ${index + 1}`,
+            time: data.updatedAt ? data.updatedAt.toDate().toLocaleString() : '-',
+            data: data.data
+          };
+        }
+      });
+      setStorages(newStorages);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/slots`);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const login = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      showToast(currentLang === 'vi' ? 'Đăng nhập thành công!' : 'Logged in successfully!', 'success');
+    } catch (error) {
+      console.error(error);
+      showToast(currentLang === 'vi' ? 'Lỗi đăng nhập!' : 'Login failed!', 'error');
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      showToast(currentLang === 'vi' ? 'Đã đăng xuất!' : 'Logged out!', 'success');
+      // Reset storages to local defaults
+      setStorages(Array.from({ length: 10 }, (_, i) => ({
+        id: i.toString(),
+        name: `Storage ${i + 1}`,
+        time: '-',
+        data: ''
+      })));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const markTutorialSeen = async () => {
+    setShowTutorialModal(false);
+    if (user) {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, { hasSeenTutorial: true });
+    } else {
+      localStorage.setItem('blocklua_tutorial_seen', 'true');
+    }
+  };
+
+  const saveToStorage = async (index: number) => {
+    if (!workspace.current) return;
+    
+    const blocks = workspace.current.getAllBlocks(false);
+    if (blocks.length === 0) {
+      showToast(currentLang === 'vi' ? 'Không có khối lệnh nào để lưu!' : 'No blocks to save!', 'error');
+      return;
+    }
+
+    const xml = Blockly.Xml.workspaceToDom(workspace.current);
+    const xmlText = Blockly.Xml.domToText(xml);
+    const newName = storages[index].name;
+
+    if (user) {
+      // Save to Firestore
+      try {
+        const slotRef = doc(db, 'users', user.uid, 'slots', `slot_${index}`);
+        await setDoc(slotRef, {
+          slotIndex: index,
+          name: newName,
+          data: xmlText,
+          updatedAt: Timestamp.now()
+        });
+        showToast(currentLang === 'vi' ? `Đã lưu vào bộ nhớ ${index + 1} (Cloud)!` : `Saved to storage ${index + 1} (Cloud)!`, 'success');
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/slots/slot_${index}`);
+      }
+    } else {
+      // Save to LocalStorage
+      const newStorages = [...storages];
+      newStorages[index] = { ...newStorages[index], time: new Date().toLocaleString(), data: xmlText };
+      setStorages(newStorages);
+      localStorage.setItem('blocklua_storages', JSON.stringify(newStorages));
+      showToast(currentLang === 'vi' ? `Đã lưu vào bộ nhớ ${index + 1} (Local)!` : `Saved to storage ${index + 1} (Local)!`, 'success');
+    }
+  };
+
+  const loadFromStorage = (index: number) => {
+    const storage = storages[index];
+    if (!storage.data) {
+      showToast(currentLang === 'vi' ? 'Ô lưu trữ này đang trống!' : 'This storage slot is empty!', 'error');
+      return;
+    }
+
+    if (workspace.current) {
+      const xml = Blockly.utils.xml.textToDom(storage.data);
+      workspace.current.clear();
+      Blockly.Xml.domToWorkspace(xml, workspace.current);
+      showToast(currentLang === 'vi' ? `Đã tải ${storage.name}!` : `Loaded ${storage.name}!`);
+    }
+  };
+
+  const renameStorage = async (index: number, newName: string) => {
+    const newStorages = [...storages];
+    newStorages[index].name = newName;
+    setStorages(newStorages);
+
+    if (user) {
+      try {
+        const slotRef = doc(db, 'users', user.uid, 'slots', `slot_${index}`);
+        const snap = await getDoc(slotRef);
+        if (snap.exists()) {
+          await updateDoc(slotRef, { name: newName });
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    } else {
+      localStorage.setItem('blocklua_storages', JSON.stringify(newStorages));
+    }
+  };
+
+  const checkCodeWithAI = async () => {
+    if (!generatedCode.trim()) {
+      showToast(currentLang === 'vi' ? 'Vui lòng thêm khối lệnh trước!' : 'Please add some blocks first!', 'error');
+      return;
+    }
+
+    setIsCheckingCode(true);
+    setAiResult(null);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+      
+      const prompt = `
+        You are an expert Roblox Lua (Luau) developer and debugger.
+        Analyze the following code for syntax errors, logical bugs, or common mistakes.
+        
+        CODE:
+        ${generatedCode}
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              status: {
+                type: Type.STRING,
+                description: "The status of the check: 'success', 'warning', or 'error'",
+                enum: ["success", "warning", "error"]
+              },
+              message: {
+                type: Type.STRING,
+                description: "A brief message explaining the result"
+              },
+              details: {
+                type: Type.STRING,
+                description: "Detailed explanation if there are issues"
+              },
+              line: {
+                type: Type.NUMBER,
+                description: "The line number where the issue occurs, or null"
+              }
+            },
+            required: ["status", "message", "details"]
+          }
+        }
+      });
+
+      const resultText = response.text;
+      if (resultText) {
+        const result = JSON.parse(resultText);
+        setAiResult(result);
+        
+        if (result.status === 'error' || result.status === 'warning') {
+          setShowControlCenter(false);
+          showToast(result.message, result.status);
+        } else {
+          showToast(currentLang === 'vi' ? 'Mã chạy tốt!' : 'Code looks good!', 'success');
+        }
+      } else {
+        showToast(currentLang === 'vi' ? 'Lỗi khi nhận phản hồi từ AI!' : 'Error receiving AI response!', 'error');
+      }
+    } catch (error) {
+      console.error("AI Check Error:", error);
+      showToast(currentLang === 'vi' ? 'Lỗi kết nối AI!' : 'AI connection error!', 'error');
+    } finally {
+      setIsCheckingCode(false);
+    }
+  };
+
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -323,7 +681,6 @@ export default function App() {
     setSelectorTarget('export');
     showToast(currentLang === 'vi' ? 'Vui lòng chọn một đối tượng trong Explorer để tạo script' : 'Please select an object in the Explorer to create the script');
   };
-  const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
   const [definedVariables, setDefinedVariables] = useState<string[]>([]);
   const [enableEffects, setEnableEffects] = useState<boolean>(true);
 
@@ -331,11 +688,7 @@ export default function App() {
     (window as any).gameStructure = explorer;
   }, [explorer]);
 
-  const [searchPanel, setSearchPanel] = useState<{ show: boolean, x: number, y: number }>({ show: false, x: 0, y: 0 });
-  const [searchQuery, setSearchQuery] = useState('');
   const [allBlocks, setAllBlocks] = useState<{ type: string, name: string, category: string, blockDef: any }[]>([]);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
   const [selectorTarget, setSelectorTarget] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(288);
   const [isResizing, setIsResizing] = useState(false);
@@ -482,12 +835,12 @@ export default function App() {
         const xml = Blockly.utils.xml.textToDom(xmlText);
         workspace.current.clear();
         Blockly.Xml.domToWorkspace(xml, workspace.current);
-        alert('Workspace loaded!');
+        showToast(currentLang === 'vi' ? 'Đã tải Workspace!' : 'Workspace loaded!');
       } else {
-        alert('No saved workspace found.');
+        showToast(currentLang === 'vi' ? 'Không tìm thấy dữ liệu đã lưu.' : 'No saved workspace found.', 'error');
       }
     }
-  }, []);
+  }, [currentLang]);
 
   const isShiftPressedRef = useRef(false);
   const lastClickShiftState = useRef(false);
@@ -667,6 +1020,7 @@ export default function App() {
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour(getCategoryColor('Logic'));
+          this.setInputsInline(true);
         }
       };
 
@@ -3606,9 +3960,18 @@ export default function App() {
       // Input Category
       Blockly.Blocks['input_key_pressed'] = {
         init: function() {
+          const keyOptions: [string, string][] = [
+            ["Space", "Space"], ["W", "W"], ["A", "A"], ["S", "S"], ["D", "D"],
+            ["E", "E"], ["Q", "Q"], ["R", "R"], ["F", "F"], ["Shift", "LeftShift"],
+            ["Ctrl", "LeftControl"], ["Alt", "LeftAlt"], ["Enter", "Return"],
+            ["Tab", "Tab"], ["Escape", "Escape"], ["Backspace", "Backspace"],
+            ["1", "One"], ["2", "Two"], ["3", "Three"], ["4", "Four"], ["5", "Five"],
+            ["6", "Six"], ["7", "Seven"], ["8", "Eight"], ["9", "Nine"], ["0", "Zero"],
+            ["Up", "Up"], ["Down", "Down"], ["Left", "Left"], ["Right", "Right"]
+          ];
           this.appendDummyInput()
               .appendField("Key Pressed")
-              .appendField(new Blockly.FieldTextInput("Space"), "KEY")
+              .appendField(new Blockly.FieldDropdown(keyOptions as Blockly.MenuOption[]), "KEY")
               .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
               .appendField("do");
           this.appendStatementInput("DO")
@@ -3616,17 +3979,22 @@ export default function App() {
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour(getCategoryColor('Input'));
-          
-          // Add autocomplete
-          const keys = ["Space", "W", "A", "S", "D", "E", "Q", "R", "F", "LeftShift", "LeftControl", "LeftAlt", "Return"];
-          blocks.addAutocomplete(this, 'KEY', keys);
         }
       };
       Blockly.Blocks['input_key_released'] = {
         init: function() {
+          const keyOptions: [string, string][] = [
+            ["Space", "Space"], ["W", "W"], ["A", "A"], ["S", "S"], ["D", "D"],
+            ["E", "E"], ["Q", "Q"], ["R", "R"], ["F", "F"], ["Shift", "LeftShift"],
+            ["Ctrl", "LeftControl"], ["Alt", "LeftAlt"], ["Enter", "Return"],
+            ["Tab", "Tab"], ["Escape", "Escape"], ["Backspace", "Backspace"],
+            ["1", "One"], ["2", "Two"], ["3", "Three"], ["4", "Four"], ["5", "Five"],
+            ["6", "Six"], ["7", "Seven"], ["8", "Eight"], ["9", "Nine"], ["0", "Zero"],
+            ["Up", "Up"], ["Down", "Down"], ["Left", "Left"], ["Right", "Right"]
+          ];
           this.appendDummyInput()
               .appendField("Key Released")
-              .appendField(new Blockly.FieldTextInput("Space"), "KEY")
+              .appendField(new Blockly.FieldDropdown(keyOptions as Blockly.MenuOption[]), "KEY")
               .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
               .appendField("do");
           this.appendStatementInput("DO")
@@ -3634,17 +4002,17 @@ export default function App() {
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour(getCategoryColor('Input'));
-          
-          // Add autocomplete
-          const keys = ["Space", "W", "A", "S", "D", "E", "Q", "R", "F", "LeftShift", "LeftControl", "LeftAlt", "Return"];
-          blocks.addAutocomplete(this, 'KEY', keys);
         }
       };
        Blockly.Blocks['input_mouse_button_down'] = {
         init: function() {
           this.appendDummyInput()
               .appendField("Mouse Button Down")
-              .appendField(new Blockly.FieldTextInput("Left"), "BUTTON")
+              .appendField(new Blockly.FieldDropdown([
+                ["Left", "MouseButton1"],
+                ["Right", "MouseButton2"],
+                ["Middle", "MouseButton3"]
+              ] as Blockly.MenuOption[]), "BUTTON")
               .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
               .appendField("do");
           this.appendStatementInput("DO")
@@ -3652,17 +4020,17 @@ export default function App() {
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour(getCategoryColor('Input'));
-          
-          // Add autocomplete
-          const buttons = ["Left", "Right", "Middle"];
-          blocks.addAutocomplete(this, 'BUTTON', buttons);
         }
       };
       Blockly.Blocks['input_mouse_button_up'] = {
         init: function() {
           this.appendDummyInput()
               .appendField("Mouse Button Up")
-              .appendField(new Blockly.FieldTextInput("Left"), "BUTTON")
+              .appendField(new Blockly.FieldDropdown([
+                ["Left", "MouseButton1"],
+                ["Right", "MouseButton2"],
+                ["Middle", "MouseButton3"]
+              ] as Blockly.MenuOption[]), "BUTTON")
               .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
               .appendField("do");
           this.appendStatementInput("DO")
@@ -3670,10 +4038,6 @@ export default function App() {
           this.setPreviousStatement(true, null);
           this.setNextStatement(true, null);
           this.setColour(getCategoryColor('Input'));
-          
-          // Add autocomplete
-          const buttons = ["Left", "Right", "Middle"];
-          blocks.addAutocomplete(this, 'BUTTON', buttons);
         }
       };
 
@@ -3702,13 +4066,18 @@ export default function App() {
 
       Blockly.Blocks['input_is_key_down'] = {
         init: function() {
+          const keyOptions: [string, string][] = [
+            ["Space", "Space"], ["W", "W"], ["A", "A"], ["S", "S"], ["D", "D"],
+            ["E", "E"], ["Q", "Q"], ["R", "R"], ["F", "F"], ["Shift", "LeftShift"],
+            ["Ctrl", "LeftControl"], ["Alt", "LeftAlt"], ["Enter", "Return"],
+            ["Tab", "Tab"], ["Escape", "Escape"], ["Backspace", "Backspace"],
+            ["1", "One"], ["2", "Two"], ["3", "Three"], ["4", "Four"], ["5", "Five"],
+            ["6", "Six"], ["7", "Seven"], ["8", "Eight"], ["9", "Nine"], ["0", "Zero"],
+            ["Up", "Up"], ["Down", "Down"], ["Left", "Left"], ["Right", "Right"]
+          ];
           this.appendDummyInput()
               .appendField("Is Key Down")
-              .appendField(new Blockly.FieldDropdown([
-                ["Space", "Space"], ["W", "W"], ["A", "A"], ["S", "S"], ["D", "D"],
-                ["E", "E"], ["Q", "Q"], ["R", "R"], ["F", "F"], ["Shift", "LeftShift"],
-                ["Ctrl", "LeftControl"], ["Alt", "LeftAlt"], ["Enter", "Return"]
-              ]), "KEY");
+              .appendField(new Blockly.FieldDropdown(keyOptions as Blockly.MenuOption[]), "KEY");
           this.setOutput(true, "Boolean");
           this.setColour(getCategoryColor('Input'));
         }
@@ -3773,7 +4142,7 @@ export default function App() {
                 ["Button A", "ButtonA"], ["Button B", "ButtonB"], ["Button X", "ButtonX"], ["Button Y", "ButtonY"],
                 ["DPad Up", "DPadUp"], ["DPad Down", "DPadDown"], ["DPad Left", "DPadLeft"], ["DPad Right", "DPadRight"],
                 ["L1", "ButtonL1"], ["R1", "ButtonR1"], ["L2", "ButtonL2"], ["R2", "ButtonR2"]
-              ]), "BUTTON")
+              ] as Blockly.MenuOption[]), "BUTTON")
               .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
               .appendField("do");
           this.appendStatementInput("DO")
@@ -3791,7 +4160,7 @@ export default function App() {
                 ["Button A", "ButtonA"], ["Button B", "ButtonB"], ["Button X", "ButtonX"], ["Button Y", "ButtonY"],
                 ["DPad Up", "DPadUp"], ["DPad Down", "DPadDown"], ["DPad Left", "DPadLeft"], ["DPad Right", "DPadRight"],
                 ["L1", "ButtonL1"], ["R1", "ButtonR1"], ["L2", "ButtonL2"], ["R2", "ButtonR2"]
-              ]), "BUTTON")
+              ] as Blockly.MenuOption[]), "BUTTON")
               .appendField(createVarLabel("var. _input", getCategoryColor('Input')), "VAR_LABEL")
               .appendField("do");
           this.appendStatementInput("DO")
@@ -4362,7 +4731,7 @@ export default function App() {
       };
       luaGenerator.forBlock['instance_set_name'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
-        const name = luaGenerator.valueToCode(block, 'NAME', Order.NONE) || '""';
+        const name = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '""';
         return instance + '.Name = ' + name + '\n';
       };
       luaGenerator.forBlock['instance_get_name'] = function(block: any) {
@@ -4371,7 +4740,7 @@ export default function App() {
       };
       luaGenerator.forBlock['instance_set_parent'] = function(block: any) {
         const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
-        const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
+        const parent = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
         return instance + '.Parent = ' + parent + '\n';
       };
       luaGenerator.forBlock['instance_get_parent'] = function(block: any) {
@@ -6688,32 +7057,6 @@ export default function App() {
       if (registry.getItem(id)) registry.unregister(id);
     });
 
-    // Add Search Blocks to workspace context menu
-    if (registry.getItem('searchBlocks')) registry.unregister('searchBlocks');
-    registry.register({
-      displayText: function() {
-        return currentLang === 'vi' ? 'Tìm Kiếm Block' : 'Search Blocks';
-      },
-      preconditionFn: function(scope: any) {
-        if (scope.workspace) {
-          return 'enabled';
-        }
-        return 'hidden';
-      },
-      callback: function(scope: any) {
-        setSearchPanel({ 
-          show: true, 
-          x: window.innerWidth / 2 - 160,
-          y: window.innerHeight / 2 - 200
-        });
-        setSearchQuery('');
-        setTimeout(() => searchInputRef.current?.focus(), 50);
-      },
-      scopeType: Blockly.ContextMenuRegistry.ScopeType.WORKSPACE,
-      id: 'searchBlocks',
-      weight: 100,
-    });
-
     // Scratch-like duplication
     if (registry.getItem('blockDuplicate')) registry.unregister('blockDuplicate');
     registry.register({
@@ -6974,84 +7317,6 @@ export default function App() {
     setShowClearModal(true);
   };
 
-  const addBlockToWorkspace = (blockDef: any) => {
-    if (!workspace.current) return;
-    
-    // Convert screen coordinates to workspace coordinates
-    const injectionDiv = workspace.current.getInjectionDiv();
-    const rect = injectionDiv.getBoundingClientRect();
-    
-    // Calculate position relative to the workspace SVG
-    const svg = workspace.current.getParentSvg();
-    const point = svg.createSVGPoint();
-    point.x = searchPanel.x;
-    point.y = searchPanel.y;
-    const workspacePoint = point.matrixTransform(workspace.current.getCanvas().getScreenCTM()?.inverse());
-
-    try {
-      // Create a clean copy of the block definition
-      const cleanDef = JSON.parse(JSON.stringify(blockDef));
-      // Remove 'kind' as it's not part of the serialization format
-      delete cleanDef.kind;
-      
-      const block = Blockly.serialization.blocks.append(cleanDef, workspace.current) as Blockly.BlockSvg;
-      if (block) {
-        block.initSvg();
-        block.render();
-        block.moveBy(workspacePoint.x, workspacePoint.y);
-        block.select();
-      }
-    } catch (e) {
-      console.error("Failed to append block from definition, falling back to newBlock", e);
-      // Fallback in case serialization fails
-      const block = workspace.current.newBlock(blockDef.type) as Blockly.BlockSvg;
-      block.initSvg();
-      block.render();
-      block.moveBy(workspacePoint.x, workspacePoint.y);
-      block.select();
-    }
-    
-    setSearchPanel(prev => ({ ...prev, show: false }));
-  };
-
-  useEffect(() => {
-    const handleGlobalClick = (e: MouseEvent) => {
-      if (!workspace.current) return;
-
-      // Quick Search feature (Shift + Left Click)
-      if (e.shiftKey && e.button === 0) {
-        // Check if click is inside blockly area
-        const blocklyArea = blocklyDiv.current;
-        if (blocklyArea && blocklyArea.contains(e.target as Node)) {
-          e.preventDefault();
-          e.stopPropagation();
-          setSearchPanel({ show: true, x: e.clientX, y: e.clientY });
-          setSearchQuery('');
-          setTimeout(() => searchInputRef.current?.focus(), 50);
-        }
-      }
-    };
-
-    window.addEventListener('mousedown', handleGlobalClick, true);
-    return () => window.removeEventListener('mousedown', handleGlobalClick, true);
-  }, []);
-
-  const openSearchAtCenter = () => {
-    setSearchPanel({ 
-      show: true, 
-      x: window.innerWidth / 2 - 160, // Center horizontally (width is 320px)
-      y: window.innerHeight / 2 - 200  // Center vertically
-    });
-    setSearchQuery('');
-    setTimeout(() => searchInputRef.current?.focus(), 50);
-  };
-
-  const filteredBlocks = allBlocks.filter(block => 
-    (block.name && block.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (block.type && block.type.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (block.category && block.category.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
   const confirmClear = () => {
     if (workspace.current) {
       workspace.current.clear();
@@ -7103,6 +7368,12 @@ export default function App() {
         className="h-12 bg-black flex items-center px-4 justify-between z-[100] border-b border-white/5 shadow-xl shrink-0"
       >
         <div className="flex items-center gap-6">
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="lg:hidden text-gray-400 hover:text-white p-1"
+          >
+            <LayoutDashboard size={20} />
+          </button>
           <div className="relative">
             <div 
               onClick={() => setShowMenu(!showMenu)}
@@ -7133,7 +7404,7 @@ export default function App() {
                       className="w-full px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3"
                     >
                       <Info size={18} className="text-[#4c97ff]" />
-                      {currentLang === 'vi' ? 'Thông Tin' : 'Information'}
+                      {currentLang === 'vi' ? 'Thông Tin Hệ Thống' : 'System Information'}
                     </button>
                     <button 
                       onClick={() => {
@@ -7209,25 +7480,67 @@ export default function App() {
           <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5">
             <button 
               onClick={() => { setView('blocks'); }}
-              className={`px-6 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${view === 'blocks' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${view === 'blocks' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
             >
               <Layers size={14} />
               BLOCKS
             </button>
             <button 
               onClick={() => { setView('codes'); }}
-              className={`px-6 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${view === 'codes' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${view === 'codes' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-gray-300'}`}
             >
               <Code2 size={14} />
-              CODES
+              SCRIPTING
             </button>
-            <button 
-              onClick={() => { setShowBlockInfoModal(true); }}
-              className={`px-6 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 text-gray-500 hover:text-gray-300`}
-            >
-              <Info size={14} />
-              {currentLang === 'vi' ? 'THÔNG TIN KHỐI' : 'BLOCK INFO'}
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowToolsMenu(!showToolsMenu)}
+                className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${showToolsMenu ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                <Settings size={14} />
+                {currentLang === 'vi' ? 'CÔNG CỤ' : 'TOOLS'}
+              </button>
+              
+              <AnimatePresence>
+                {showToolsMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-full right-0 mt-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[120] overflow-hidden py-2 origin-top-right"
+                  >
+                    <button 
+                      onClick={() => { setShowControlCenter(true); setShowToolsMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left text-[10px] font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3 uppercase tracking-widest"
+                    >
+                      <LayoutDashboard size={14} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Trung tâm Lab' : 'Lab Center'}
+                    </button>
+                    <button 
+                      onClick={() => { setShowSyncModal(true); setShowToolsMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left text-[10px] font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3 uppercase tracking-widest"
+                    >
+                      <RefreshCw size={14} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Đồng bộ' : 'Sync'}
+                    </button>
+                    <button 
+                      onClick={() => { setShowExportModal(true); setShowToolsMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left text-[10px] font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3 uppercase tracking-widest"
+                    >
+                      <Download size={14} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Xuất mã' : 'Export'}
+                    </button>
+                    <button 
+                      onClick={() => { setShowTutorialModal(true); setShowTutorialModal(true); setTutorialStep(0); setShowToolsMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left text-[10px] font-bold text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3 uppercase tracking-widest"
+                    >
+                      <HelpCircle size={14} className="text-[#4c97ff]" />
+                      {currentLang === 'vi' ? 'Hướng dẫn' : 'Tutorial'}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
@@ -7305,26 +7618,29 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 origin-top-left w-full h-full"
+              className="fixed top-0 left-0 bg-black/80 backdrop-blur-md z-[2000] flex items-center justify-center w-full h-full"
             >
               <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-[#1e1e1e] border border-white/10 rounded-3xl w-[90vw] max-w-5xl h-[85vh] shadow-2xl flex flex-col overflow-hidden"
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 50, opacity: 0 }}
+                className="bg-[#111111] w-full h-full flex flex-col overflow-hidden"
               >
-                <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#4c97ff]/20 rounded-xl flex items-center justify-center">
-                      <Info className="text-[#4c97ff]" size={24} />
+                {/* Header */}
+                <div className="flex items-center justify-between px-8 py-6 border-b border-white/5 bg-black/40">
+                  <div className="flex items-center gap-6">
+                    <div className="w-14 h-14 bg-[#4c97ff]/20 rounded-2xl flex items-center justify-center shadow-lg shadow-[#4c97ff]/5 border border-[#4c97ff]/20">
+                      <Info className="text-[#4c97ff]" size={28} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-white tracking-tight">
-                        {currentLang === 'vi' ? 'THÔNG TIN CÁC KHỐI LỆNH' : 'BLOCK INFORMATION'}
+                      <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
+                        {currentLang === 'vi' ? 'THƯ VIỆN KHỐI LỆNH' : 'BLOCK LIBRARY'}
+                        <span className="px-2 py-0.5 bg-white/5 rounded text-[10px] text-gray-500 font-mono border border-white/5 uppercase tracking-widest">v2.0</span>
                       </h3>
-                      <p className="text-xs text-gray-400 font-bold tracking-widest uppercase mt-1">
-                        {currentLang === 'vi' ? 'Tất cả các khối lệnh trong BlockLua' : 'All blocks in BlockLua'}
-                      </p>
+                      <div className="text-sm text-gray-400 font-bold tracking-widest uppercase mt-1 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                        {currentLang === 'vi' ? 'Tài liệu hướng dẫn chi tiết cho mọi khối lệnh' : 'Detailed documentation for every block'}
+                      </div>
                     </div>
                   </div>
                   <button 
@@ -7332,22 +7648,22 @@ export default function App() {
                       setShowBlockInfoModal(false);
                       setSelectedBlockInfo(null);
                     }}
-                    className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                    className="w-12 h-12 bg-white/5 hover:bg-red-500/20 hover:text-red-500 rounded-2xl flex items-center justify-center text-gray-400 transition-all group"
                   >
-                    <X size={20} />
+                    <X size={24} className="group-hover:rotate-90 transition-transform duration-300" />
                   </button>
                 </div>
                 
                 <div className="flex-1 flex overflow-hidden">
-                  {/* Sidebar with categories and blocks */}
-                  <div className="w-1/3 border-r border-white/10 flex flex-col bg-[#1a1a1a]">
-                    <div className="p-4 border-b border-white/5">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                  {/* Sidebar */}
+                  <div className="w-80 border-r border-white/5 flex flex-col bg-[#0a0a0a]">
+                    <div className="p-6">
+                      <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#4c97ff] transition-colors" size={18} />
                         <input 
                           type="text" 
-                          placeholder={currentLang === 'vi' ? "Tìm kiếm khối lệnh..." : "Search blocks..."}
-                          className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-[#4c97ff]/50 transition-colors"
+                          placeholder={currentLang === 'vi' ? "Tìm kiếm khối..." : "Search blocks..."}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-[#4c97ff]/50 focus:bg-white/10 transition-all placeholder:text-gray-600"
                           onChange={(e) => {
                             const val = e.target.value.toLowerCase();
                             const buttons = document.querySelectorAll('.block-info-btn');
@@ -7373,30 +7689,30 @@ export default function App() {
                         />
                       </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-8">
                       {CATEGORIES.map(cat => {
                         const catBlocks = allBlocks.filter(b => b.category === cat.name);
                         if (catBlocks.length === 0) return null;
                         const catColor = getCategoryColor(cat.name);
                         
                         return (
-                          <div key={cat.name} className="mb-6 block-info-category">
-                            <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest px-2 mb-3 flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: catColor }}></div>
-                              {cat.name.length > 13 ? cat.name.substring(0, 13) + '...' : cat.name}
+                          <div key={cat.name} className="mb-8 block-info-category">
+                            <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] px-4 mb-4 flex items-center gap-3">
+                              <div className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ backgroundColor: catColor }}></div>
+                              {cat.name}
                             </h4>
-                            <div className="space-y-1">
+                            <div className="space-y-1.5">
                               {catBlocks.map(block => (
                                 <button
                                   key={block.type}
                                   onClick={() => setSelectedBlockInfo(block)}
-                                  className={`block-info-btn w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all flex items-center gap-3 ${selectedBlockInfo?.type === block.type ? 'bg-white/10 text-white shadow-md' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}
+                                  className={`block-info-btn w-full text-left px-4 py-3 rounded-2xl text-sm transition-all flex items-center gap-4 group ${selectedBlockInfo?.type === block.type ? 'bg-[#4c97ff] text-white shadow-lg shadow-[#4c97ff]/20' : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'}`}
                                 >
                                   <div 
-                                    className="w-4 h-4 rounded-sm flex-shrink-0 shadow-sm" 
-                                    style={{ backgroundColor: catColor }}
+                                    className={`w-2.5 h-2.5 rounded-full flex-shrink-0 transition-transform group-hover:scale-125 ${selectedBlockInfo?.type === block.type ? 'bg-white' : ''}`} 
+                                    style={{ backgroundColor: selectedBlockInfo?.type === block.type ? undefined : catColor }}
                                   ></div>
-                                  <span className="truncate font-medium">{block.name}</span>
+                                  <span className="truncate font-bold tracking-tight">{block.name}</span>
                                 </button>
                               ))}
                             </div>
@@ -7406,86 +7722,129 @@ export default function App() {
                     </div>
                   </div>
                   
-                  {/* Main content area for selected block */}
-                  <div className="flex-1 bg-[#222222] p-8 overflow-y-auto custom-scrollbar">
+                  {/* Content */}
+                  <div className="flex-1 bg-[#0f0f0f] overflow-y-auto custom-scrollbar relative">
+                    {/* Background decoration */}
+                    <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ 
+                      backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+                      backgroundSize: '48px 48px'
+                    }}></div>
+
                     {selectedBlockInfo ? (
-                      <div className="max-w-2xl mx-auto">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div 
-                            className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-sm"
-                            style={{ backgroundColor: getCategoryColor(selectedBlockInfo.category) }}
-                          >
-                            {selectedBlockInfo.category.length > 13 ? selectedBlockInfo.category.substring(0, 13) + '...' : selectedBlockInfo.category}
-                          </div>
-                          <div className="text-gray-500 text-sm font-mono bg-black/20 px-2 py-1 rounded">{selectedBlockInfo.type}</div>
-                        </div>
-                        
-                        <h2 className="text-3xl font-black text-white mb-8">{selectedBlockInfo.name}</h2>
-                        
-                        {/* Visual representation of the block */}
-                        <div className="bg-[#1a1a1a] border border-white/5 rounded-3xl p-8 mb-8 flex items-center justify-center min-h-[200px] shadow-inner relative overflow-hidden">
-                          <div className="absolute inset-0 opacity-10" style={{ 
-                            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
-                            backgroundSize: '24px 24px'
-                          }}></div>
-                          
-                          <div className="relative z-10 w-full h-[150px]">
-                            <BlocklyPreview blockType={selectedBlockInfo.type} />
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-8">
-                          <div>
-                            <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                              <Info className="text-[#4c97ff]" size={20} />
-                              {currentLang === 'vi' ? 'Chức năng' : 'Function'}
-                            </h3>
-                            <p className="text-gray-300 leading-relaxed bg-white/5 p-5 rounded-2xl border border-white/5 shadow-sm">
-                              {getBlockDescription(selectedBlockInfo, currentLang)}
-                            </p>
+                      <div className="max-w-4xl mx-auto py-16 px-8 relative z-10">
+                        <motion.div
+                          key={selectedBlockInfo.type}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4 }}
+                        >
+                          <div className="flex items-center gap-4 mb-8">
+                            <div 
+                              className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-xl"
+                              style={{ backgroundColor: getCategoryColor(selectedBlockInfo.category) }}
+                            >
+                              {selectedBlockInfo.category}
+                            </div>
+                            <div className="text-gray-600 text-xs font-mono bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">{selectedBlockInfo.type}</div>
                           </div>
                           
-                          <div>
-                            <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                              <Code2 className="text-[#4c97ff]" size={20} />
-                              {currentLang === 'vi' ? 'Cách sử dụng' : 'How to use'}
-                            </h3>
-                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 shadow-inner">
-                              <ul className="list-disc list-inside text-gray-300 space-y-4">
-                                <li>
+                          <h2 className="text-5xl font-black text-white mb-12 tracking-tight leading-tight">{selectedBlockInfo.name}</h2>
+                          
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                            <div className="space-y-12">
+                              <section>
+                                <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-widest">
+                                  <div className="w-8 h-8 bg-[#4c97ff]/10 rounded-lg flex items-center justify-center">
+                                    <Info className="text-[#4c97ff]" size={18} />
+                                  </div>
+                                  {currentLang === 'vi' ? 'Chức năng' : 'Function'}
+                                </h3>
+                                <div className="text-lg text-gray-300 leading-relaxed bg-white/5 p-8 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-sm">
+                                  {getBlockDescription(selectedBlockInfo, currentLang)}
+                                </div>
+                              </section>
+                              
+                              <section>
+                                <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-widest">
+                                  <div className="w-8 h-8 bg-[#4c97ff]/10 rounded-lg flex items-center justify-center">
+                                    <Code2 className="text-[#4c97ff]" size={18} />
+                                  </div>
+                                  {currentLang === 'vi' ? 'Cách sử dụng' : 'How to use'}
+                                </h3>
+                                <div className="bg-black/40 p-8 rounded-[2rem] border border-white/5 shadow-inner">
+                                  <ul className="space-y-6">
+                                    {[
+                                      currentLang === 'vi' 
+                                        ? `Tìm khối này trong nhóm ${selectedBlockInfo.category} ở thanh công cụ.`
+                                        : `Find this block in the ${selectedBlockInfo.category} category in the toolbox.`,
+                                      currentLang === 'vi'
+                                        ? `Kéo và thả nó vào vùng làm việc chính.`
+                                        : `Drag and drop it into the main workspace.`,
+                                      currentLang === 'vi'
+                                        ? `Kết nối các đầu vào/đầu ra với các khối lệnh tương ứng.`
+                                        : `Connect inputs/outputs with corresponding blocks.`,
+                                      currentLang === 'vi'
+                                        ? `Kiểm tra mã Lua được tạo ra ở tab CODE để hiểu rõ hơn.`
+                                        : `Check the generated Lua code in the CODE tab for better understanding.`
+                                    ].map((step, i) => (
+                                      <li key={i} className="flex gap-4 text-gray-400 items-start">
+                                        <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold text-[#4c97ff] flex-shrink-0 mt-1 border border-white/10">
+                                          {i + 1}
+                                        </div>
+                                        <span className="text-base leading-relaxed">{step}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </section>
+                            </div>
+
+                            <div className="space-y-8">
+                              <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-widest">
+                                <div className="w-8 h-8 bg-[#4c97ff]/10 rounded-lg flex items-center justify-center">
+                                  <Layers className="text-[#4c97ff]" size={18} />
+                                </div>
+                                {currentLang === 'vi' ? 'Xem trước' : 'Preview'}
+                              </h3>
+                              <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] p-12 flex items-center justify-center min-h-[300px] shadow-2xl relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-[#4c97ff]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div className="relative z-10 w-full transform group-hover:scale-105 transition-transform duration-500">
+                                  <BlocklyPreview blockType={selectedBlockInfo.type} />
+                                </div>
+                              </div>
+                              
+                              <div className="bg-gradient-to-br from-[#4c97ff]/10 to-transparent p-8 rounded-[2rem] border border-[#4c97ff]/10">
+                                <h4 className="text-sm font-black text-[#4c97ff] uppercase tracking-widest mb-4">Mẹo nhỏ</h4>
+                                <p className="text-sm text-gray-400 leading-relaxed italic">
                                   {currentLang === 'vi' 
-                                    ? `Kéo khối lệnh từ thanh công cụ bên trái (nhóm `
-                                    : `Drag the block from the left toolbox (`}
-                                  <span className="font-bold text-white">{selectedBlockInfo.category}</span>
-                                  {currentLang === 'vi' ? `).` : ` category).`}
-                                </li>
-                                <li>
-                                  {currentLang === 'vi' 
-                                    ? `Ghép nối với các khối lệnh khác để tạo thành một kịch bản hoàn chỉnh.`
-                                    : `Connect it with other blocks to form a complete script.`}
-                                </li>
-                                <li>
-                                  {currentLang === 'vi' 
-                                    ? `Điền các thông số cần thiết (nếu có) vào các ô trống trên khối lệnh.`
-                                    : `Fill in the required parameters (if any) in the empty slots on the block.`}
-                                </li>
-                              </ul>
+                                    ? "Bạn có thể chuột phải vào khối lệnh trong Workspace và chọn 'Help' để mở nhanh trang thông tin này."
+                                    : "You can right-click the block in the Workspace and select 'Help' to quickly open this information page."}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </motion.div>
                       </div>
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center">
-                        <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                          <Layers className="text-gray-600" size={48} />
-                        </div>
-                        <h3 className="text-xl font-black text-white mb-2 tracking-tight">
-                          {currentLang === 'vi' ? 'CHỌN MỘT KHỐI LỆNH' : 'SELECT A BLOCK'}
+                      <div className="h-full flex flex-col items-center justify-center text-center p-12">
+                        <motion.div
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="relative"
+                        >
+                          <div className="w-40 h-40 bg-white/5 rounded-[3rem] flex items-center justify-center mb-10 shadow-2xl border border-white/5 relative z-10">
+                            <Layers className="text-gray-700" size={80} />
+                          </div>
+                          <div className="absolute -top-4 -right-4 w-12 h-12 bg-[#4c97ff]/20 rounded-2xl blur-xl animate-pulse"></div>
+                          <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-[#ff4c4c]/10 rounded-full blur-2xl animate-bounce"></div>
+                        </motion.div>
+                        <h3 className="text-3xl font-black text-white mb-4 tracking-tight">
+                          {currentLang === 'vi' ? 'KHÁM PHÁ THƯ VIỆN' : 'EXPLORE THE LIBRARY'}
                         </h3>
-                        <p className="text-gray-500 max-w-sm">
+                        <p className="text-gray-500 max-w-md text-lg leading-relaxed">
                           {currentLang === 'vi' 
-                            ? 'Nhấn vào một khối lệnh ở danh sách bên trái để xem thông tin chi tiết, hình ảnh minh họa và cách sử dụng.'
-                            : 'Click on a block in the list on the left to view detailed information, illustrations, and usage instructions.'}
+                            ? 'Chọn một khối lệnh từ danh sách bên trái để khám phá sức mạnh và cách sử dụng nó trong dự án của bạn.'
+                            : 'Select a block from the list on the left to discover its power and how to use it in your project.'}
                         </p>
                       </div>
                     )}
@@ -7975,66 +8334,300 @@ sync() -- Initial sync on load`;
             </motion.div>
           )}
 
-          {searchPanel.show && (
-            <div 
-              className="fixed z-[10000] bg-[#252526] border border-white/10 rounded-xl shadow-2xl w-80 overflow-hidden search-panel"
-              style={{ left: searchPanel.x, top: searchPanel.y }}
+          {showCanvasModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed top-0 left-0 bg-black/80 backdrop-blur-md z-[1000] flex items-center justify-center p-4 w-full h-full"
             >
-              <div className="p-3 border-b border-white/5 flex items-center gap-3 bg-[#2d2d2d]">
-                <Search size={18} className="text-[#4c97ff]" />
-                <input 
-                  ref={searchInputRef}
-                  type="text" 
-                  className="bg-transparent border-none outline-none text-sm text-gray-200 w-full placeholder:text-gray-500"
-                  placeholder={currentLang === 'vi' ? "Tìm kiếm khối lệnh..." : "Search blocks..."}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') setSearchPanel(prev => ({ ...prev, show: false }));
-                    if (e.key === 'Enter' && filteredBlocks.length > 0) {
-                      addBlockToWorkspace(filteredBlocks[0].blockDef);
-                    }
-                  }}
-                />
-              </div>
-              <div className="max-h-80 overflow-y-auto custom-scrollbar bg-[#1e1e1e]">
-                {filteredBlocks.map((block, idx) => {
-                  const categoryColor = CATEGORIES.find(c => c.name === block.category)?.color || '#4c97ff';
-                  return (
-                    <div 
-                      key={idx}
-                      className="px-4 py-3 hover:bg-white/5 cursor-pointer flex flex-col gap-2 border-b border-white/5 last:border-none transition-colors group"
-                      onClick={() => addBlockToWorkspace(block.blockDef)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div 
-                          className="relative px-3 py-1.5 rounded text-[11px] font-bold text-white shadow-sm border-b-2 border-black/20 flex items-center max-w-[85%]"
-                          style={{ backgroundColor: categoryColor }}
-                        >
-                          <div className="absolute top-0 left-2 w-3 h-1 bg-black/10 rounded-b-sm"></div>
-                          <span className="truncate">{block.name}</span>
-                        </div>
-                        <ChevronRight size={14} className="text-gray-600 group-hover:text-white transition-all transform group-hover:translate-x-1 flex-shrink-0" />
-                      </div>
-                      <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">
-                        {block.category.length > 13 ? block.category.substring(0, 13) + '...' : block.category}
-                      </span>
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#1a1a1a] border border-white/10 rounded-3xl w-[90vw] h-[85vh] shadow-2xl flex flex-col overflow-hidden"
+              >
+                <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-[#4c97ff]/20 rounded-xl flex items-center justify-center">
+                      <Monitor className="text-[#4c97ff]" size={24} />
                     </div>
-                  );
-                })}
-                {filteredBlocks.length === 0 && (
-                  <div className="p-8 text-center flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center">
-                      <Search size={20} className="text-gray-600" />
-                    </div>
-                    <div className="text-gray-500 text-xs font-bold uppercase tracking-widest">
-                      {currentLang === 'vi' ? "Không tìm thấy khối lệnh" : "No blocks found"}
+                    <div>
+                      <h3 className="text-xl font-black text-white tracking-tight">
+                        {currentLang === 'vi' ? 'CANVAS TRỰC QUAN' : 'VISUAL CANVAS'}
+                      </h3>
+                      <p className="text-xs text-gray-400 font-bold tracking-widest uppercase mt-1">
+                        {currentLang === 'vi' ? 'Môi trường xem trước 3D' : '3D Preview Environment'}
+                      </p>
                     </div>
                   </div>
-                )}
-              </div>
+                  <button 
+                    onClick={() => setShowCanvasModal(false)}
+                    className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                
+                <div className="flex-1 relative bg-black overflow-hidden flex items-center justify-center">
+                  {/* Grid Background */}
+                  <div className="absolute inset-0 opacity-20" style={{ 
+                    backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+                    backgroundSize: '40px 40px',
+                    transform: 'perspective(500px) rotateX(60deg) translateY(-100px)',
+                    transformOrigin: 'top'
+                  }}></div>
+                  
+                  <div className="relative z-10 text-center">
+                    <div className="w-32 h-32 bg-[#4c97ff]/10 rounded-full flex items-center justify-center mb-6 mx-auto animate-pulse">
+                      <Monitor className="text-[#4c97ff]" size={64} />
+                    </div>
+                    <h2 className="text-2xl font-black text-white mb-2">CANVAS ACTIVE</h2>
+                    <p className="text-gray-400 max-w-md mx-auto">
+                      {currentLang === 'vi' 
+                        ? 'Hệ thống Canvas đã được kích hoạt. Bạn có thể xem trước các thay đổi trực quan tại đây.'
+                        : 'Canvas system is active. You can preview visual changes here.'}
+                    </p>
+                  </div>
+                  
+                  {/* Floating elements to make it look "active" */}
+                  <div className="absolute top-1/4 left-1/4 w-4 h-4 bg-[#4c97ff] rounded-full blur-xl animate-bounce"></div>
+                  <div className="absolute bottom-1/4 right-1/4 w-6 h-6 bg-[#ff4c4c] rounded-full blur-xl animate-pulse"></div>
+                </div>
+                
+                <div className="p-6 border-t border-white/10 bg-white/5 flex justify-end">
+                  <button 
+                    onClick={() => setShowCanvasModal(false)}
+                    className="px-8 py-3 rounded-2xl bg-[#4c97ff] hover:bg-[#3d86f0] text-white font-black transition-all"
+                  >
+                    {currentLang === 'vi' ? 'QUAY LẠI' : 'BACK'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showExportModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 w-full h-full"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#2b2b2b] border border-white/10 rounded-3xl p-8 max-w-2xl w-full shadow-2xl relative"
+              >
+                <button 
+                  onClick={() => setShowExportModal(false)} 
+                  className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+                <div className="w-16 h-16 bg-[#4c97ff]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Download className="text-[#4c97ff]" size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">
+                  {currentLang === 'vi' ? 'XUẤT MÃ LUA' : 'EXPORT LUA CODE'}
+                </h3>
+                <p className="text-gray-400 mb-6 leading-relaxed">
+                  {currentLang === 'vi' 
+                    ? 'Mã Lua đã được tạo sẵn sàng để sử dụng trong Roblox Studio.'
+                    : 'Lua code has been generated and is ready for use in Roblox Studio.'}
+                </p>
+                
+                <div className="relative group">
+                  <pre className="bg-[#1e1e1e] p-6 rounded-xl overflow-x-auto text-sm font-mono text-gray-300 border border-white/5 shadow-inner max-h-64 custom-scrollbar">
+                    {generatedCode || '-- No code generated yet'}
+                  </pre>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedCode);
+                      setToast({ message: currentLang === 'vi' ? 'Đã sao chép mã!' : 'Code copied!', type: 'success' });
+                    }}
+                    className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-all opacity-0 group-hover:opacity-100"
+                    title="Copy Code"
+                  >
+                    <Copy size={16} />
+                  </button>
+                </div>
+                
+                <div className="mt-8 flex justify-end gap-4">
+                  <button 
+                    onClick={() => setShowExportModal(false)}
+                    className="px-8 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-black transition-all"
+                  >
+                    {currentLang === 'vi' ? 'ĐÓNG' : 'CLOSE'}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const blob = new Blob([generatedCode], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'script.lua';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="px-8 py-3 rounded-2xl bg-[#4c97ff] hover:bg-[#3d86f0] text-white font-black transition-all shadow-xl shadow-[#4c97ff]/20 flex items-center gap-2"
+                  >
+                    <Download size={18} />
+                    {currentLang === 'vi' ? 'TẢI XUỐNG' : 'DOWNLOAD'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showControlCenter && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000] flex items-center justify-center p-6"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                className="bg-[#1a1a1a] border border-white/10 rounded-[2.5rem] w-full max-w-5xl h-[85vh] shadow-2xl flex flex-col overflow-hidden"
+              >
+                <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/2">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-[#4c97ff]/20 rounded-2xl flex items-center justify-center">
+                      <LayoutDashboard className="text-[#4c97ff]" size={28} />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-black text-white tracking-tight">LAB CENTER</h2>
+                      <p className="text-sm text-gray-500 font-bold tracking-widest uppercase mt-1">Advanced Tools & Experiments</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowControlCenter(false)} className="w-12 h-12 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-all">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-auto p-8 custom-scrollbar">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Storages Section */}
+                    <div className="bg-white/2 rounded-3xl p-6 border border-white/5 flex flex-col h-full">
+                      <div className="flex items-center gap-3 mb-6">
+                        <History className="text-[#4c97ff]" size={20} />
+                        <h3 className="text-xl font-black text-white uppercase tracking-tight">Storages</h3>
+                      </div>
+                      <div className="space-y-3 overflow-y-auto pr-2 flex-1 max-h-[500px] custom-scrollbar">
+                        {storages.map((s, index) => (
+                          <div key={s.id} className="p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-[#4c97ff]/30 transition-all group">
+                            <div className="flex items-center justify-between mb-3">
+                              <input 
+                                type="text" 
+                                value={s.name}
+                                onChange={(e) => renameStorage(index, e.target.value)}
+                                className="bg-transparent border-none text-sm font-bold text-white focus:ring-0 p-0 w-full"
+                              />
+                              <div className="text-[10px] text-gray-500 font-mono whitespace-nowrap ml-2">{s.time}</div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => saveToStorage(index)} 
+                                className="flex-1 py-2 bg-[#4c97ff]/10 hover:bg-[#4c97ff] text-[#4c97ff] hover:text-white text-[10px] font-black rounded-xl transition-all flex items-center justify-center gap-2"
+                              >
+                                <Save size={12} /> SAVE
+                              </button>
+                              <button 
+                                onClick={() => loadFromStorage(index)} 
+                                className="flex-1 py-2 bg-white/5 hover:bg-emerald-500 text-gray-400 hover:text-white text-[10px] font-black rounded-xl transition-all flex items-center justify-center gap-2"
+                              >
+                                <RefreshCw size={12} /> LOAD
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* AI Code Checker Section */}
+                    <div className="bg-white/2 rounded-3xl p-6 border border-white/5 flex flex-col h-full">
+                      <div className="flex items-center gap-3 mb-6">
+                        <Cpu className="text-[#4c97ff]" size={20} />
+                        <h3 className="text-xl font-black text-white uppercase tracking-tight">AI Code Checker</h3>
+                      </div>
+                      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/40 rounded-3xl border border-white/5 text-center">
+                        <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 ${isCheckingCode ? 'bg-[#4c97ff]/20 text-[#4c97ff] animate-spin' : aiResult?.status === 'error' ? 'bg-red-500/20 text-red-500' : aiResult?.status === 'warning' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
+                          {isCheckingCode ? <RefreshCw size={48} /> : aiResult?.status === 'error' ? <AlertCircle size={48} /> : aiResult?.status === 'warning' ? <AlertTriangle size={48} /> : <CheckCircle2 size={48} />}
+                        </div>
+                        
+                        <h4 className="text-xl font-black text-white mb-2">
+                          {isCheckingCode ? 'AI IS ANALYZING...' : aiResult ? aiResult.message : 'READY TO CHECK'}
+                        </h4>
+                        
+                        <p className="text-sm text-gray-500 mb-8 px-4 leading-relaxed">
+                          {isCheckingCode 
+                            ? 'Our AI is scanning your blocks for syntax errors and logical bugs.' 
+                            : aiResult 
+                              ? aiResult.details 
+                              : 'Click the button below to have AI verify your code logic and syntax.'}
+                        </p>
+
+                        <button 
+                          onClick={checkCodeWithAI}
+                          disabled={isCheckingCode}
+                          className="w-full py-5 bg-[#4c97ff] hover:bg-[#3d86f0] disabled:bg-gray-800 text-white font-black rounded-2xl transition-all shadow-2xl shadow-[#4c97ff]/20 flex items-center justify-center gap-3"
+                        >
+                          {isCheckingCode ? <RefreshCw className="animate-spin" size={20} /> : <Sparkles size={20} />}
+                          {isCheckingCode ? 'ANALYZING...' : 'RUN AI CHECK'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showTutorialModal && (
+            <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTutorialModal(false)} />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="relative bg-[#1a1a1a] border border-[#4c97ff]/50 rounded-3xl p-8 max-w-md w-full shadow-[0_0_50px_rgba(76,151,255,0.3)]"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="text-[#4c97ff]" size={24} />
+                    <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Tutorial Step {tutorialStep + 1}/3</span>
+                  </div>
+                  <button onClick={() => setShowTutorialModal(false)} className="text-gray-500 hover:text-white"><X size={20} /></button>
+                </div>
+                <h3 className="text-2xl font-black text-white mb-4 tracking-tight">{tutorials[tutorialStep].title}</h3>
+                <p className="text-gray-400 leading-relaxed mb-8">{tutorials[tutorialStep].content}</p>
+                <div className="flex justify-between items-center">
+                  <button 
+                    disabled={tutorialStep === 0}
+                    onClick={() => setTutorialStep(s => s - 1)}
+                    className="text-xs font-bold text-gray-500 hover:text-white disabled:opacity-0 transition-all"
+                  >
+                    PREVIOUS
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (tutorialStep < tutorials.length - 1) {
+                        setTutorialStep(s => s + 1);
+                      } else {
+                        setShowTutorialModal(false);
+                      }
+                    }}
+                    className="px-8 py-3 bg-[#4c97ff] hover:bg-[#3d86f0] text-white font-black rounded-2xl transition-all shadow-lg shadow-[#4c97ff]/20"
+                  >
+                    {tutorialStep === tutorials.length - 1 ? 'FINISH' : 'NEXT STEP'}
+                  </button>
+                </div>
+              </motion.div>
             </div>
           )}
+
         </AnimatePresence>
 
         <div 
@@ -8132,20 +8725,23 @@ sync() -- Initial sync on load`;
                   </button>
                 </div>
               </div>
-              <div className="flex-1 overflow-auto bg-[#1e1e1e]">
-                <div 
-                  className="p-6 font-mono text-sm leading-relaxed relative select-text min-h-full"
+              <div className="flex-1 overflow-auto bg-[#1e1e1e] custom-scrollbar">
+                <SyntaxHighlighter 
+                  language="lua" 
+                  style={robloxTheme}
+                  customStyle={{
+                    margin: 0,
+                    padding: '24px',
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    background: 'transparent',
+                    fontFamily: 'JetBrains Mono, monospace'
+                  }}
+                  showLineNumbers={true}
+                  lineNumberStyle={{ minWidth: '3em', paddingRight: '1em', color: '#444', textAlign: 'right', userSelect: 'none' }}
                 >
-                  {/* Line Numbers */}
-                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-black/10 border-r border-white/5 flex flex-col items-center py-6 text-gray-700 select-none">
-                    {generatedCode.split('\n').map((_, i) => (
-                      <div key={i} className="h-[1.5em]">{i + 1}</div>
-                    ))}
-                  </div>
-                  <pre className="pl-10 text-gray-300 whitespace-pre-wrap">
-                    {generatedCode}
-                  </pre>
-                </div>
+                  {generatedCode}
+                </SyntaxHighlighter>
               </div>
             </motion.div>
           )}
@@ -8153,88 +8749,133 @@ sync() -- Initial sync on load`;
       </div>
 
       {/* Explorer Sidebar */}
-      <div 
-        style={{ width: sidebarWidth }}
-        className={`relative bg-[#1a1a1a] border-l border-white/5 flex flex-col transition-shadow ${selectorTarget ? 'z-[200] ring-4 ring-[#4c97ff] ring-inset shadow-[0_0_100px_rgba(76,151,255,0.4)]' : 'z-20'}`}
-      >
-        {/* Resize Handle */}
-        <div 
-          onMouseDown={startResizing}
-          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#4c97ff]/30 transition-colors z-30"
-        />
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div 
+            initial={{ x: 300 }}
+            animate={{ x: 0 }}
+            exit={{ x: 300 }}
+            style={{ width: sidebarWidth }}
+            className={`relative bg-[#1a1a1a] border-l border-white/5 flex flex-col transition-shadow h-full ${selectorTarget ? 'z-[200] ring-4 ring-[#4c97ff] ring-inset shadow-[0_0_100px_rgba(76,151,255,0.4)]' : 'z-20'}`}
+          >
+            {/* Resize Handle */}
+            <div 
+              onMouseDown={startResizing}
+              className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#4c97ff]/30 transition-colors z-30 hidden lg:block"
+            />
 
-        <div className="h-10 bg-[#252525] border-b border-white/5 flex items-center px-4 justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="text-[#4c97ff]" size={16} />
-            <span className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Explorer</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {selectorTarget === 'export' && (
-              <div className="flex items-center gap-1 px-2 py-0.5 bg-red-500/20 rounded text-[9px] font-bold text-red-400 animate-pulse">
-                SELECT TARGET...
+            <div className="h-10 bg-[#252525] border-b border-white/5 flex items-center px-4 justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="text-[#4c97ff]" size={16} />
+                <span className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Explorer</span>
               </div>
-            )}
-            {selectorTarget && selectorTarget !== 'export' && (
-              <div className="flex items-center gap-1 px-2 py-0.5 bg-[#4c97ff]/20 rounded text-[9px] font-bold text-[#4c97ff] animate-pulse">
-                SELECTING...
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setSidebarOpen(false)}
+                  className="lg:hidden text-gray-400 hover:text-white"
+                >
+                  <X size={14} />
+                </button>
+                {selectorTarget === 'export' && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 bg-red-500/20 rounded text-[9px] font-bold text-red-400 animate-pulse">
+                    SELECT TARGET...
+                  </div>
+                )}
+                {selectorTarget && selectorTarget !== 'export' && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 bg-[#4c97ff]/20 rounded text-[9px] font-bold text-[#4c97ff] animate-pulse">
+                    SELECTING...
+                  </div>
+                )}
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/export_tree', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tree: explorer })
+                      });
+                      if (res.ok) {
+                        showToast(currentLang === 'vi' ? 'Đã gửi yêu cầu lưu Explorer về Roblox Studio!' : 'Sent Explorer save request to Roblox Studio!');
+                      } else {
+                        showToast(currentLang === 'vi' ? 'Lỗi khi gửi yêu cầu lưu!' : 'Error sending save request!');
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      showToast(currentLang === 'vi' ? 'Lỗi khi gửi yêu cầu lưu!' : 'Error sending save request!');
+                    }
+                  }}
+                  className="p-1.5 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-[#4c97ff]"
+                  title={currentLang === 'vi' ? 'Lưu Explorer về Roblox Studio' : 'Save Explorer to Roblox Studio'}
+                >
+                  <Save size={14} />
+                </button>
               </div>
-            )}
-            <button
-              onClick={async () => {
-                try {
-                  const res = await fetch('/api/export_tree', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tree: explorer })
-                  });
-                  if (res.ok) {
-                    showToast(currentLang === 'vi' ? 'Đã gửi yêu cầu lưu Explorer về Roblox Studio!' : 'Sent Explorer save request to Roblox Studio!');
-                  } else {
-                    showToast(currentLang === 'vi' ? 'Lỗi khi gửi yêu cầu lưu!' : 'Error sending save request!');
+            </div>
+            <div className="flex-1 overflow-auto p-1 custom-scrollbar">
+              <ExplorerTree 
+                instance={explorer} 
+                onSelect={(instance, path) => handleInstanceSelect(path, instance.id)}
+                onToggleExpand={toggleExpand}
+                onAddChild={(id) => setShowInsertObjectFor(id)}
+                onRename={(id, newName) => updateInstanceProperty(id, 'Name', newName)}
+                onDelete={deleteInstance}
+                selectedId={selectedInstancePath}
+              />
+            </div>
+
+            {/* User Profile / Login */}
+            <div className="px-4 py-4 border-t border-white/5 bg-[#1a1a1a]">
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <img 
+                    src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
+                    className="w-8 h-8 rounded-full border border-white/10" 
+                    alt="Avatar" 
+                    referrerPolicy="no-referrer" 
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold text-white truncate">{user.displayName}</p>
+                    <button 
+                      onClick={logout} 
+                      className="text-[9px] text-gray-500 hover:text-red-400 transition-colors uppercase font-black tracking-widest"
+                    >
+                      {currentLang === 'vi' ? 'ĐĂNG XUẤT' : 'LOGOUT'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={login}
+                  className="w-full py-2 bg-[#4c97ff] hover:bg-[#3b82f6] text-white text-[10px] font-black rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+                >
+                  <User size={14} />
+                  {currentLang === 'vi' ? 'ĐĂNG NHẬP GOOGLE' : 'GOOGLE LOGIN'}
+                </button>
+              )}
+            </div>
+
+            {selectorTarget && (
+              <div className={`p-3 border-t ${selectorTarget === 'export' ? 'bg-red-500/10 border-red-500/20' : 'bg-[#4c97ff]/10 border-[#4c97ff]/20'}`}>
+                <p className="text-[10px] text-gray-400 mb-2">
+                  {selectorTarget === 'export' 
+                    ? (currentLang === 'vi' ? 'Chọn một đối tượng để tạo script.' : 'Select an instance to create the script.')
+                    : (currentLang === 'vi' ? 'Chọn một đối tượng để cập nhật khối lệnh.' : 'Select an instance to update the block.')
                   }
-                } catch (e) {
-                  console.error(e);
-                  showToast(currentLang === 'vi' ? 'Lỗi khi gửi yêu cầu lưu!' : 'Error sending save request!');
-                }
-              }}
-              className="p-1.5 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-[#4c97ff]"
-              title={currentLang === 'vi' ? 'Lưu Explorer về Roblox Studio' : 'Save Explorer to Roblox Studio'}
-            >
-              <Save size={14} />
-            </button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-auto p-1 custom-scrollbar">
-          <ExplorerTree 
-            instance={explorer} 
-            onSelect={(instance, path) => handleInstanceSelect(path, instance.id)}
-            onToggleExpand={toggleExpand}
-            onAddChild={(id) => setShowInsertObjectFor(id)}
-            onRename={(id, newName) => updateInstanceProperty(id, 'Name', newName)}
-            onDelete={deleteInstance}
-            selectedId={selectedInstancePath}
-          />
-        </div>
-        {selectorTarget && (
-          <div className={`p-3 border-t ${selectorTarget === 'export' ? 'bg-red-500/10 border-red-500/20' : 'bg-[#4c97ff]/10 border-[#4c97ff]/20'}`}>
-            <p className="text-[10px] text-gray-400 mb-2">
-              {selectorTarget === 'export' 
-                ? (currentLang === 'vi' ? 'Chọn một đối tượng để tạo script.' : 'Select an instance to create the script.')
-                : (currentLang === 'vi' ? 'Chọn một đối tượng để cập nhật khối lệnh.' : 'Select an instance to update the block.')
-              }
-            </p>
-            <button 
-              onClick={() => {
-                setSelectorTarget(null);
-                setExportScriptType(null);
-              }}
-              className="w-full py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold rounded transition-colors"
-            >
-              {currentLang === 'vi' ? 'HỦY BỎ' : 'CANCEL SELECTION'}
-            </button>
-          </div>
+                </p>
+                <button 
+                  onClick={() => {
+                    setSelectorTarget(null);
+                    setExportScriptType(null);
+                  }}
+                  className="w-full py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold rounded transition-colors"
+                >
+                  {currentLang === 'vi' ? 'HỦY BỎ' : 'CANCEL SELECTION'}
+                </button>
+              </div>
+            )}
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
 
       {/* Insert Object Menu Modal */}
       <AnimatePresence>

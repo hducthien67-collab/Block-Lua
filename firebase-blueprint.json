@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "hasSeenTutorial": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "StorageSlot": {
+      "title": "Storage Slot",
+      "description": "A saved blockly workspace slot",
+      "type": "object",
+      "properties": {
+        "slotIndex": { "type": "number" },
+        "name": { "type": "string" },
+        "data": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["slotIndex", "data"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/users/{userId}/slots/{slotId}": {
+      "schema": "StorageSlot",
+      "description": "User's saved workspace slots"
+    }
+  }
+}

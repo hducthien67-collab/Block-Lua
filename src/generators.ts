@@ -3,6 +3,47 @@ import path from 'path';
 import { serviceGroups } from './serviceBlocks';
 
 export const defineCustomGenerators = () => {
+  luaGenerator.forBlock['lua_event_touched'] = function(block: any) {
+    const part = luaGenerator.valueToCode(block, 'PART', Order.NONE) || 'script.Parent';
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return `${part}.Touched:Connect(function(otherPart)\n${branch}end)\n`;
+  };
+
+  luaGenerator.forBlock['instance_get_self'] = function() {
+    return ['script.Parent', Order.ATOMIC];
+  };
+
+  luaGenerator.forBlock['lua_humanoid_take_damage'] = function(block: any) {
+    const humanoid = luaGenerator.valueToCode(block, 'HUMANOID', Order.NONE) || 'nil';
+    const damage = luaGenerator.valueToCode(block, 'DAMAGE', Order.NONE) || '0';
+    return `${humanoid}:TakeDamage(${damage})\n`;
+  };
+
+  luaGenerator.forBlock['instance_find_first_child_of_class'] = function(block: any) {
+    const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
+    const className = luaGenerator.valueToCode(block, 'CLASS', Order.NONE) || '""';
+    return [`${parent}:FindFirstChildOfClass(${className})`, Order.ATOMIC];
+  };
+
+  luaGenerator.forBlock['lua_event_touch_other'] = function() {
+    return ['otherPart', Order.ATOMIC];
+  };
+
+  luaGenerator.forBlock['lua_event_player_added'] = function(block: any) {
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return `game.Players.PlayerAdded:Connect(function(player)\n${branch}end)\n`;
+  };
+
+  luaGenerator.forBlock['instance_create'] = function(block: any) {
+    const className = luaGenerator.valueToCode(block, 'CLASS', Order.NONE) || '""';
+    const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
+    return `Instance.new(${className}, ${parent})\n`;
+  };
+
+  luaGenerator.forBlock['lua_event_player'] = function() {
+    return ['player', Order.ATOMIC];
+  };
+
   // Sound Generators
   luaGenerator.forBlock['sound_soundid'] = function(block: any) {
     const sound = luaGenerator.valueToCode(block, 'SOUND', Order.NONE) || 'nil';

@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string
+    //   - photoURL: string
+    //   - hasSeenTutorial: bool
+    //   - createdAt: timestamp
+    //
+    // Collection: users/{userId}/slots
+    // Document ID: {slotId} (e.g., "slot_0", "slot_1", ...)
+    // Fields:
+    //   - slotIndex: number (required, 0-9)
+    //   - name: string (max 50 chars)
+    //   - data: string (max 1MB)
+    //   - updatedAt: timestamp
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             (!('displayName' in data) || data.displayName is string) &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             (!('hasSeenTutorial' in data) || data.hasSeenTutorial is bool);
+    }
+
+    function isValidSlot(data) {
+      return data.keys().hasAll(['slotIndex', 'data']) &&
+             data.slotIndex is number && data.slotIndex >= 0 && data.slotIndex <= 9 &&
+             data.data is string && data.data.size() < 1048576 && // 1MB limit
+             (!('name' in data) || (data.name is string && data.name.size() <= 50));
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      
+      match /slots/{slotId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidSlot(request.resource.data);
+      }
+    }
+  }
+}
