@@ -525,88 +525,11 @@ export const fullToolbox = {
     const name = cat.name || '';
     const truncatedName = name.length > 13 ? name.substring(0, 13) + '...' : name;
     const data = CATEGORY_DATA[name] || { icon: 'Box', color: '#666' };
-    
-    let categoryContents: any[] = cat.contents || [];
-    
-    // Add dynamic blocks for service groups if it's a service category
-    if (serviceGroups.includes(name)) {
-      const serviceName = name;
-      categoryContents = [
-        { kind: 'label', text: 'Methods / Blocks' },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_getservice` },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_method_findfirstchild`,
-          inputs: { NAME: { shadow: { type: 'placeholder_string' } } }
-        },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_method_waitforchild`,
-          inputs: { NAME: { shadow: { type: 'placeholder_string' } } }
-        },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_getchildren` },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_getdescendants` },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_clone` },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_method_destroy` },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_method_setattribute`,
-          inputs: { 
-            NAME: { shadow: { type: 'placeholder_string' } },
-            VALUE: { shadow: { type: 'placeholder_any' } }
-          }
-        },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_method_getattribute`,
-          inputs: { NAME: { shadow: { type: 'placeholder_string' } } }
-        },
-        { kind: 'label', text: 'Properties / Blocks' },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_property_get_name` },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_property_set_name`,
-          inputs: { VALUE: { shadow: { type: 'placeholder_string' } } }
-        },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_property_get_parent` },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_property_set_parent`,
-          inputs: { VALUE: { shadow: { type: 'placeholder_instance' } } }
-        },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_property_get_classname` },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_property_get_archivable` },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_property_set_archivable`,
-          inputs: { VALUE: { shadow: { type: 'placeholder_boolean' } } }
-        },
-        { kind: 'label', text: 'Events / Blocks' },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_childadded` },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_childremoved` },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_descendantadded` },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_descendantremoving` },
-        { kind: 'block', type: `rbx_${serviceName.toLowerCase()}_event_changed` },
-        { kind: 'label', text: 'Child Objects / Blocks' },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_child_create_instance`,
-          inputs: { CLASS: { shadow: { type: 'placeholder_string' } } }
-        },
-        { 
-          kind: 'block', 
-          type: `rbx_${serviceName.toLowerCase()}_child_parent_object_to_service`,
-          inputs: { INSTANCE: { shadow: { type: 'placeholder_instance' } } }
-        }
-      ];
-    }
-
     return {
       ...cat,
       name: truncatedName,
       colour: data.color,
-      icon: data.icon,
-      contents: categoryContents
+      icon: data.icon
     };
   })
 };
@@ -616,4 +539,4 @@ export const initialToolbox = {
   contents: fullToolbox.contents.filter(cat => ['Comment', 'Logic', 'Math'].includes(cat.name))
 };
 
-export const toolbox = fullToolbox;
+export const toolbox = initialToolbox;
