@@ -36,6 +36,8 @@ import {
   Play, 
   Save, 
   Trash2, 
+  Plus,
+  MessageSquare,
   X,
   Info,
   ChevronRight,
@@ -62,8 +64,14 @@ import {
   Box,
   Wrench,
   Music,
-  User
+  User,
+  Moon,
+  Zap,
+  Trophy,
+  Database,
+  Terminal
 } from 'lucide-react';
+import Markdown from 'react-markdown';
 import { useExplorer } from './explorer';
 import { ExplorerTree, getIcon } from './components/Explorer/Explorer';
 import { InsertObjectMenu } from './components/Explorer/InsertObjectMenu';
@@ -75,7 +83,7 @@ import { serviceGroups } from './serviceBlocks';
 
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { auth, db, googleProvider, OperationType, handleFirestoreError } from './firebase';
 import { 
   signInWithPopup, 
@@ -360,7 +368,13 @@ const robloxTheme = {
 
 export default function App() {
   const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
+
   const { explorer, setExplorer, toggleExpand, addInstance, updateInstanceProperty, deleteInstance } = useExplorer();
+  
+  const explorerRef = useRef(explorer);
+  useEffect(() => {
+    explorerRef.current = explorer;
+  }, [explorer]);
   const [selectedInstancePath, setSelectedInstancePath] = useState('game.Workspace');
   const [selectedInstanceId, setSelectedInstanceId] = useState('workspace');
   const blocklyDiv = useRef<HTMLDivElement>(null);
@@ -377,6 +391,63 @@ export default function App() {
   const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
   const [showBlockInfoModal, setShowBlockInfoModal] = useState<boolean>(false);
   const [selectedBlockInfo, setSelectedBlockInfo] = useState<any>(null);
+  const toolboxRef = useRef<any>(null);
+  const [chatSessions, setChatSessions] = useState<{ id: string, title: string, messages: { role: 'user' | 'ai', content: string }[] }[]>(() => {
+    const saved = localStorage.getItem('blocklua_ai_sessions');
+    return saved ? JSON.parse(saved) : [{ id: 'default', title: 'New Chat', messages: [] }];
+  });
+  const [currentSessionId, setCurrentSessionId] = useState<string>('default');
+  
+  const aiMessages = chatSessions.find(s => s.id === currentSessionId)?.messages || [];
+  
+  const setAiMessages = (updater: (prev: { role: 'user' | 'ai', content: string }[]) => { role: 'user' | 'ai', content: string }[]) => {
+    setChatSessions(prev => {
+      const newSessions = prev.map(s => {
+        if (s.id === currentSessionId) {
+          const newMsgs = updater(s.messages);
+          return { ...s, messages: newMsgs };
+        }
+        return s;
+      });
+      localStorage.setItem('blocklua_ai_sessions', JSON.stringify(newSessions));
+      return newSessions;
+    });
+  };
+
+  const createNewSession = () => {
+    const id = Date.now().toString();
+    const newSession = { id, title: `Chat ${chatSessions.length + 1}`, messages: [] };
+    setChatSessions(prev => {
+      const next = [newSession, ...prev];
+      localStorage.setItem('blocklua_ai_sessions', JSON.stringify(next));
+      return next;
+    });
+    setCurrentSessionId(id);
+  };
+
+  const deleteSession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setChatSessions(prev => {
+      let next = prev.filter(s => s.id !== id);
+      if (next.length === 0) next = [{ id: 'default', title: 'New Chat', messages: [] }];
+      localStorage.setItem('blocklua_ai_sessions', JSON.stringify(next));
+      return next;
+    });
+    if (currentSessionId === id) {
+      setCurrentSessionId('default');
+    }
+  };
+
+  const [aiInput, setAiInput] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [aiMessages]);
 
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'warning' } | null>(null);
   const [storages, setStorages] = useState<{ id: string, name: string, time: string, data: string }[]>(
@@ -398,17 +469,101 @@ export default function App() {
   ];
 
   const [showControlCenter, setShowControlCenter] = useState(false);
+  const [controlCenterTab, setControlCenterTab] = useState<'storage' | 'ai' | 'achievements'>('storage');
+  const [achievements, setAchievements] = useState<string[]>([]);
+  const [achievementsLoaded, setAchievementsLoaded] = useState(false);
+  const isInitialLoading = useRef(true);
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [explorerOpens, setExplorerOpens] = useState(0);
   const [isCheckingCode, setIsCheckingCode] = useState(false);
-  const [aiResult, setAiResult] = useState<{ status: string, message: string, details: string, line: number | null } | null>(null);
+  const [aiResult, setAiResult] = useState<{ status: 'success' | 'error' | 'warning', message: string, details: string, line?: number } | null>(null);
+  const [activeAchievement, setActiveAchievement] = useState<any>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [activeSlotIndex, setActiveSlotIndex] = useState(0);
+  
+  const activeSlotIndexRef = useRef(0);
+  useEffect(() => {
+    activeSlotIndexRef.current = activeSlotIndex;
+  }, [activeSlotIndex]);
+
+  const storagesRef = useRef(storages);
+  useEffect(() => {
+    storagesRef.current = storages;
+  }, [storages]);
+  
+  const achievementsRef = useRef<string[]>([]);
+  useEffect(() => {
+    achievementsRef.current = achievements;
+  }, [achievements]);
+
+  const achievementList = [
+    { id: 'hello_world', icon: <Cpu size={20} />, title: { vi: 'Chào Thế Giới', en: 'Hello World' }, desc: { vi: 'Tạo khối lệnh đầu tiên của bạn.', en: 'Create your first block.' } },
+    { id: 'spammer', icon: <MousePointer2 size={20} />, title: { vi: 'Kẻ Phá Hoại', en: 'Spammer' }, desc: { vi: 'Nhấn vào logo 10 lần liên tiếp.', en: 'Click the logo 10 times.' } },
+    { id: 'night_owl', icon: <Moon size={20} />, title: { vi: 'Cú Đêm', en: 'Night Owl' }, desc: { vi: 'Sử dụng ứng dụng vào lúc nửa đêm.', en: 'Use the app at midnight.' } },
+    { id: 'code_master', icon: <Code2 size={20} />, title: { vi: 'Bậc Thầy Code', en: 'Code Master' }, desc: { vi: 'Tạo ra hơn 100 dòng mã Luau.', en: 'Generate over 100 lines of Luau code.' } },
+    { id: 'eraser', icon: <Trash2 size={20} />, title: { vi: 'Cục Tẩy', en: 'The Eraser' }, desc: { vi: 'Xóa sạch Workspace của bạn.', en: 'Clear your workspace.' } },
+    { id: 'hacker', icon: <Terminal size={20} />, title: { vi: 'Bạn đang làm gì vậy?', en: 'What are you doing?' }, desc: { vi: 'Bạn đang cố gắng hack trang web này sao? 🙃', en: 'Are you trying to hack this website? 🙃' } },
+    { id: 'stalker', icon: <Search size={20} />, title: { vi: 'Kẻ Theo Dõi', en: 'Stalker' }, desc: { vi: 'Mở bảng Explorer 20 lần.', en: 'Open the Explorer 20 times.' } },
+    { id: 'block_hoarder', icon: <Layers size={20} />, title: { vi: 'Kẻ Thu Gom', en: 'Block Hoarder' }, desc: { vi: 'Có hơn 50 khối lệnh trên Workspace.', en: 'Have over 50 blocks on workspace.' } },
+    { id: 'speedrunner', icon: <Zap size={20} />, title: { vi: 'Siêu Tốc', en: 'Speedrunner' }, desc: { vi: 'Sao chép mã trong vòng 30 giây.', en: 'Copy code within 30 seconds.' } },
+    { id: 'rich_kid', icon: <Trophy size={20} />, title: { vi: 'Đại Gia', en: 'Rich Kid' }, desc: { vi: 'Đăng nhập để lưu trữ đám mây.', en: 'Login for cloud storage.' } },
+  ];
+
+  const unlockAchievement = async (id: string) => {
+    if (!achievementsLoaded) return;
+    if (achievementsRef.current.includes(id)) return;
+    
+    const achievement = achievementList.find(a => a.id === id);
+    if (!achievement) return;
+
+    const newAchievements = [...achievementsRef.current, id];
+    setAchievements(newAchievements);
+    achievementsRef.current = newAchievements; // Update ref synchronously
+    
+    // Show custom badge notification
+    setActiveAchievement(achievement);
+    setTimeout(() => setActiveAchievement(null), 5000);
+
+    const currentUser = userRefState.current || auth.currentUser;
+
+    if (currentUser) {
+      setIsAutoSaving(true);
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, { achievements: newAchievements });
+      } catch (error) {
+        console.error("Error saving achievements:", error);
+      } finally {
+        setTimeout(() => setIsAutoSaving(false), 1000);
+      }
+    } else {
+      localStorage.setItem('blocklua_achievements', JSON.stringify(newAchievements));
+    }
+  };
+
+  // Hacker achievement listener (F12)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F12') {
+        unlockAchievement('hacker');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Firebase State
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const userRefState = useRef<FirebaseUser | null>(null);
+  useEffect(() => {
+    userRefState.current = user;
+  }, [user]);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      const prevUser = user;
+      const prevUser = userRefState.current;
       setUser(firebaseUser);
       setIsAuthReady(true);
 
@@ -417,6 +572,8 @@ export default function App() {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const userSnap = await getDoc(userRef);
         
+        let currentAchievements: string[] = [];
+
         if (!userSnap.exists()) {
           await setDoc(userRef, {
             uid: firebaseUser.uid,
@@ -424,17 +581,29 @@ export default function App() {
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
             hasSeenTutorial: false,
+            achievements: [],
             createdAt: Timestamp.now()
           });
-          setShowTutorialModal(true);
+          setShowTutorialModal(false);
         } else {
           // Sync tutorial state from cloud
           const userData = userSnap.data();
           if (userData.hasSeenTutorial) {
             setShowTutorialModal(false);
           } else {
-            setShowTutorialModal(true);
+            setShowTutorialModal(false);
           }
+          currentAchievements = userData.achievements || [];
+        }
+        
+        // Update state and ref synchronously to prevent race conditions
+        setAchievements(currentAchievements);
+        achievementsRef.current = currentAchievements;
+        setAchievementsLoaded(true);
+
+        // Now unlock rich_kid if not already unlocked
+        if (!currentAchievements.includes('rich_kid')) {
+          unlockAchievement('rich_kid');
         }
       } else {
         // Guest mode: only show tutorial if they haven't seen it and they didn't just log out
@@ -442,13 +611,20 @@ export default function App() {
         if (!prevUser) {
           const hasSeen = localStorage.getItem('blocklua_tutorial_seen');
           if (!hasSeen) {
-            setShowTutorialModal(true);
+            setShowTutorialModal(false);
           }
         }
+        const savedAchievements = localStorage.getItem('blocklua_achievements');
+        if (savedAchievements) {
+          const parsedAchievements = JSON.parse(savedAchievements);
+          setAchievements(parsedAchievements);
+          achievementsRef.current = parsedAchievements;
+        }
+        setAchievementsLoaded(true);
       }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, []); // Removed user dependency to fix infinite loop
 
   // Real-time Storage Sync
   useEffect(() => {
@@ -469,20 +645,22 @@ export default function App() {
     // Sync from Firestore for logged-in users
     const slotsRef = collection(db, 'users', user.uid, 'slots');
     const unsubscribe = onSnapshot(slotsRef, (snapshot) => {
-      const newStorages = [...storages];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        const index = data.slotIndex;
-        if (index >= 0 && index < 10) {
-          newStorages[index] = {
-            id: index.toString(),
-            name: data.name || `Storage ${index + 1}`,
-            time: data.updatedAt ? data.updatedAt.toDate().toLocaleString() : '-',
-            data: data.data
-          };
-        }
+      setStorages(prevStorages => {
+        const newStorages = [...prevStorages];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const index = data.slotIndex;
+          if (index >= 0 && index < 10) {
+            newStorages[index] = {
+              id: index.toString(),
+              name: data.name || `Storage ${index + 1}`,
+              time: data.updatedAt ? data.updatedAt.toDate().toLocaleString() : '-',
+              data: data.data
+            };
+          }
+        });
+        return newStorages;
       });
-      setStorages(newStorages);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/slots`);
     });
@@ -533,41 +711,75 @@ export default function App() {
     }
   };
 
-  const saveToStorage = async (index: number) => {
+  const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  const triggerAutoSave = useCallback(() => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      saveToStorage(activeSlotIndexRef.current, true);
+    }, 5000);
+  }, []);
+
+  // Trigger auto-save when explorer state changes
+  useEffect(() => {
+    triggerAutoSave();
+  }, [explorer, triggerAutoSave]);
+
+  const saveToStorage = async (index: number, silent = false) => {
     if (!workspace.current) return;
     
     const blocks = workspace.current.getAllBlocks(false);
-    if (blocks.length === 0) {
+    if (blocks.length === 0 && !silent) {
       showToast(currentLang === 'vi' ? 'Không có khối lệnh nào để lưu!' : 'No blocks to save!', 'error');
       return;
     }
 
     const xml = Blockly.Xml.workspaceToDom(workspace.current);
     const xmlText = Blockly.Xml.domToText(xml);
-    const newName = storages[index].name;
+    
+    const currentStorages = storagesRef.current;
+    const currentUser = userRefState.current;
+    const currentExplorer = explorerRef.current;
+    const newName = currentStorages[index].name;
 
-    if (user) {
+    const saveData = JSON.stringify({
+      xml: xmlText,
+      explorer: currentExplorer
+    });
+
+    // Always save the latest state to localStorage for auto-recovery on reload
+    localStorage.setItem('blocklua_workspace', xmlText);
+    localStorage.setItem('blocklua_explorer', JSON.stringify(currentExplorer));
+
+    if (!silent) setIsAutoSaving(true);
+
+    if (currentUser) {
       // Save to Firestore
       try {
-        const slotRef = doc(db, 'users', user.uid, 'slots', `slot_${index}`);
+        const slotRef = doc(db, 'users', currentUser.uid, 'slots', `slot_${index}`);
         await setDoc(slotRef, {
           slotIndex: index,
           name: newName,
-          data: xmlText,
+          data: saveData,
           updatedAt: Timestamp.now()
         });
-        showToast(currentLang === 'vi' ? `Đã lưu vào bộ nhớ ${index + 1} (Cloud)!` : `Saved to storage ${index + 1} (Cloud)!`, 'success');
+        if (!silent) showToast(currentLang === 'vi' ? `Đã lưu vào bộ nhớ ${index + 1} (Cloud)!` : `Saved to storage ${index + 1} (Cloud)!`, 'success');
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/slots/slot_${index}`);
+        if (!silent) handleFirestoreError(error, OperationType.WRITE, `users/${currentUser.uid}/slots/slot_${index}`);
       }
     } else {
       // Save to LocalStorage
-      const newStorages = [...storages];
-      newStorages[index] = { ...newStorages[index], time: new Date().toLocaleString(), data: xmlText };
+      const newStorages = [...currentStorages];
+      newStorages[index] = { ...newStorages[index], time: new Date().toLocaleString(), data: saveData };
       setStorages(newStorages);
       localStorage.setItem('blocklua_storages', JSON.stringify(newStorages));
-      showToast(currentLang === 'vi' ? `Đã lưu vào bộ nhớ ${index + 1} (Local)!` : `Saved to storage ${index + 1} (Local)!`, 'success');
+      if (!silent) showToast(currentLang === 'vi' ? `Đã lưu vào bộ nhớ ${index + 1} (Local)!` : `Saved to storage ${index + 1} (Local)!`, 'success');
     }
+
+    if (!silent) {
+      setTimeout(() => setIsAutoSaving(false), 1000);
+    }
+    
+    setActiveSlotIndex(index);
   };
 
   const loadFromStorage = (index: number) => {
@@ -577,12 +789,38 @@ export default function App() {
       return;
     }
 
-    if (workspace.current) {
-      const xml = Blockly.utils.xml.textToDom(storage.data);
-      workspace.current.clear();
-      Blockly.Xml.domToWorkspace(xml, workspace.current);
-      showToast(currentLang === 'vi' ? `Đã tải ${storage.name}!` : `Loaded ${storage.name}!`);
+    let xmlText = storage.data;
+    let explorerData = null;
+
+    if (storage.data.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(storage.data);
+        xmlText = parsed.xml;
+        explorerData = parsed.explorer;
+      } catch (e) {
+        console.error("Failed to parse storage data", e);
+      }
     }
+
+    if (workspace.current && xmlText) {
+      try {
+        isInitialLoading.current = true;
+        const xml = Blockly.utils.xml.textToDom(xmlText);
+        workspace.current.clear();
+        Blockly.Xml.domToWorkspace(xml, workspace.current);
+        setTimeout(() => { isInitialLoading.current = false; }, 100);
+      } catch (e) {
+        isInitialLoading.current = false;
+        console.error("Failed to load workspace XML", e);
+      }
+    }
+
+    if (explorerData) {
+      setExplorer(explorerData);
+    }
+
+    setActiveSlotIndex(index);
+    showToast(currentLang === 'vi' ? `Đã tải ${storage.name}!` : `Loaded ${storage.name}!`);
   };
 
   const renameStorage = async (index: number, newName: string) => {
@@ -602,6 +840,291 @@ export default function App() {
       }
     } else {
       localStorage.setItem('blocklua_storages', JSON.stringify(newStorages));
+    }
+  };
+
+  const sendChatMessage = async (input?: string) => {
+    const messageText = input || aiInput;
+    if (!messageText.trim()) return;
+
+    const newUserMessage = { role: 'user' as const, content: messageText };
+    setAiMessages(prev => [...prev, newUserMessage]);
+    setAiInput('');
+    setIsCheckingCode(true);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+      const history = aiMessages.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }]
+      }));
+
+      const tools = [
+        {
+          functionDeclarations: [
+            {
+              name: "addBlock",
+              description: "Adds a new block to the workspace at the specified coordinates. Use this to create new logic.",
+              parameters: {
+                type: Type.OBJECT,
+                properties: {
+                  blockType: {
+                    type: Type.STRING,
+                    description: "The type of the block to add (e.g., 'lua_if', 'loops_while_lua', 'math_number_custom', 'roblox_part')."
+                  },
+                  x: {
+                    type: Type.NUMBER,
+                    description: "The x-coordinate in the workspace."
+                  },
+                  y: {
+                    type: Type.NUMBER,
+                    description: "The y-coordinate in the workspace."
+                  }
+                },
+                required: ["blockType", "x", "y"]
+              }
+            },
+            {
+              name: "updateBlock",
+              description: "Updates an existing block's field value (like a number or string value).",
+              parameters: {
+                type: Type.OBJECT,
+                properties: {
+                  blockId: {
+                    type: Type.STRING,
+                    description: "The unique ID of the block to update."
+                  },
+                  fieldName: {
+                    type: Type.STRING,
+                    description: "The name of the field to update (e.g., 'NUM', 'TEXT', 'VAR')."
+                  },
+                  value: {
+                    type: Type.STRING,
+                    description: "The new value to set for the field."
+                  }
+                },
+                required: ["blockId", "fieldName", "value"]
+              }
+            },
+            {
+              name: "connectBlocks",
+              description: "Connects two blocks together. Use this to assemble logic chains.",
+              parameters: {
+                type: Type.OBJECT,
+                properties: {
+                  parentBlockId: { type: Type.STRING, description: "The ID of the block that will receive the connection." },
+                  childBlockId: { type: Type.STRING, description: "The ID of the block that will be connected to the parent." },
+                  connectionType: { 
+                    type: Type.STRING, 
+                    enum: ["next", "input"],
+                    description: "'next' for statement connection, 'input' for value input connection."
+                  },
+                  inputName: { type: Type.STRING, description: "The name of the input if connectionType is 'input' (e.g., 'CONDITION', 'VALUE', 'A', 'B')." }
+                },
+                required: ["parentBlockId", "childBlockId", "connectionType"]
+              }
+            },
+            {
+              name: "clearWorkspace",
+              description: "Clears all blocks from the workspace.",
+              parameters: {
+                type: Type.OBJECT,
+                properties: {}
+              }
+            }
+          ]
+        }
+      ];
+
+      const systemInstruction = `
+        You are a helpful AI assistant for BlockLua, a Roblox Luau block-based programming environment.
+        You can explain code, find bugs, and DIRECTLY control the workspace by adding, updating, connecting, or clearing blocks.
+        
+        WORKSPACE MANIPULATION:
+        - When a user asks for a block (e.g., "add a while loop"), use the 'addBlock' tool.
+        - To build logic, you MUST connect blocks using 'connectBlocks'. For example, to put a 'print' inside an 'if', add both blocks then connect 'if' (DO input) to 'print'.
+        - When you find an error in the current workspace blocks compared to valid Roblox Luau syntax, use 'updateBlock' to fix fields or 'addBlock' to replace incorrect logic.
+        - Be smart: If a user's intent is slightly ambiguous, choose the most logical block (e.g., if they mention "looping while something is true", use 'loops_while_lua').
+        - IMPORTANT: When adding blocks with inputs, the system will automatically handle basic placeholders for you.
+        - Your goal is to ensure the blocks in the workspace generate valid Roblox Luau code. Compare the 'Workspace (Blocks)' state with the 'Roblox Luau Code' generated from it. If the code is wrong, fix the blocks.
+        
+        REPORTING:
+        - After performing actions, tell the user exactly what you did (e.g., "I fixed the condition in your loop" or "I added a Touch event for you").
+        - If you are creating a complex script, you can call 'addBlock' and 'connectBlocks' multiple times in sequence.
+        
+        CRITICAL:
+        - DO NOT start your response with "Chào bạn" or any generic greetings. Get straight to the point.
+        - If the user asks you to create or add something, you MUST use the tools to do it. Do not just explain how to do it.
+        - Always prioritize the user's specific request for block creation.
+        - Ensure blocks are connected logically. Disconnected blocks are usually useless.
+        - Use ONLY the block types provided in the 'Toolbox' context.
+      `;
+
+      const chat = ai.chats.create({
+        model: "gemini-3-flash-preview",
+        history: history,
+        config: {
+          systemInstruction: systemInstruction,
+          maxOutputTokens: 2048,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          tools: tools
+        },
+      });
+
+      // Context about the current environment
+      const workspaceData = workspace.current ? Blockly.serialization.workspaces.save(workspace.current) : {};
+      const explorerData = explorer;
+      const toolboxData = toolboxRef.current;
+
+      const contextPrompt = `
+        Environment Context:
+        - Roblox Luau Code: ${generatedCode}
+        - Explorer (Object Tree): ${JSON.stringify(explorerData)}
+        - Workspace (Blocks): ${JSON.stringify(workspaceData)}
+        - Toolbox (Available Blocks): ${JSON.stringify(toolboxData)}
+
+        User Message: ${messageText}
+      `;
+
+      let result = await chat.sendMessageStream({ message: contextPrompt });
+      
+      // Add empty AI message to start streaming into
+      setAiMessages(prev => [...prev, { role: 'ai', content: "" }]);
+      
+      let fullText = "";
+      let lastChunk: any = null;
+      for await (const chunk of result) {
+        lastChunk = chunk;
+        const chunkText = chunk.text || "";
+        fullText += chunkText;
+        setAiMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'ai') {
+            return [...prev.slice(0, -1), { role: 'ai', content: fullText }];
+          }
+          return prev;
+        });
+      }
+
+      const response = lastChunk;
+
+      // Loop to handle multiple rounds of function calls
+      let rounds = 0;
+      let currentResponse = response;
+      while (currentResponse && currentResponse.functionCalls && rounds < 10) {
+        rounds++;
+        const toolResults = [];
+        for (const call of currentResponse.functionCalls) {
+          if (call.name === 'addBlock') {
+            const { blockType, x, y } = call.args as any;
+            if (workspace.current) {
+              try {
+                const block = workspace.current.newBlock(blockType);
+                block.initSvg();
+                block.render();
+                block.moveBy(x, y);
+
+                // Auto-attach placeholders for all value inputs
+                block.inputList.forEach(input => {
+                  // input.connection.type === 1 is INPUT_VALUE
+                  if (input.connection && input.connection.type === 1 && !input.connection.targetBlock()) {
+                    let placeholderType = 'placeholder_any';
+                    if (input.name === 'CONDITION' || input.name === 'BOOL') placeholderType = 'placeholder_condition';
+                    else if (input.name === 'NUM' || input.name === 'SECONDS' || input.name === 'A' || input.name === 'B') placeholderType = 'placeholder_number';
+                    else if (input.name === 'TEXT' || input.name === 'NAME') placeholderType = 'placeholder_string';
+                    else if (input.name === 'INSTANCE' || input.name === 'PARENT') placeholderType = 'placeholder_instance';
+
+                    try {
+                      const placeholder = workspace.current!.newBlock(placeholderType);
+                      placeholder.initSvg();
+                      placeholder.render();
+                      input.connection?.connect(placeholder.outputConnection!);
+                    } catch (e) {
+                      console.warn("Failed to add placeholder:", e);
+                    }
+                  }
+                });
+                
+                toolResults.push({ name: call.name, result: `Successfully added block ${blockType} with ID ${block.id}` });
+              } catch (e) {
+                toolResults.push({ name: call.name, error: `Failed to add block ${blockType}: ${e}` });
+              }
+            }
+          } else if (call.name === 'connectBlocks') {
+            const { parentBlockId, childBlockId, connectionType, inputName } = call.args as any;
+            if (workspace.current) {
+              const parent = workspace.current.getBlockById(parentBlockId);
+              const child = workspace.current.getBlockById(childBlockId);
+              if (parent && child) {
+                try {
+                  if (connectionType === 'next') {
+                    parent.nextConnection?.connect(child.previousConnection!);
+                  } else if (connectionType === 'input' && inputName) {
+                    const input = parent.getInput(inputName);
+                    if (input) {
+                      input.connection?.connect(child.outputConnection! || child.previousConnection!);
+                    }
+                  }
+                  toolResults.push({ name: call.name, result: `Successfully connected ${childBlockId} to ${parentBlockId}` });
+                } catch (e) {
+                  toolResults.push({ name: call.name, error: `Failed to connect blocks: ${e}` });
+                }
+              } else {
+                toolResults.push({ name: call.name, error: `One or both blocks not found: ${parentBlockId}, ${childBlockId}` });
+              }
+            }
+          } else if (call.name === 'updateBlock') {
+            const { blockId, fieldName, value } = call.args as any;
+            if (workspace.current) {
+              const block = workspace.current.getBlockById(blockId);
+              if (block) {
+                try {
+                  block.setFieldValue(value, fieldName);
+                  toolResults.push({ name: call.name, result: `Successfully updated block ${blockId}` });
+                } catch (e) {
+                  toolResults.push({ name: call.name, error: `Failed to update block ${blockId}: ${e}` });
+                }
+              } else {
+                toolResults.push({ name: call.name, error: `Block ${blockId} not found` });
+              }
+            }
+          } else if (call.name === 'clearWorkspace') {
+            if (workspace.current) {
+              workspace.current.clear();
+              toolResults.push({ name: call.name, result: `Successfully cleared workspace` });
+            }
+          }
+        }
+        
+        // Send all tool results back to AI in one go
+        const toolResultStream = await chat.sendMessageStream({
+          message: `Tool execution results: ${JSON.stringify(toolResults)}. Please continue or provide final response.`
+        });
+
+        fullText = "";
+        let lastToolChunk: any = null;
+        for await (const chunk of toolResultStream) {
+          lastToolChunk = chunk;
+          const chunkText = chunk.text || "";
+          fullText += chunkText;
+          setAiMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === 'ai') {
+              return [...prev.slice(0, -1), { role: 'ai', content: fullText }];
+            }
+            return prev;
+          });
+        }
+        currentResponse = lastToolChunk;
+      }
+
+      const text = response.text || (currentLang === 'vi' ? 'AI không có phản hồi.' : 'AI provided no response.');
+      setAiMessages(prev => [...prev, { role: 'ai', content: text }]);
+    } catch (error) {
+      console.error("AI Chat Error:", error);
+      showToast(currentLang === 'vi' ? 'Lỗi kết nối AI!' : 'AI Connection Error!', 'error');
+    } finally {
+      setIsCheckingCode(false);
     }
   };
 
@@ -627,7 +1150,7 @@ export default function App() {
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: prompt,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -844,10 +1367,17 @@ export default function App() {
     if (workspace.current) {
       const xmlText = localStorage.getItem('blocklua_workspace');
       if (xmlText) {
-        const xml = Blockly.utils.xml.textToDom(xmlText);
-        workspace.current.clear();
-        Blockly.Xml.domToWorkspace(xml, workspace.current);
-        showToast(currentLang === 'vi' ? 'Đã tải Workspace!' : 'Workspace loaded!');
+        try {
+          isInitialLoading.current = true;
+          const xml = Blockly.utils.xml.textToDom(xmlText);
+          workspace.current.clear();
+          Blockly.Xml.domToWorkspace(xml, workspace.current);
+          setTimeout(() => { isInitialLoading.current = false; }, 100);
+          showToast(currentLang === 'vi' ? 'Đã tải Workspace!' : 'Workspace loaded!');
+        } catch (e) {
+          isInitialLoading.current = false;
+          console.error("Failed to load workspace", e);
+        }
       } else {
         showToast(currentLang === 'vi' ? 'Không tìm thấy dữ liệu đã lưu.' : 'No saved workspace found.', 'error');
       }
@@ -7133,6 +7663,7 @@ export default function App() {
     blocks.defineCustomBlocks();
     defineCustomGenerators();
 
+    toolboxRef.current = toolbox;
     workspace.current = Blockly.inject(blocklyDiv.current, {
       toolbox: toolbox,
       trashcan: false,
@@ -7187,7 +7718,7 @@ export default function App() {
     const extractedBlocks: { type: string, name: string, category: string, blockDef: any }[] = [];
     
     // Only extract if we haven't already
-    Blockly.Events.disable();
+    isInitialLoading.current = true;
     try {
       toolbox.contents.forEach((cat: any) => {
         if (cat.kind === 'category' && cat.contents) {
@@ -7241,12 +7772,37 @@ export default function App() {
         }
       });
     } finally {
-      Blockly.Events.enable();
+      setTimeout(() => { isInitialLoading.current = false; }, 100);
     }
     
     setAllBlocks(extractedBlocks);
 
     workspace.current.addChangeListener((e: any) => {
+      if (e.type === Blockly.Events.BLOCK_CREATE && !isInitialLoading.current) {
+        unlockAchievement('hello_world');
+        const blocks = workspace.current!.getAllBlocks(false);
+        if (blocks.length >= 50) {
+          unlockAchievement('block_hoarder');
+        }
+      }
+
+      // Auto-save trigger
+      if (e.type === Blockly.Events.BLOCK_MOVE || 
+          e.type === Blockly.Events.BLOCK_CHANGE || 
+          e.type === Blockly.Events.BLOCK_CREATE || 
+          e.type === Blockly.Events.BLOCK_DELETE) {
+        
+        // Immediate save to localStorage for reliability
+        if (workspace.current) {
+          const xml = Blockly.Xml.workspaceToDom(workspace.current);
+          const xmlText = Blockly.Xml.domToText(xml);
+          localStorage.setItem('blocklua_workspace', xmlText);
+          localStorage.setItem('blocklua_explorer', JSON.stringify(explorerRef.current));
+        }
+        
+        triggerAutoSave();
+      }
+
       // Update defined variables
       if (e.type === Blockly.Events.BLOCK_CREATE || 
           e.type === Blockly.Events.BLOCK_DELETE || 
@@ -7266,9 +7822,26 @@ export default function App() {
     // Initial load from localStorage
     const savedXml = localStorage.getItem('blocklua_workspace');
     if (savedXml) {
-      const xml = Blockly.utils.xml.textToDom(savedXml);
-      Blockly.Xml.domToWorkspace(xml, workspace.current!);
+      try {
+        isInitialLoading.current = true;
+        const xml = Blockly.utils.xml.textToDom(savedXml);
+        Blockly.Xml.domToWorkspace(xml, workspace.current!);
+        setTimeout(() => { isInitialLoading.current = false; }, 100);
+      } catch (e) {
+        isInitialLoading.current = false;
+        console.error("Failed to load initial workspace XML", e);
+      }
     }
+
+    const handleBeforeUnload = () => {
+      if (workspace.current) {
+        const xml = Blockly.Xml.workspaceToDom(workspace.current);
+        const xmlText = Blockly.Xml.domToText(xml);
+        localStorage.setItem('blocklua_workspace', xmlText);
+        localStorage.setItem('blocklua_explorer', JSON.stringify(explorerRef.current));
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     const handleResize = () => {
       if (workspace.current) {
@@ -7279,6 +7852,7 @@ export default function App() {
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (workspace.current) {
         try {
           workspace.current.dispose();
@@ -7332,9 +7906,34 @@ export default function App() {
   const confirmClear = () => {
     if (workspace.current) {
       workspace.current.clear();
+      unlockAchievement('eraser');
     }
     setShowClearModal(false);
   };
+
+  useEffect(() => {
+    (window as any).sessionStartTime = Date.now();
+    const hour = new Date().getHours();
+    if (hour >= 0 && hour <= 4) {
+      unlockAchievement('night_owl');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (generatedCode.split('\n').length > 100) {
+      unlockAchievement('code_master');
+    }
+  }, [generatedCode]);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      const newOpens = explorerOpens + 1;
+      setExplorerOpens(newOpens);
+      if (newOpens >= 20) {
+        unlockAchievement('stalker');
+      }
+    }
+  }, [sidebarOpen]);
 
   return (
     <div 
@@ -7388,7 +7987,14 @@ export default function App() {
           </button>
           <div className="relative">
             <div 
-              className="flex items-center gap-2 group"
+              onClick={() => {
+                const newClicks = logoClicks + 1;
+                setLogoClicks(newClicks);
+                if (newClicks >= 10) {
+                  unlockAchievement('spammer');
+                }
+              }}
+              className="flex items-center gap-2 group cursor-pointer"
             >
               <div className="w-6 h-6 bg-gradient-to-br from-[#4c97ff] to-[#0055ff] rounded-md flex items-center justify-center shadow-lg shadow-blue-500/20 transition-transform group-hover:rotate-12">
                 <Cpu className="text-white" size={14} />
@@ -7397,6 +8003,21 @@ export default function App() {
                 <div className="text-white font-black text-lg tracking-tighter leading-none">BLOCKLUA</div>
                 <div className="text-[9px] text-[#4c97ff] font-bold tracking-widest uppercase mt-0.5">PRO EDITION</div>
               </div>
+              
+              {/* Auto-save indicator */}
+              <AnimatePresence>
+                {isAutoSaving && (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="flex items-center gap-1.5 ml-2 px-2 py-0.5 bg-green-500/10 rounded-full border border-green-500/20"
+                  >
+                    <RefreshCw size={10} className="text-green-500 animate-spin" />
+                    <span className="text-[8px] font-black text-green-500 uppercase tracking-widest">Auto-saving</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
@@ -8380,107 +9001,334 @@ sync() -- Initial sync on load`;
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000] flex items-center justify-center p-6"
+              className={`fixed top-0 left-0 z-[1000] flex items-center justify-center w-full h-full transition-all duration-500 ${controlCenterTab === 'ai' ? 'bg-black p-0' : 'bg-black/60 backdrop-blur-sm p-4'}`}
             >
               <motion.div 
-                initial={{ scale: 0.9, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                className="bg-[#1a1a1a] border border-white/10 rounded-[2.5rem] w-full max-w-5xl h-[85vh] shadow-2xl flex flex-col overflow-hidden"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className={`bg-[#1a1a1a] border border-white/10 shadow-2xl flex overflow-hidden transition-all duration-500 ${controlCenterTab === 'ai' ? 'w-full h-full rounded-none border-none' : 'max-w-4xl w-full h-[80vh] rounded-3xl'}`}
               >
-                <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/2">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-[#4c97ff]/20 rounded-2xl flex items-center justify-center">
-                      <LayoutDashboard className="text-[#4c97ff]" size={28} />
+                {/* Sidebar - Hidden in AI mode */}
+                {controlCenterTab !== 'ai' && (
+                  <div className="w-64 bg-black/40 border-r border-white/5 flex flex-col p-6">
+                  <div className="flex items-center gap-3 mb-10">
+                    <div className="w-10 h-10 bg-[#4c97ff] rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                      <LayoutDashboard className="text-white" size={20} />
                     </div>
-                    <div>
-                      <h2 className="text-3xl font-black text-white tracking-tight">LAB CENTER</h2>
-                      <p className="text-sm text-gray-500 font-bold tracking-widest uppercase mt-1">Advanced Tools & Experiments</p>
-                    </div>
+                    <h3 className="text-lg font-black text-white tracking-tight">LAB CENTER</h3>
                   </div>
-                  <button onClick={() => setShowControlCenter(false)} className="w-12 h-12 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-all">
-                    <X size={24} />
+
+                  <div className="space-y-2 flex-1">
+                    <button 
+                      onClick={() => setControlCenterTab('storage')}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${controlCenterTab === 'storage' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300'}`}
+                    >
+                      <Database size={18} />
+                      <span className="text-xs font-black uppercase tracking-widest">{currentLang === 'vi' ? 'Kho lưu trữ' : 'Storages'}</span>
+                    </button>
+                    <button 
+                      onClick={() => setControlCenterTab('ai')}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-all text-gray-500 hover:bg-white/5 hover:text-gray-300`}
+                    >
+                      <Sparkles size={18} />
+                      <span className="text-xs font-black uppercase tracking-widest">{currentLang === 'vi' ? 'AI Phân tích' : 'AI Analysis'}</span>
+                    </button>
+                    <button 
+                      onClick={() => setControlCenterTab('achievements')}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${controlCenterTab === 'achievements' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300'}`}
+                    >
+                      <Trophy size={18} />
+                      <span className="text-xs font-black uppercase tracking-widest">{currentLang === 'vi' ? 'Thành tựu' : 'Achievements'}</span>
+                    </button>
+                  </div>
+
+                  <button 
+                    onClick={() => setShowControlCenter(false)}
+                    className="mt-auto w-full py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                  >
+                    {currentLang === 'vi' ? 'Đóng' : 'Close'}
                   </button>
                 </div>
+                )}
 
-                <div className="flex-1 overflow-auto p-8 custom-scrollbar">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Storages Section */}
-                    <div className="bg-white/2 rounded-3xl p-6 border border-white/5 flex flex-col h-full">
-                      <div className="flex items-center gap-3 mb-6">
-                        <History className="text-[#4c97ff]" size={20} />
-                        <h3 className="text-xl font-black text-white uppercase tracking-tight">Storages</h3>
+                {/* Content Area */}
+                <div className="flex-1 flex flex-col overflow-hidden bg-[#1e1e1e]">
+                  {controlCenterTab === 'storage' && (
+                    <div className="flex-1 flex flex-col p-8 overflow-hidden">
+                      <div className="flex items-center justify-between mb-8">
+                        <div>
+                          <h2 className="text-2xl font-black text-white tracking-tight">{currentLang === 'vi' ? 'KHO LƯU TRỮ ĐÁM MÂY' : 'CLOUD STORAGES'}</h2>
+                          <p className="text-xs text-gray-500 font-bold tracking-widest uppercase mt-1">
+                            {currentLang === 'vi' ? 'Lưu và tải các dự án của bạn' : 'Save and load your projects'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full border border-green-500/20">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Connected</span>
+                        </div>
                       </div>
-                      <div className="space-y-3 overflow-y-auto pr-2 flex-1 max-h-[500px] custom-scrollbar">
-                        {storages.map((s, index) => (
-                          <div key={s.id} className="p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-[#4c97ff]/30 transition-all group">
-                            <div className="flex items-center justify-between mb-3">
-                              <input 
-                                type="text" 
-                                value={s.name}
-                                onChange={(e) => renameStorage(index, e.target.value)}
-                                className="bg-transparent border-none text-sm font-bold text-white focus:ring-0 p-0 w-full"
-                              />
-                              <div className="text-[10px] text-gray-500 font-mono whitespace-nowrap ml-2">{s.time}</div>
+
+                      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                        {storages.map((storage, index) => (
+                          <div 
+                            key={storage.id}
+                            className="bg-black/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:border-[#4c97ff]/30 transition-all"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-gray-500 group-hover:text-[#4c97ff] transition-colors">
+                                <Database size={18} />
+                              </div>
+                              <div>
+                                <input 
+                                  type="text" 
+                                  value={storage.name}
+                                  onChange={(e) => renameStorage(index, e.target.value)}
+                                  className="bg-transparent text-sm font-black text-white focus:outline-none focus:text-[#4c97ff] transition-colors w-40"
+                                />
+                                <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mt-0.5">
+                                  {storage.time === '-' ? (currentLang === 'vi' ? 'Trống' : 'Empty') : storage.time}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                               <button 
-                                onClick={() => saveToStorage(index)} 
-                                className="flex-1 py-2 bg-[#4c97ff]/10 hover:bg-[#4c97ff] text-[#4c97ff] hover:text-white text-[10px] font-black rounded-xl transition-all flex items-center justify-center gap-2"
+                                onClick={() => saveToStorage(index)}
+                                className="px-4 py-2 bg-white/5 hover:bg-[#4c97ff] text-gray-400 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
                               >
-                                <Save size={12} /> SAVE
+                                <Save size={14} />
+                                {currentLang === 'vi' ? 'Lưu' : 'Save'}
                               </button>
                               <button 
-                                onClick={() => loadFromStorage(index)} 
-                                className="flex-1 py-2 bg-white/5 hover:bg-emerald-500 text-gray-400 hover:text-white text-[10px] font-black rounded-xl transition-all flex items-center justify-center gap-2"
+                                onClick={() => loadFromStorage(index)}
+                                disabled={storage.time === '-'}
+                                className="px-4 py-2 bg-white/5 hover:bg-green-500 disabled:opacity-20 text-gray-400 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
                               >
-                                <RefreshCw size={12} /> LOAD
+                                <Download size={14} />
+                                {currentLang === 'vi' ? 'Tải' : 'Load'}
                               </button>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
+                  )}
 
-                    {/* AI Code Checker Section */}
-                    <div className="bg-white/2 rounded-3xl p-6 border border-white/5 flex flex-col h-full">
-                      <div className="flex items-center gap-3 mb-6">
-                        <Cpu className="text-[#4c97ff]" size={20} />
-                        <h3 className="text-xl font-black text-white uppercase tracking-tight">AI Code Checker</h3>
-                      </div>
-                      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/40 rounded-3xl border border-white/5 text-center">
-                        <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 ${isCheckingCode ? 'bg-[#4c97ff]/20 text-[#4c97ff] animate-spin' : aiResult?.status === 'error' ? 'bg-red-500/20 text-red-500' : aiResult?.status === 'warning' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
-                          {isCheckingCode ? <RefreshCw size={48} /> : aiResult?.status === 'error' ? <AlertCircle size={48} /> : aiResult?.status === 'warning' ? <AlertTriangle size={48} /> : <CheckCircle2 size={48} />}
+                  {controlCenterTab === 'ai' && (
+                    <div className="flex-1 flex h-full bg-[#0a0a0a] relative overflow-hidden">
+                      {/* Chat Sidebar */}
+                      <div className="w-64 border-r border-white/5 bg-black/20 flex flex-col">
+                        <div className="p-4 border-b border-white/5">
+                          <button 
+                            onClick={createNewSession}
+                            className="w-full py-2.5 bg-[#4c97ff]/10 hover:bg-[#4c97ff]/20 text-[#4c97ff] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                          >
+                            <Plus size={14} />
+                            {currentLang === 'vi' ? 'Cuộc hội thoại mới' : 'New Chat'}
+                          </button>
                         </div>
-                        
-                        <h4 className="text-xl font-black text-white mb-2">
-                          {isCheckingCode ? 'AI IS ANALYZING...' : aiResult ? aiResult.message : 'READY TO CHECK'}
-                        </h4>
-                        
-                        <p className="text-sm text-gray-500 mb-8 px-4 leading-relaxed">
-                          {isCheckingCode 
-                            ? 'Our AI is scanning your blocks for syntax errors and logical bugs.' 
-                            : aiResult 
-                              ? aiResult.details 
-                              : 'Click the button below to have AI verify your code logic and syntax.'}
-                        </p>
+                        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-1">
+                          {chatSessions.map(session => (
+                            <div 
+                              key={session.id}
+                              onClick={() => setCurrentSessionId(session.id)}
+                              className={`group p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between ${currentSessionId === session.id ? 'bg-white/5 text-white' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300'}`}
+                            >
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <MessageSquare size={14} className="shrink-0" />
+                                <span className="text-[10px] font-bold truncate">{session.title}</span>
+                              </div>
+                              <button 
+                                onClick={(e) => deleteSession(session.id, e)}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
 
+                      {/* Chat Main Area */}
+                      <div className="flex-1 flex flex-col relative">
+                        {/* Close Button for Full Screen Mode */}
                         <button 
-                          onClick={() => {
-                            if (user) {
-                              checkCodeWithAI();
-                            } else {
-                              showToast(currentLang === 'vi' ? 'Vui lòng đăng nhập để sử dụng AI!' : 'Please login to use AI!', 'warning');
-                            }
-                          }}
-                          disabled={isCheckingCode}
-                          className="w-full py-5 bg-[#4c97ff] hover:bg-[#3d86f0] disabled:bg-gray-800 text-white font-black rounded-2xl transition-all shadow-2xl shadow-[#4c97ff]/20 flex items-center justify-center gap-3"
+                          onClick={() => setControlCenterTab('storage')}
+                          className="absolute top-4 right-4 z-[1001] p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl transition-all border border-white/5"
                         >
-                          {isCheckingCode ? <RefreshCw className="animate-spin" size={20} /> : <Sparkles size={20} />}
-                          {isCheckingCode ? 'ANALYZING...' : 'RUN AI CHECK'}
+                          <X size={20} />
                         </button>
+
+                        {/* Chat Header */}
+                        <div className="p-3 border-b border-white/5 bg-black/40">
+                          <div className="max-w-2xl mx-auto flex items-center gap-2">
+                            <div className="w-7 h-7 bg-[#4c97ff]/20 rounded-lg flex items-center justify-center">
+                              <Sparkles className="text-[#4c97ff]" size={14} />
+                            </div>
+                            <div>
+                              <h2 className="text-base font-black text-white tracking-tight uppercase">AI ASSISTANT</h2>
+                              <p className="text-[9px] text-gray-500 font-bold tracking-widest uppercase mt-0.5">
+                                {currentLang === 'vi' ? 'Phân tích code và hỗ trợ lập trình' : 'Code analysis and programming support'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-3 custom-scrollbar space-y-3">
+                          {aiMessages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-3">
+                              <div className="w-14 h-14 bg-white/5 rounded-xl flex items-center justify-center">
+                                <Sparkles className="text-gray-600" size={28} />
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-black text-white tracking-tight uppercase">
+                                  {currentLang === 'vi' ? 'Bắt đầu trò chuyện' : 'Start Chatting'}
+                                </h3>
+                                <p className="text-[10px] text-gray-500 mt-1 leading-relaxed">
+                                  {currentLang === 'vi' 
+                                    ? 'Tôi có thể giúp bạn giải thích code, tìm lỗi hoặc hướng dẫn bạn cách sử dụng các khối lệnh.' 
+                                    : 'I can help you explain code, find bugs, or guide you on how to use blocks.'}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            aiMessages.map((msg, idx) => (
+                              <motion.div 
+                                key={idx}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                              >
+                                <div className={`max-w-[90%] p-3 rounded-xl ${
+                                  msg.role === 'user' 
+                                    ? 'bg-[#4c97ff] text-white rounded-tr-none shadow-lg shadow-blue-500/20' 
+                                    : 'bg-white/5 text-gray-200 border border-white/5 rounded-tl-none'
+                                }`}>
+                                  <div className="markdown-body text-[11px] leading-relaxed">
+                                    <Markdown>{msg.content}</Markdown>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ))
+                          )}
+                          {isCheckingCode && (
+                            <div className="flex justify-start">
+                              <div className="bg-white/5 p-3 rounded-xl rounded-tl-none border border-white/5 flex items-center gap-2">
+                                <div className="flex gap-1">
+                                  <div className="w-1 h-1 bg-[#4c97ff] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                                  <div className="w-1 h-1 bg-[#4c97ff] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                                  <div className="w-1 h-1 bg-[#4c97ff] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                                </div>
+                                <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">AI is thinking...</span>
+                              </div>
+                            </div>
+                          )}
+                          <div ref={chatEndRef} />
+                        </div>
+
+                        {/* Input Area */}
+                        <div className="p-3 bg-black/40 border-t border-white/5">
+                          <div className="max-w-2xl mx-auto relative flex items-end gap-2">
+                            <div className="flex-1 relative">
+                              <textarea 
+                                value={aiInput}
+                                onChange={(e) => {
+                                  setAiInput(e.target.value);
+                                  e.target.style.height = 'auto';
+                                  const newHeight = Math.min(e.target.scrollHeight, 100);
+                                  e.target.style.height = newHeight + 'px';
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    sendChatMessage();
+                                  }
+                                }}
+                                placeholder={currentLang === 'vi' ? "Nhập tin nhắn..." : "Type a message..."}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4 text-white text-[11px] focus:outline-none focus:border-[#4c97ff]/50 transition-all resize-none custom-scrollbar min-h-[40px] max-h-[100px]"
+                                rows={1}
+                              />
+                            </div>
+                            <button 
+                              onClick={() => sendChatMessage()}
+                              disabled={!aiInput.trim() || isCheckingCode}
+                              className="p-2.5 bg-[#4c97ff] hover:bg-[#3d86f0] disabled:bg-gray-800 text-white rounded-xl transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center"
+                            >
+                              <Play size={16} fill="currentColor" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {controlCenterTab === 'achievements' && (
+                    <div className="flex-1 flex flex-col p-8 overflow-hidden">
+                      <div className="flex items-center justify-between mb-8">
+                        <div>
+                          <h2 className="text-2xl font-black text-white tracking-tight">{currentLang === 'vi' ? 'THÀNH TỰU VÔ TRÍ' : 'MINDLESS ACHIEVEMENTS'}</h2>
+                          <p className="text-xs text-gray-500 font-bold tracking-widest uppercase mt-1">
+                            {currentLang === 'vi' ? 'Những cột mốc không ai cần nhưng bạn vẫn có' : 'Milestones nobody needs but you still have'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {user && isAutoSaving && (
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-green-500/10 rounded-full border border-green-500/20">
+                              <RefreshCw size={10} className="text-green-500 animate-spin" />
+                              <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Auto-saving</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20">
+                            <Trophy size={12} className="text-yellow-500" />
+                            <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest">
+                              {achievements.length} / {achievementList.length}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar grid grid-cols-2 gap-4">
+                        {achievementList.map((ach) => {
+                          const isUnlocked = achievements.includes(ach.id);
+                          return (
+                            <div 
+                              key={ach.id}
+                              className={`p-4 rounded-2xl border transition-all flex items-center gap-4 ${isUnlocked ? 'bg-white/5 border-white/10' : 'bg-black/20 border-white/5 opacity-40 grayscale'}`}
+                            >
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isUnlocked ? 'bg-[#4c97ff]/20' : 'bg-gray-800 text-gray-600'}`}>
+                                {isUnlocked ? (
+                                  <img 
+                                    src="/attachments/86c69f2e-131b-410c-977b-6020586e37e9.png" 
+                                    alt="Badge" 
+                                    className="w-10 h-10 object-contain"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/190/190411.png';
+                                    }}
+                                  />
+                                ) : (
+                                  ach.icon
+                                )}
+                              </div>
+                              <div>
+                                <h4 className={`text-sm font-black tracking-tight ${isUnlocked ? 'text-white' : 'text-gray-500'}`}>
+                                  {ach.title[currentLang as 'vi' | 'en']}
+                                </h4>
+                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">
+                                  {ach.desc[currentLang as 'vi' | 'en']}
+                                </p>
+                              </div>
+                              {isUnlocked && (
+                                <div className="ml-auto">
+                                  <CheckCircle2 size={16} className="text-green-500" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             </motion.div>
@@ -8618,6 +9466,12 @@ sync() -- Initial sync on load`;
                     onClick={() => {
                       navigator.clipboard.writeText(generatedCode);
                       showToast(currentLang === 'vi' ? 'Đã sao chép mã!' : 'Code copied to clipboard!');
+                      
+                      // Speedrunner check
+                      const sessionStart = (window as any).sessionStartTime || Date.now();
+                      if (Date.now() - sessionStart < 30000) {
+                        unlockAchievement('speedrunner');
+                      }
                     }}
                     className="text-[10px] font-black text-[#4c97ff] hover:text-white transition-colors uppercase tracking-widest"
                   >
@@ -9147,6 +10001,67 @@ sync() -- Initial sync on load`;
           }
         `).join('\n')}
       `}</style>
+      {/* Achievement Badge Notification */}
+      <AnimatePresence>
+        {activeAchievement && (
+          <motion.div 
+            initial={{ x: 400, opacity: 0 }}
+            animate={{ 
+              x: 0, 
+              opacity: 1,
+              transition: {
+                type: 'spring',
+                damping: 12,
+                stiffness: 100,
+                restDelta: 0.001
+              }
+            }}
+            exit={{ x: 400, opacity: 0 }}
+            className="fixed bottom-10 right-10 z-[3000] flex items-center gap-4 bg-[#1a1a1a] border-2 border-[#4c97ff] rounded-3xl p-6 shadow-[0_0_50px_rgba(76,151,255,0.3)] min-w-[320px]"
+          >
+            <motion.div 
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="relative shrink-0"
+            >
+              <div className="w-20 h-20 bg-gradient-to-br from-[#4c97ff]/20 to-transparent rounded-2xl flex items-center justify-center overflow-hidden border border-white/10">
+                <img 
+                  src="/attachments/86c69f2e-131b-410c-977b-6020586e37e9.png" 
+                  alt="Badge" 
+                  className="w-16 h-16 object-contain"
+                  onError={(e) => {
+                    // Fallback if attachment is not found
+                    (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/190/190411.png';
+                  }}
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="absolute -top-2 -right-2 w-6 h-6 bg-[#4c97ff] rounded-full flex items-center justify-center shadow-lg">
+                <Trophy size={12} className="text-white" />
+              </div>
+            </motion.div>
+            
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-[#4c97ff] uppercase tracking-[0.2em] mb-1">Thành tựu mới!</span>
+              <h4 className="text-xl font-black text-white tracking-tight leading-none mb-1">
+                {activeAchievement.title[currentLang as 'vi' | 'en']}
+              </h4>
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">
+                {activeAchievement.desc[currentLang as 'vi' | 'en']}
+              </p>
+            </div>
+
+            {/* Shine effect */}
+            <motion.div 
+              initial={{ left: '-100%' }}
+              animate={{ left: '200%' }}
+              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3 }}
+              className="absolute top-0 w-20 h-full bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-[-20deg]"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Toast Notification */}
       <AnimatePresence>
         {toast && (

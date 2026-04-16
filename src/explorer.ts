@@ -71,7 +71,17 @@ const INITIAL_STRUCTURE: RobloxInstance = {
 };
 
 export const useExplorer = () => {
-  const [explorer, setExplorer] = useState<RobloxInstance>(INITIAL_STRUCTURE);
+  const [explorer, setExplorer] = useState<RobloxInstance>(() => {
+    const saved = localStorage.getItem('blocklua_explorer');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved explorer", e);
+      }
+    }
+    return INITIAL_STRUCTURE;
+  });
 
   const addInstance = useCallback((parentId: string, name: string, className: string, initialProps: Record<string, any> = {}) => {
     const newInstance: RobloxInstance = {
