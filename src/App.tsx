@@ -72,6 +72,7 @@ import {
   Terminal
 } from 'lucide-react';
 import Markdown from 'react-markdown';
+import { registerCustomContextMenu } from './contextMenu';
 import { useExplorer } from './explorer';
 import { ExplorerTree, getIcon } from './components/Explorer/Explorer';
 import { InsertObjectMenu } from './components/Explorer/InsertObjectMenu';
@@ -80,11 +81,17 @@ import { defineCustomGenerators } from './generators';
 import { toolbox } from './toolbox';
 import { getCategoryColor } from './colors';
 import { serviceGroups } from './serviceBlocks';
+import { BlocklyPreview } from './components/BlocklyPreview';
+import { getBlockDescription } from './lib/block-descriptions';
+import { CATEGORIES } from './constants/categories';
+import { robloxTheme } from './lib/roblox-theme';
 
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { auth, db, googleProvider, OperationType, handleFirestoreError } from './firebase';
+import { sendChatMessage } from './services/ai-chat';
+import { checkCodeWithAI } from './services/ai-checker';
 import { 
   signInWithPopup, 
   signOut, 
@@ -103,268 +110,6 @@ import {
   Timestamp,
   writeBatch
 } from 'firebase/firestore';
-
-const CATEGORIES = [
-  { name: 'Comment' },
-  { name: 'Debug' },
-  { name: 'Logic' },
-  { name: 'Math' },
-  { name: 'Text' },
-  { name: 'Sound' },
-  { name: 'Values' },
-  { name: 'Variables' },
-  { name: 'Lists' },
-  { name: 'Loops' },
-  { name: 'World' },
-  { name: 'Instance' },
-  { name: 'Part' },
-  { name: 'Character' },
-  { name: 'Model' },
-  { name: 'Gui' },
-  { name: 'ClickDetector' },
-  { name: 'Marketplace' },
-  { name: 'Tweening' },
-  { name: 'Client' },
-  { name: 'Server' },
-  { name: 'Leaderstats' },
-  { name: 'Datastore' },
-  { name: 'Functions' },
-  { name: 'Events' },
-  { name: 'Animation' },
-  { name: 'Input' },
-  { name: 'Camera' },
-  { name: 'Effects' },
-  { name: 'AdService' },
-  { name: 'AnalyticsService' },
-  { name: 'AnimationClipProvider' },
-  { name: 'AssetService' },
-  { name: 'AvatarEditorService' },
-  { name: 'BadgeService' },
-  { name: 'BrowserService' },
-  { name: 'ChangeHistoryService' },
-  { name: 'Chat' },
-  { name: 'CollectionService' },
-  { name: 'ContentProvider' },
-  { name: 'ContextActionService' },
-  { name: 'ControllerService' },
-  { name: 'CoreGui' },
-  { name: 'CorePackages' },
-  { name: 'CSGDictionaryService' },
-  { name: 'DataStoreService' },
-  { name: 'Debris' },
-  { name: 'DebuggerManager' },
-  { name: 'DeviceService' },
-  { name: 'FriendService' },
-  { name: 'GamepadService' },
-  { name: 'Geometry' },
-  { name: 'GroupService' },
-  { name: 'GuiService' },
-  { name: 'HapticService' },
-  { name: 'HttpService' },
-  { name: 'InsertService' },
-  { name: 'JointsService' },
-  { name: 'KeyframeSequenceProvider' },
-  { name: 'LanguageService' },
-  { name: 'Lighting' },
-  { name: 'LocalizationService' },
-  { name: 'LogService' },
-  { name: 'LuaSettings' },
-  { name: 'MarketplaceService' },
-  { name: 'MaterialService' },
-  { name: 'MemoryStoreService' },
-  { name: 'MessagingService' },
-  { name: 'NetworkClient' },
-  { name: 'NetworkServer' },
-  { name: 'NotificationService' },
-  { name: 'PathfindingService' },
-  { name: 'PhysicsService' },
-  { name: 'Players' },
-  { name: 'PluginDebugService' },
-  { name: 'PluginGuiService' },
-  { name: 'PointsService' },
-  { name: 'PolicyService' },
-  { name: 'ProximityPromptService' },
-  { name: 'ReplicatedFirst' },
-  { name: 'ReplicatedStorage' },
-  { name: 'RunService' },
-  { name: 'ScriptContext' },
-  { name: 'Selection' },
-  { name: 'ServerScriptService' },
-  { name: 'ServerStorage' },
-  { name: 'SoundService' },
-  { name: 'StarterGui' },
-  { name: 'StarterPack' },
-  { name: 'StarterPlayer' },
-  { name: 'Stats' },
-  { name: 'StudioData' },
-  { name: 'Teams' },
-  { name: 'TeleportService' },
-  { name: 'TestService' },
-  { name: 'TextChatService' },
-  { name: 'TextService' },
-  { name: 'TweenService' },
-  { name: 'UserGameSettings' },
-  { name: 'UserInputService' },
-  { name: 'VRService' },
-  { name: 'Workspace' },
-].map((cat) => ({
-  ...cat,
-  color: getCategoryColor(cat.name)
-}));
-
-const BlocklyPreview = ({ blockType }: { blockType: string }) => {
-  const previewRef = useRef<HTMLDivElement>(null);
-  const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null);
-
-  useEffect(() => {
-    if (!previewRef.current) return;
-
-    // Clean up previous workspace
-    if (workspaceRef.current) {
-      try {
-        workspaceRef.current.dispose();
-      } catch (e) {
-        console.warn("Error disposing workspace:", e);
-      }
-      workspaceRef.current = null;
-    }
-
-    // Inject new read-only workspace
-    workspaceRef.current = Blockly.inject(previewRef.current, {
-      readOnly: true,
-      sounds: false,
-      scrollbars: false,
-      trashcan: false,
-      renderer: 'custom_zelos',
-      move: {
-        scrollbars: false,
-        drag: false,
-        wheel: false
-      },
-      theme: Blockly.Theme.defineTheme('previewTheme', {
-        name: 'previewTheme',
-        base: Blockly.Themes.Classic,
-        componentStyles: {
-          workspaceBackgroundColour: 'transparent',
-          toolboxBackgroundColour: 'transparent',
-          toolboxForegroundColour: '#fff',
-          flyoutBackgroundColour: '#252526',
-          flyoutForegroundColour: '#ccc',
-          flyoutOpacity: 1,
-          scrollbarColour: '#797979',
-          insertionMarkerColour: '#fff',
-          insertionMarkerOpacity: 0.3,
-          scrollbarOpacity: 0.4,
-          cursorColour: '#d0d0d0'
-        }
-      })
-    });
-
-    // Create the block
-    try {
-      const block = workspaceRef.current.newBlock(blockType);
-      block.initSvg();
-      block.render();
-
-      // Center the block
-      const metrics = workspaceRef.current.getMetrics();
-      const blockMetrics = block.getBoundingRectangle();
-      
-      const width = blockMetrics.right - blockMetrics.left;
-      const height = blockMetrics.bottom - blockMetrics.top;
-      
-      const x = (metrics.viewWidth - width) / 2;
-      const y = (metrics.viewHeight - height) / 2;
-      
-      block.moveBy(x, y);
-    } catch (e) {
-      console.error("Failed to render preview block:", e);
-    }
-
-    return () => {
-      if (workspaceRef.current) {
-        try {
-          workspaceRef.current.dispose();
-        } catch (e) {
-          console.warn("Error disposing workspace:", e);
-        }
-        workspaceRef.current = null;
-      }
-    };
-  }, [blockType]);
-
-  return <div ref={previewRef} className="w-full h-full" />;
-};
-
-const getBlockDescription = (block: any, lang: string) => {
-  const type = block.type.toLowerCase();
-  const name = block.name;
-  
-  // Events
-  if (type.includes('event')) {
-    if (type.includes('touched')) {
-      return lang === 'vi'
-        ? `Sự kiện này kích hoạt khi một đối tượng khác chạm vào đối tượng này. Nó trả về đối tượng đã chạm vào (OtherPart). Rất hữu ích để tạo bẫy, cửa tự động hoặc vùng hồi máu.`
-        : `This event triggers when another object touches this object. It returns the object that touched it (OtherPart). Useful for creating traps, automatic doors, or healing zones.`;
-    }
-    if (type.includes('click')) {
-      return lang === 'vi'
-        ? `Sự kiện này kích hoạt khi người chơi click chuột vào đối tượng (phải có ClickDetector). Cho phép bạn tạo các nút bấm, công tắc hoặc vật phẩm có thể tương tác.`
-        : `This event triggers when a player clicks on the object (requires a ClickDetector). Allows you to create buttons, switches, or interactive items.`;
-    }
-    return lang === 'vi' 
-      ? `Sự kiện "${name}" sẽ tự động chạy đoạn mã bên trong khi điều kiện tương ứng xảy ra trong trò chơi. Đây là điểm bắt đầu của hầu hết các kịch bản.`
-      : `The "${name}" event will automatically run the code inside when the corresponding condition occurs in the game. This is the starting point for most scripts.`;
-  }
-  
-  // Properties (Set/Get)
-  if (type.includes('set_')) {
-    const prop = name.replace('set ', '').replace('đặt ', '');
-    return lang === 'vi'
-      ? `Khối lệnh này cho phép bạn thay đổi giá trị của thuộc tính "${prop}". Ví dụ: đổi màu sắc, độ trong suốt, hoặc vị trí của một khối Part.`
-      : `This block allows you to change the value of the "${prop}" property. For example: changing the color, transparency, or position of a Part.`;
-  }
-  if (type.includes('get_')) {
-    const prop = name.replace('get ', '').replace('lấy ', '');
-    return lang === 'vi'
-      ? `Khối lệnh này đọc giá trị hiện tại của thuộc tính "${prop}" để bạn có thể sử dụng nó trong các phép tính hoặc điều kiện khác.`
-      : `This block reads the current value of the "${prop}" property so you can use it in other calculations or conditions.`;
-  }
-  
-  // Logic
-  if (type === 'lua_if') {
-    return lang === 'vi'
-      ? `Cấu trúc điều kiện cơ bản nhất. Nếu [điều kiện] là đúng (true), thì các lệnh bên trong sẽ được thực hiện. Nếu sai, chúng sẽ bị bỏ qua.`
-      : `The most basic conditional structure. If the [condition] is true, the blocks inside will be executed. If false, they will be skipped.`;
-  }
-  
-  // Instance creation
-  if (type.includes('instance_new')) {
-    return lang === 'vi'
-      ? `Tạo ra một đối tượng mới hoàn toàn (như Part, Script, Sound) trong trò chơi. Bạn cần đặt Parent cho nó để nó xuất hiện trong thế giới.`
-      : `Creates a brand new object (like a Part, Script, Sound) in the game. You need to set its Parent for it to appear in the world.`;
-  }
-
-  // Default fallback
-  return lang === 'vi' 
-    ? `Khối lệnh "${name}" thuộc nhóm ${block.category}. Nó cung cấp các chức năng chuyên sâu để điều khiển ${name.toLowerCase()} trong môi trường Roblox.`
-    : `The "${name}" block belongs to the ${block.category} category. It provides specialized functions to control ${name.toLowerCase()} within the Roblox environment.`;
-};
-
-const robloxTheme = {
-  ...vscDarkPlus,
-  'keyword': { color: '#f86d7c' }, // Pink/Red
-  'function': { color: '#f86d7c' }, // Pink/Red
-  'string': { color: '#32cd32' }, // Green
-  'number': { color: '#ff8c00' }, // Orange/Red
-  'comment': { color: '#666666' }, // Grey
-  'operator': { color: '#ffffff' },
-  'punctuation': { color: '#ffffff' },
-  'builtin': { color: '#84d6f7' }, // Light Blue
-  'class-name': { color: '#84d6f7' }, // Light Blue
-  'boolean': { color: '#ffc600' }, // Yellow
-  'constant': { color: '#ffc600' }, // Yellow (for nil)
-};
 
 export default function App() {
   const [currentLang, setCurrentLang] = useState<'vi' | 'en'>('vi');
@@ -843,362 +588,38 @@ export default function App() {
     }
   };
 
-  const sendChatMessage = async (input?: string) => {
+  const sendChatMessageInternal = async (input?: string) => {
     const messageText = input || aiInput;
     if (!messageText.trim()) return;
 
     const newUserMessage = { role: 'user' as const, content: messageText };
     setAiMessages(prev => [...prev, newUserMessage]);
     setAiInput('');
-    setIsCheckingCode(true);
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-      const history = aiMessages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }]
-      }));
-
-      const tools = [
-        {
-          functionDeclarations: [
-            {
-              name: "addBlock",
-              description: "Adds a new block to the workspace at the specified coordinates. Use this to create new logic.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {
-                  blockType: {
-                    type: Type.STRING,
-                    description: "The type of the block to add (e.g., 'lua_if', 'loops_while_lua', 'math_number_custom', 'roblox_part')."
-                  },
-                  x: {
-                    type: Type.NUMBER,
-                    description: "The x-coordinate in the workspace."
-                  },
-                  y: {
-                    type: Type.NUMBER,
-                    description: "The y-coordinate in the workspace."
-                  }
-                },
-                required: ["blockType", "x", "y"]
-              }
-            },
-            {
-              name: "updateBlock",
-              description: "Updates an existing block's field value (like a number or string value).",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {
-                  blockId: {
-                    type: Type.STRING,
-                    description: "The unique ID of the block to update."
-                  },
-                  fieldName: {
-                    type: Type.STRING,
-                    description: "The name of the field to update (e.g., 'NUM', 'TEXT', 'VAR')."
-                  },
-                  value: {
-                    type: Type.STRING,
-                    description: "The new value to set for the field."
-                  }
-                },
-                required: ["blockId", "fieldName", "value"]
-              }
-            },
-            {
-              name: "connectBlocks",
-              description: "Connects two blocks together. Use this to assemble logic chains.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {
-                  parentBlockId: { type: Type.STRING, description: "The ID of the block that will receive the connection." },
-                  childBlockId: { type: Type.STRING, description: "The ID of the block that will be connected to the parent." },
-                  connectionType: { 
-                    type: Type.STRING, 
-                    enum: ["next", "input"],
-                    description: "'next' for statement connection, 'input' for value input connection."
-                  },
-                  inputName: { type: Type.STRING, description: "The name of the input if connectionType is 'input' (e.g., 'CONDITION', 'VALUE', 'A', 'B')." }
-                },
-                required: ["parentBlockId", "childBlockId", "connectionType"]
-              }
-            },
-            {
-              name: "clearWorkspace",
-              description: "Clears all blocks from the workspace.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {}
-              }
-            }
-          ]
-        }
-      ];
-
-      const systemInstruction = `
-        You are a helpful AI assistant for BlockLua, a Roblox Luau block-based programming environment.
-        You can explain code, find bugs, and DIRECTLY control the workspace by adding, updating, connecting, or clearing blocks.
-        
-        WORKSPACE MANIPULATION:
-        - When a user asks for a block (e.g., "add a while loop"), use the 'addBlock' tool.
-        - To build logic, you MUST connect blocks using 'connectBlocks'. For example, to put a 'print' inside an 'if', add both blocks then connect 'if' (DO input) to 'print'.
-        - When you find an error in the current workspace blocks compared to valid Roblox Luau syntax, use 'updateBlock' to fix fields or 'addBlock' to replace incorrect logic.
-        - Be smart: If a user's intent is slightly ambiguous, choose the most logical block (e.g., if they mention "looping while something is true", use 'loops_while_lua').
-        - IMPORTANT: When adding blocks with inputs, the system will automatically handle basic placeholders for you.
-        - Your goal is to ensure the blocks in the workspace generate valid Roblox Luau code. Compare the 'Workspace (Blocks)' state with the 'Roblox Luau Code' generated from it. If the code is wrong, fix the blocks.
-        
-        REPORTING:
-        - After performing actions, tell the user exactly what you did (e.g., "I fixed the condition in your loop" or "I added a Touch event for you").
-        - If you are creating a complex script, you can call 'addBlock' and 'connectBlocks' multiple times in sequence.
-        
-        CRITICAL:
-        - DO NOT start your response with "Chào bạn" or any generic greetings. Get straight to the point.
-        - If the user asks you to create or add something, you MUST use the tools to do it. Do not just explain how to do it.
-        - Always prioritize the user's specific request for block creation.
-        - Ensure blocks are connected logically. Disconnected blocks are usually useless.
-        - Use ONLY the block types provided in the 'Toolbox' context.
-      `;
-
-      const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        history: history,
-        config: {
-          systemInstruction: systemInstruction,
-          maxOutputTokens: 2048,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          tools: tools
-        },
-      });
-
-      // Context about the current environment
-      const workspaceData = workspace.current ? Blockly.serialization.workspaces.save(workspace.current) : {};
-      const explorerData = explorer;
-      const toolboxData = toolboxRef.current;
-
-      const contextPrompt = `
-        Environment Context:
-        - Roblox Luau Code: ${generatedCode}
-        - Explorer (Object Tree): ${JSON.stringify(explorerData)}
-        - Workspace (Blocks): ${JSON.stringify(workspaceData)}
-        - Toolbox (Available Blocks): ${JSON.stringify(toolboxData)}
-
-        User Message: ${messageText}
-      `;
-
-      let result = await chat.sendMessageStream({ message: contextPrompt });
-      
-      // Add empty AI message to start streaming into
-      setAiMessages(prev => [...prev, { role: 'ai', content: "" }]);
-      
-      let fullText = "";
-      let lastChunk: any = null;
-      for await (const chunk of result) {
-        lastChunk = chunk;
-        const chunkText = chunk.text || "";
-        fullText += chunkText;
-        setAiMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last && last.role === 'ai') {
-            return [...prev.slice(0, -1), { role: 'ai', content: fullText }];
-          }
-          return prev;
-        });
-      }
-
-      const response = lastChunk;
-
-      // Loop to handle multiple rounds of function calls
-      let rounds = 0;
-      let currentResponse = response;
-      while (currentResponse && currentResponse.functionCalls && rounds < 10) {
-        rounds++;
-        const toolResults = [];
-        for (const call of currentResponse.functionCalls) {
-          if (call.name === 'addBlock') {
-            const { blockType, x, y } = call.args as any;
-            if (workspace.current) {
-              try {
-                const block = workspace.current.newBlock(blockType);
-                block.initSvg();
-                block.render();
-                block.moveBy(x, y);
-
-                // Auto-attach placeholders for all value inputs
-                block.inputList.forEach(input => {
-                  // input.connection.type === 1 is INPUT_VALUE
-                  if (input.connection && input.connection.type === 1 && !input.connection.targetBlock()) {
-                    let placeholderType = 'placeholder_any';
-                    if (input.name === 'CONDITION' || input.name === 'BOOL') placeholderType = 'placeholder_condition';
-                    else if (input.name === 'NUM' || input.name === 'SECONDS' || input.name === 'A' || input.name === 'B') placeholderType = 'placeholder_number';
-                    else if (input.name === 'TEXT' || input.name === 'NAME') placeholderType = 'placeholder_string';
-                    else if (input.name === 'INSTANCE' || input.name === 'PARENT') placeholderType = 'placeholder_instance';
-
-                    try {
-                      const placeholder = workspace.current!.newBlock(placeholderType);
-                      placeholder.initSvg();
-                      placeholder.render();
-                      input.connection?.connect(placeholder.outputConnection!);
-                    } catch (e) {
-                      console.warn("Failed to add placeholder:", e);
-                    }
-                  }
-                });
-                
-                toolResults.push({ name: call.name, result: `Successfully added block ${blockType} with ID ${block.id}` });
-              } catch (e) {
-                toolResults.push({ name: call.name, error: `Failed to add block ${blockType}: ${e}` });
-              }
-            }
-          } else if (call.name === 'connectBlocks') {
-            const { parentBlockId, childBlockId, connectionType, inputName } = call.args as any;
-            if (workspace.current) {
-              const parent = workspace.current.getBlockById(parentBlockId);
-              const child = workspace.current.getBlockById(childBlockId);
-              if (parent && child) {
-                try {
-                  if (connectionType === 'next') {
-                    parent.nextConnection?.connect(child.previousConnection!);
-                  } else if (connectionType === 'input' && inputName) {
-                    const input = parent.getInput(inputName);
-                    if (input) {
-                      input.connection?.connect(child.outputConnection! || child.previousConnection!);
-                    }
-                  }
-                  toolResults.push({ name: call.name, result: `Successfully connected ${childBlockId} to ${parentBlockId}` });
-                } catch (e) {
-                  toolResults.push({ name: call.name, error: `Failed to connect blocks: ${e}` });
-                }
-              } else {
-                toolResults.push({ name: call.name, error: `One or both blocks not found: ${parentBlockId}, ${childBlockId}` });
-              }
-            }
-          } else if (call.name === 'updateBlock') {
-            const { blockId, fieldName, value } = call.args as any;
-            if (workspace.current) {
-              const block = workspace.current.getBlockById(blockId);
-              if (block) {
-                try {
-                  block.setFieldValue(value, fieldName);
-                  toolResults.push({ name: call.name, result: `Successfully updated block ${blockId}` });
-                } catch (e) {
-                  toolResults.push({ name: call.name, error: `Failed to update block ${blockId}: ${e}` });
-                }
-              } else {
-                toolResults.push({ name: call.name, error: `Block ${blockId} not found` });
-              }
-            }
-          } else if (call.name === 'clearWorkspace') {
-            if (workspace.current) {
-              workspace.current.clear();
-              toolResults.push({ name: call.name, result: `Successfully cleared workspace` });
-            }
-          }
-        }
-        
-        // Send all tool results back to AI in one go
-        const toolResultStream = await chat.sendMessageStream({
-          message: `Tool execution results: ${JSON.stringify(toolResults)}. Please continue or provide final response.`
-        });
-
-        fullText = "";
-        let lastToolChunk: any = null;
-        for await (const chunk of toolResultStream) {
-          lastToolChunk = chunk;
-          const chunkText = chunk.text || "";
-          fullText += chunkText;
-          setAiMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'ai') {
-              return [...prev.slice(0, -1), { role: 'ai', content: fullText }];
-            }
-            return prev;
-          });
-        }
-        currentResponse = lastToolChunk;
-      }
-
-      const text = response.text || (currentLang === 'vi' ? 'AI không có phản hồi.' : 'AI provided no response.');
-      setAiMessages(prev => [...prev, { role: 'ai', content: text }]);
-    } catch (error) {
-      console.error("AI Chat Error:", error);
-      showToast(currentLang === 'vi' ? 'Lỗi kết nối AI!' : 'AI Connection Error!', 'error');
-    } finally {
-      setIsCheckingCode(false);
-    }
+    
+    await sendChatMessage(
+      messageText,
+      currentLang,
+      generatedCode,
+      explorer,
+      workspace,
+      toolboxRef.current,
+      chatSessions,
+      currentSessionId,
+      setAiMessages,
+      setIsCheckingCode,
+      showToast
+    );
   };
 
-  const checkCodeWithAI = async () => {
-    if (!generatedCode.trim()) {
-      showToast(currentLang === 'vi' ? 'Vui lòng thêm khối lệnh trước!' : 'Please add some blocks first!', 'error');
-      return;
-    }
-
-    setIsCheckingCode(true);
-    setAiResult(null);
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-      
-      const prompt = `
-        You are an expert Roblox Lua (Luau) developer and debugger.
-        Analyze the following code for syntax errors, logical bugs, or common mistakes.
-        
-        CODE:
-        ${generatedCode}
-      `;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              status: {
-                type: Type.STRING,
-                description: "The status of the check: 'success', 'warning', or 'error'",
-                enum: ["success", "warning", "error"]
-              },
-              message: {
-                type: Type.STRING,
-                description: "A brief message explaining the result"
-              },
-              details: {
-                type: Type.STRING,
-                description: "Detailed explanation if there are issues"
-              },
-              line: {
-                type: Type.NUMBER,
-                description: "The line number where the issue occurs, or null"
-              }
-            },
-            required: ["status", "message", "details"]
-          }
-        }
-      });
-
-      const resultText = response.text;
-      if (resultText) {
-        const result = JSON.parse(resultText);
-        setAiResult(result);
-        
-        if (result.status === 'error' || result.status === 'warning') {
-          setShowControlCenter(false);
-          showToast(result.message, result.status);
-        } else {
-          showToast(currentLang === 'vi' ? 'Mã chạy tốt!' : 'Code looks good!', 'success');
-        }
-      } else {
-        showToast(currentLang === 'vi' ? 'Lỗi khi nhận phản hồi từ AI!' : 'Error receiving AI response!', 'error');
-      }
-    } catch (error) {
-      console.error("AI Check Error:", error);
-      showToast(currentLang === 'vi' ? 'Lỗi kết nối AI!' : 'AI connection error!', 'error');
-    } finally {
-      setIsCheckingCode(false);
-    }
+  const checkCodeWithAIInternal = async () => {
+    await checkCodeWithAI(
+      generatedCode,
+      currentLang,
+      setIsCheckingCode,
+      setAiResult,
+      showToast,
+      setShowControlCenter
+    );
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -1424,6 +845,11 @@ export default function App() {
 
   useEffect(() => {
     if (!blocklyDiv.current) return;
+
+    blocks.patchFlyoutAnimations();
+    blocks.defineCustomBlocks();
+    defineCustomGenerators();
+    registerCustomContextMenu(currentLang);
 
     // Custom field for clickable variable labels
     class FieldClickableVarLabel extends Blockly.FieldLabel {
@@ -4841,272 +4267,14 @@ export default function App() {
       };
 
     const defineGenerators = () => {
-      // Comment
-      luaGenerator.forBlock['comment'] = function(block: any) {
-        const text = block.getFieldValue('TEXT');
-        return '-- ' + text + '\n';
-      };
-
-      // Debug
-      luaGenerator.forBlock['print'] = function(block: any) {
-        const text = luaGenerator.valueToCode(block, 'TEXT', Order.NONE) || '""';
-        return 'print(' + text + ')\n';
-      };
-      luaGenerator.forBlock['warn'] = function(block: any) {
-        const text = luaGenerator.valueToCode(block, 'TEXT', Order.NONE) || '""';
-        return 'warn(' + text + ')\n';
-      };
-      luaGenerator.forBlock['run_lua'] = function(block: any) {
-        const code = block.getFieldValue('CODE');
-        return code + '\n';
-      };
-
       // Logic
-      luaGenerator.forBlock['wait'] = function(block: any) {
-        const seconds = luaGenerator.valueToCode(block, 'SECONDS', Order.NONE) || '0';
-        return 'task.wait(' + seconds + ')\n';
-      };
-      luaGenerator.forBlock['lua_if'] = function(block: any) {
-        const condition = luaGenerator.valueToCode(block, 'CONDITION', Order.NONE) || 'false';
-        const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'if ' + condition + ' then\n' + branch + 'end\n';
-      };
-      luaGenerator.forBlock['logic_negate'] = function(block: any) {
-        const bool = luaGenerator.valueToCode(block, 'BOOL', Order.UNARY) || 'false';
-        return ['not ' + bool, Order.UNARY];
-      };
-      luaGenerator.forBlock['logic_compare_eq'] = function(block: any) {
-        const a = luaGenerator.valueToCode(block, 'A', Order.RELATIONAL) || 'nil';
-        const b = luaGenerator.valueToCode(block, 'B', Order.RELATIONAL) || 'nil';
-        return [a + ' == ' + b, Order.RELATIONAL];
-      };
-      luaGenerator.forBlock['logic_compare_lt'] = function(block: any) {
-        const a = luaGenerator.valueToCode(block, 'A', Order.RELATIONAL) || '0';
-        const b = luaGenerator.valueToCode(block, 'B', Order.RELATIONAL) || '0';
-        return [a + ' < ' + b, Order.RELATIONAL];
-      };
-      luaGenerator.forBlock['logic_compare_gt'] = function(block: any) {
-        const a = luaGenerator.valueToCode(block, 'A', Order.RELATIONAL) || '0';
-        const b = luaGenerator.valueToCode(block, 'B', Order.RELATIONAL) || '0';
-        return [a + ' > ' + b, Order.RELATIONAL];
-      };
-      luaGenerator.forBlock['logic_compare_neq'] = function(block: any) {
-        const a = luaGenerator.valueToCode(block, 'A', Order.RELATIONAL) || 'nil';
-        const b = luaGenerator.valueToCode(block, 'B', Order.RELATIONAL) || 'nil';
-        return [a + ' ~= ' + b, Order.RELATIONAL];
-      };
-      luaGenerator.forBlock['logic_boolean_true'] = function() {
-        return ['true', Order.ATOMIC];
-      };
-      luaGenerator.forBlock['logic_boolean_false'] = function() {
-        return ['false', Order.ATOMIC];
-      };
-      luaGenerator.forBlock['logic_operation_and'] = function(block: any) {
-        const a = luaGenerator.valueToCode(block, 'A', Order.AND) || 'false';
-        const b = luaGenerator.valueToCode(block, 'B', Order.AND) || 'false';
-        return [a + ' and ' + b, Order.AND];
-      };
-      luaGenerator.forBlock['logic_operation_or'] = function(block: any) {
-        const a = luaGenerator.valueToCode(block, 'A', Order.OR) || 'false';
-        const b = luaGenerator.valueToCode(block, 'B', Order.OR) || 'false';
-        return [a + ' or ' + b, Order.OR];
-      };
-
       // Math
-      luaGenerator.forBlock['math_number_custom'] = function(block: any) {
-        const num = block.getFieldValue('NUM');
-        return [num, Order.ATOMIC];
-      };
-      luaGenerator.forBlock['math_arithmetic_add'] = function(block: any) {
-        const a = luaGenerator.valueToCode(block, 'A', Order.ADDITIVE) || '0';
-        const b = luaGenerator.valueToCode(block, 'B', Order.ADDITIVE) || '0';
-        return [a + ' + ' + b, Order.ADDITIVE];
-      };
-      luaGenerator.forBlock['math_random_custom'] = function(block: any) {
-        const from = luaGenerator.valueToCode(block, 'FROM', Order.NONE) || '1';
-        const to = luaGenerator.valueToCode(block, 'TO', Order.NONE) || '10';
-        return ['math.random(' + from + ', ' + to + ')', Order.HIGH];
-      };
-      luaGenerator.forBlock['math_expr_1'] = function(block: any) {
-        const num = luaGenerator.valueToCode(block, 'NUM', Order.MULTIPLICATIVE) || '0';
-        const expr = block.getFieldValue('EXPR') || '';
-        return [num + ' ' + expr, Order.MULTIPLICATIVE];
-      };
-      luaGenerator.forBlock['math_expr_2'] = function(block: any) {
-        const num = luaGenerator.valueToCode(block, 'NUM', Order.MULTIPLICATIVE) || '0';
-        const expr = block.getFieldValue('EXPR') || '';
-        return [expr + ' ' + num, Order.MULTIPLICATIVE];
-      };
-      luaGenerator.forBlock['math_round'] = function(block: any) {
-        const num = luaGenerator.valueToCode(block, 'NUM', Order.NONE) || '0';
-        return ['math.round(' + num + ')', Order.HIGH];
-      };
-      luaGenerator.forBlock['math_abs'] = function(block: any) {
-        const num = luaGenerator.valueToCode(block, 'NUM', Order.NONE) || '0';
-        return ['math.abs(' + num + ')', Order.HIGH];
-      };
-      luaGenerator.forBlock['math_ceil'] = function(block: any) {
-        const num = luaGenerator.valueToCode(block, 'NUM', Order.NONE) || '0';
-        return ['math.ceil(' + num + ')', Order.HIGH];
-      };
-      luaGenerator.forBlock['math_floor'] = function(block: any) {
-        const num = luaGenerator.valueToCode(block, 'NUM', Order.NONE) || '0';
-        return ['math.floor(' + num + ')', Order.HIGH];
-      };
-
       // Text
-      luaGenerator.forBlock['text_string_custom'] = function(block: any) {
-        const text = block.getFieldValue('TEXT');
-        return ['"' + text + '"', Order.ATOMIC];
-      };
-      luaGenerator.forBlock['text_join_custom'] = function(block: any) {
-        const a = luaGenerator.valueToCode(block, 'A', Order.CONCATENATION) || '""';
-        const b = luaGenerator.valueToCode(block, 'B', Order.CONCATENATION) || '""';
-        return [a + ' .. ' + b, Order.CONCATENATION];
-      };
-      luaGenerator.forBlock['text_length_custom'] = function(block: any) {
-        const text = luaGenerator.valueToCode(block, 'TEXT', Order.UNARY) || '""';
-        return ['#' + text, Order.UNARY];
-      };
-      luaGenerator.forBlock['text_to_upper'] = function(block: any) {
-        const text = luaGenerator.valueToCode(block, 'TEXT', Order.NONE) || '""';
-        return [text + ':upper()', Order.HIGH];
-      };
-      luaGenerator.forBlock['text_to_lower'] = function(block: any) {
-        const text = luaGenerator.valueToCode(block, 'TEXT', Order.NONE) || '""';
-        return [text + ':lower()', Order.HIGH];
-      };
-
       // Values
-      luaGenerator.forBlock['values_to_string'] = function(block: any) {
-        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
-        return ['tostring(' + val + ')', Order.HIGH];
-      };
-      luaGenerator.forBlock['values_to_number'] = function(block: any) {
-        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
-        return ['tonumber(' + val + ')', Order.HIGH];
-      };
-
       // Variables
-      luaGenerator.forBlock['variables_create'] = function(block: any) {
-        const name = block.getFieldValue('VAR');
-        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
-        return 'local ' + name + ' = ' + val + '\n';
-      };
-      luaGenerator.forBlock['variables_set_custom'] = function(block: any) {
-        const name = block.getFieldValue('VAR');
-        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
-        return name + ' = ' + val + '\n';
-      };
-      luaGenerator.forBlock['variables_change_custom'] = function(block: any) {
-        const name = block.getFieldValue('VAR');
-        const val = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || '0';
-        return name + ' = ' + name + ' + ' + val + '\n';
-      };
-      luaGenerator.forBlock['variables_get_custom'] = function(block: any) {
-        const name = block.getFieldValue('VAR');
-        return [name, Order.ATOMIC];
-      };
-      luaGenerator.forBlock['var_reporter'] = function(block: any) {
-        let name = block.getFieldValue('NAME');
-        if (name && name.startsWith('var. ')) {
-          name = name.substring(5);
-        } else if (name && name.startsWith('var.')) {
-          name = name.substring(4);
-        }
-        return [name, Order.ATOMIC];
-      };
-
-      const varReporterGenerator = function(block: any): [string, number] {
-        let varName = block.getFieldValue('NAME');
-        if (varName && varName.startsWith('var. ')) {
-          varName = varName.substring(5);
-        } else if (varName && varName.startsWith('var.')) {
-          varName = varName.substring(4);
-        }
-        return [varName, Order.ATOMIC];
-      };
-
-      ['var_count', 'var_child', 'var_descendant', 'var_instance', 'var_clone', 'var_touched_part', 'var_climb_speed', 'var_humanoid', 'var_character_model', 'var_new_health', 'var_reached_goal', 'var_input', 'var_mouse_input', 'var_touch_input', 'var_player', 'var_click_detector', 'var_productid', 'var_key_input', 'var_received_data', 'var_data', 'var_value', 'var_character', 'var_otherPart', 'var_property', 'var_active', 'var_speed', 'var_deltaTime', 'var_time', 'var_message', 'var_attributeName'].forEach(type => {
-        luaGenerator.forBlock[type] = varReporterGenerator;
-      });
-
       // Lists
-      luaGenerator.forBlock['lists_empty'] = function() {
-        return ['{}', Order.ATOMIC];
-      };
-      luaGenerator.forBlock['lists_create'] = function() {
-        return ['{}', Order.ATOMIC];
-      };
-      luaGenerator.forBlock['lists_add'] = function(block: any) {
-        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
-        const item = luaGenerator.valueToCode(block, 'ITEM', Order.NONE) || 'nil';
-        return 'table.insert(' + list + ', ' + item + ')\n';
-      };
-      luaGenerator.forBlock['lists_set_item'] = function(block: any) {
-        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
-        const index = luaGenerator.valueToCode(block, 'INDEX', Order.NONE) || '1';
-        const item = luaGenerator.valueToCode(block, 'VALUE', Order.NONE) || 'nil';
-        return list + '[' + index + '] = ' + item + '\n';
-      };
-      luaGenerator.forBlock['lists_get_item'] = function(block: any) {
-        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
-        const index = luaGenerator.valueToCode(block, 'INDEX', Order.NONE) || '1';
-        return [list + '[' + index + ']', Order.HIGH];
-      };
-      luaGenerator.forBlock['lists_get'] = function(block: any) {
-        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
-        const index = luaGenerator.valueToCode(block, 'INDEX', Order.NONE) || '1';
-        return [list + '[' + index + ']', Order.HIGH];
-      };
-      luaGenerator.forBlock['lists_insert'] = function(block: any) {
-        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
-        const item = luaGenerator.valueToCode(block, 'ITEM', Order.NONE) || 'nil';
-        return 'table.insert(' + list + ', ' + item + ')\n';
-      };
-      luaGenerator.forBlock['lists_remove'] = function(block: any) {
-        const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
-        const index = luaGenerator.valueToCode(block, 'INDEX', Order.NONE) || '1';
-        return 'table.remove(' + list + ', ' + index + ')\n';
-      };
-      luaGenerator.forBlock['lists_length'] = function(block: any) {
-        const list = luaGenerator.valueToCode(block, 'LIST', Order.UNARY) || '{}';
-        return ['#' + list, Order.UNARY];
-      };
-
       // Loops
-      luaGenerator.forBlock['loops_repeat_lua'] = function(block: any) {
-        const from = luaGenerator.valueToCode(block, 'FROM', Order.NONE) || '1';
-        const to = luaGenerator.valueToCode(block, 'TO', Order.NONE) || '10';
-        const branch = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _count').replace('var. ', '');
-        return 'for ' + varName + ' = ' + from + ', ' + to + ' do\n' + branch + 'end\n';
-      };
-      luaGenerator.forBlock['loops_while_lua'] = function(block: any) {
-        const condition = luaGenerator.valueToCode(block, 'CONDITION', Order.NONE) || 'false';
-        const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'while ' + condition + ' do\n' + branch + 'end\n';
-      };
-      luaGenerator.forBlock['loops_for_children'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
-        const branch = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _child').replace('var. ', '');
-        return 'for _, ' + varName + ' in pairs(' + instance + ':GetChildren()) do\n' + branch + 'end\n';
-      };
-      luaGenerator.forBlock['loops_for_descendants'] = function(block: any) {
-        const instance = luaGenerator.valueToCode(block, 'INSTANCE', Order.NONE) || 'nil';
-        const branch = luaGenerator.statementToCode(block, 'DO');
-        const varName = (block.getFieldValue('VAR_LABEL') || 'var. _descendant').replace('var. ', '');
-        return 'for _, ' + varName + ' in pairs(' + instance + ':GetDescendants()) do\n' + branch + 'end\n';
-      };
-      luaGenerator.forBlock['loops_break_lua'] = function() {
-        return 'break\n';
-      };
-      luaGenerator.forBlock['loops_repeat'] = function(block: any) {
-        const times = luaGenerator.valueToCode(block, 'TIMES', Order.NONE) || '0';
-        const branch = luaGenerator.statementToCode(block, 'DO');
-        return 'for i = 1, ' + times + ' do\n' + branch + 'end\n';
-      };
+      // Events
       luaGenerator.forBlock['loops_while'] = function(block: any) {
         const condition = luaGenerator.valueToCode(block, 'CONDITION', Order.NONE) || 'false';
         const branch = luaGenerator.statementToCode(block, 'DO');
@@ -6139,9 +5307,6 @@ export default function App() {
       luaGenerator.forBlock['placeholder_player'] = function() { return ['nil', Order.ATOMIC]; };
     };
 
-    defineGenerators();
-
-    
     const toolbox = {
       kind: 'categoryToolbox',
       contents: CATEGORIES.map((cat) => {
@@ -7587,62 +6752,6 @@ export default function App() {
       (Blockly.VerticalFlyout as any).prototype._isPatchedForAnimations = true;
     }
 
-    // Remove unwanted context menu items safely
-    const registry = Blockly.ContextMenuRegistry.registry;
-    if (registry.getItem('blockInline')) registry.unregister('blockInline');
-    if (registry.getItem('blockCollapseExpand')) registry.unregister('blockCollapseExpand');
-    if (registry.getItem('blockDisable')) registry.unregister('blockDisable');
-    if (registry.getItem('blockComment')) registry.unregister('blockComment');
-
-    // Remove unwanted workspace context menu items
-    ['workspaceCollapse', 'collapseWorkspace', 'workspaceExpand', 'expandWorkspace', 'undoWorkspace', 'redoWorkspace'].forEach(id => {
-      if (registry.getItem(id)) registry.unregister(id);
-    });
-
-    // Scratch-like duplication
-    if (registry.getItem('blockDuplicate')) registry.unregister('blockDuplicate');
-    registry.register({
-      displayText: function() {
-        return currentLang === 'vi' ? 'Bản sao' : 'Duplicate';
-      },
-      preconditionFn: function(scope: any) {
-        if (scope.block && scope.block.isDeletable() && scope.block.isMovable()) {
-          return 'enabled';
-        }
-        return 'hidden';
-      },
-      callback: function(scope: any) {
-        const block = scope.block;
-        if (!block) return;
-        
-        const workspace = block.workspace;
-        Blockly.Events.setGroup(true);
-        try {
-          const xml = Blockly.Xml.blockToDom(block) as Element;
-          const newBlock = Blockly.Xml.domToBlock(xml, workspace) as any;
-          
-          // Position it exactly where the original is
-          const xy = (block as any).getRelativeToSurfaceXY();
-          newBlock.moveBy(xy.x, xy.y);
-          
-          // In standard Blockly, to make it follow the mouse like Scratch:
-          // We need to trigger a drag. This is best done by selecting it 
-          // and letting the user move it, but Scratch actually "grabs" it.
-          if (newBlock.select) newBlock.select();
-          
-          // For a true Scratch feel, we'd need to hook into the gesture system
-          // but simply selecting and placing it is the closest standard behavior.
-          // We'll add a small offset so it's visible if not immediately moved.
-          newBlock.moveBy(20, 20);
-        } finally {
-          Blockly.Events.setGroup(false);
-        }
-      },
-      scopeType: Blockly.ContextMenuRegistry.ScopeType.BLOCK,
-      id: 'blockDuplicate',
-      weight: 1,
-    });
-
     const customTheme = Blockly.Theme.defineTheme('customTheme', {
       'name': 'customTheme',
       'base': Blockly.Themes.Zelos,
@@ -7662,6 +6771,7 @@ export default function App() {
 
     blocks.defineCustomBlocks();
     defineCustomGenerators();
+    defineGenerators();
 
     toolboxRef.current = toolbox;
     workspace.current = Blockly.inject(blocklyDiv.current, {
@@ -9242,7 +8352,7 @@ sync() -- Initial sync on load`;
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
-                                    sendChatMessage();
+                                    sendChatMessageInternal();
                                   }
                                 }}
                                 placeholder={currentLang === 'vi' ? "Nhập tin nhắn..." : "Type a message..."}
@@ -9251,7 +8361,7 @@ sync() -- Initial sync on load`;
                               />
                             </div>
                             <button 
-                              onClick={() => sendChatMessage()}
+                              onClick={() => sendChatMessageInternal()}
                               disabled={!aiInput.trim() || isCheckingCode}
                               className="p-2.5 bg-[#4c97ff] hover:bg-[#3d86f0] disabled:bg-gray-800 text-white rounded-xl transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center"
                             >
