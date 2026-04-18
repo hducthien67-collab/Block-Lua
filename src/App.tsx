@@ -7326,6 +7326,7 @@ export default function App() {
     toolboxRef.current = toolbox;
     workspace.current = Blockly.inject(blocklyDiv.current, {
       toolbox: toolbox,
+      media: 'https://unpkg.com/blockly/media/',
       trashcan: false,
       zoom: {
         controls: false,
