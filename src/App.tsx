@@ -71,7 +71,7 @@ import {
   Database,
   Terminal
 } from 'lucide-react';
-import Markdown from 'react-markdown';
+import * as luaparse from 'luaparse';
 import { useExplorer } from './explorer';
 import { ExplorerTree, getIcon } from './components/Explorer/Explorer';
 import { InsertObjectMenu } from './components/Explorer/InsertObjectMenu';
@@ -83,7 +83,7 @@ import { serviceGroups } from './serviceBlocks';
 
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+const Type = { OBJECT: 'object', STRING: 'string', NUMBER: 'number' };
 import { auth, db, googleProvider, OperationType, handleFirestoreError } from './firebase';
 import { 
   signInWithPopup, 
@@ -392,62 +392,6 @@ export default function App() {
   const [showBlockInfoModal, setShowBlockInfoModal] = useState<boolean>(false);
   const [selectedBlockInfo, setSelectedBlockInfo] = useState<any>(null);
   const toolboxRef = useRef<any>(null);
-  const [chatSessions, setChatSessions] = useState<{ id: string, title: string, messages: { role: 'user' | 'ai', content: string }[] }[]>(() => {
-    const saved = localStorage.getItem('blocklua_ai_sessions');
-    return saved ? JSON.parse(saved) : [{ id: 'default', title: 'New Chat', messages: [] }];
-  });
-  const [currentSessionId, setCurrentSessionId] = useState<string>('default');
-  
-  const aiMessages = chatSessions.find(s => s.id === currentSessionId)?.messages || [];
-  
-  const setAiMessages = (updater: (prev: { role: 'user' | 'ai', content: string }[]) => { role: 'user' | 'ai', content: string }[]) => {
-    setChatSessions(prev => {
-      const newSessions = prev.map(s => {
-        if (s.id === currentSessionId) {
-          const newMsgs = updater(s.messages);
-          return { ...s, messages: newMsgs };
-        }
-        return s;
-      });
-      localStorage.setItem('blocklua_ai_sessions', JSON.stringify(newSessions));
-      return newSessions;
-    });
-  };
-
-  const createNewSession = () => {
-    const id = Date.now().toString();
-    const newSession = { id, title: `Chat ${chatSessions.length + 1}`, messages: [] };
-    setChatSessions(prev => {
-      const next = [newSession, ...prev];
-      localStorage.setItem('blocklua_ai_sessions', JSON.stringify(next));
-      return next;
-    });
-    setCurrentSessionId(id);
-  };
-
-  const deleteSession = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setChatSessions(prev => {
-      let next = prev.filter(s => s.id !== id);
-      if (next.length === 0) next = [{ id: 'default', title: 'New Chat', messages: [] }];
-      localStorage.setItem('blocklua_ai_sessions', JSON.stringify(next));
-      return next;
-    });
-    if (currentSessionId === id) {
-      setCurrentSessionId('default');
-    }
-  };
-
-  const [aiInput, setAiInput] = useState('');
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [aiMessages]);
 
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'warning' } | null>(null);
   const [storages, setStorages] = useState<{ id: string, name: string, time: string, data: string }[]>(
@@ -469,14 +413,12 @@ export default function App() {
   ];
 
   const [showControlCenter, setShowControlCenter] = useState(false);
-  const [controlCenterTab, setControlCenterTab] = useState<'storage' | 'ai' | 'achievements'>('storage');
+  const [controlCenterTab, setControlCenterTab] = useState<'storage' | 'achievements'>('storage');
   const [achievements, setAchievements] = useState<string[]>([]);
   const [achievementsLoaded, setAchievementsLoaded] = useState(false);
   const isInitialLoading = useRef(true);
   const [logoClicks, setLogoClicks] = useState(0);
   const [explorerOpens, setExplorerOpens] = useState(0);
-  const [isCheckingCode, setIsCheckingCode] = useState(false);
-  const [aiResult, setAiResult] = useState<{ status: 'success' | 'error' | 'warning', message: string, details: string, line?: number } | null>(null);
   const [activeAchievement, setActiveAchievement] = useState<any>(null);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [activeSlotIndex, setActiveSlotIndex] = useState(0);
@@ -843,378 +785,81 @@ export default function App() {
     }
   };
 
-  const sendChatMessage = async (input?: string) => {
-    const messageText = input || aiInput;
-    if (!messageText.trim()) return;
+  const [testResult, setTestResult] = useState<{ status: 'idle' | 'testing' | 'done', logs: { line: number | string, message: string, type: 'error' | 'success' | 'warning' }[] }>( { status: 'idle', logs: [] } );
+  const testCode = async () => {
+    if (!workspace.current) return;
+    setTestResult({ status: 'testing', logs: [] });
 
-    const newUserMessage = { role: 'user' as const, content: messageText };
-    setAiMessages(prev => [...prev, newUserMessage]);
-    setAiInput('');
-    setIsCheckingCode(true);
+    // 1. Reset all blocks? 
+    // Skipping reset for now to avoid runtime errors with Blockly API
+    // We will directly set the colors and let the user re-trigger a test if styles get messy.
 
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-      const history = aiMessages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }]
-      }));
-
-      const tools = [
-        {
-          functionDeclarations: [
-            {
-              name: "addBlock",
-              description: "Adds a new block to the workspace at the specified coordinates. Use this to create new logic.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {
-                  blockType: {
-                    type: Type.STRING,
-                    description: "The type of the block to add (e.g., 'lua_if', 'loops_while_lua', 'math_number_custom', 'roblox_part')."
-                  },
-                  x: {
-                    type: Type.NUMBER,
-                    description: "The x-coordinate in the workspace."
-                  },
-                  y: {
-                    type: Type.NUMBER,
-                    description: "The y-coordinate in the workspace."
-                  }
-                },
-                required: ["blockType", "x", "y"]
-              }
-            },
-            {
-              name: "updateBlock",
-              description: "Updates an existing block's field value (like a number or string value).",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {
-                  blockId: {
-                    type: Type.STRING,
-                    description: "The unique ID of the block to update."
-                  },
-                  fieldName: {
-                    type: Type.STRING,
-                    description: "The name of the field to update (e.g., 'NUM', 'TEXT', 'VAR')."
-                  },
-                  value: {
-                    type: Type.STRING,
-                    description: "The new value to set for the field."
-                  }
-                },
-                required: ["blockId", "fieldName", "value"]
-              }
-            },
-            {
-              name: "connectBlocks",
-              description: "Connects two blocks together. Use this to assemble logic chains.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {
-                  parentBlockId: { type: Type.STRING, description: "The ID of the block that will receive the connection." },
-                  childBlockId: { type: Type.STRING, description: "The ID of the block that will be connected to the parent." },
-                  connectionType: { 
-                    type: Type.STRING, 
-                    enum: ["next", "input"],
-                    description: "'next' for statement connection, 'input' for value input connection."
-                  },
-                  inputName: { type: Type.STRING, description: "The name of the input if connectionType is 'input' (e.g., 'CONDITION', 'VALUE', 'A', 'B')." }
-                },
-                required: ["parentBlockId", "childBlockId", "connectionType"]
-              }
-            },
-            {
-              name: "clearWorkspace",
-              description: "Clears all blocks from the workspace.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {}
-              }
-            }
-          ]
-        }
-      ];
-
-      const systemInstruction = `
-        You are a helpful AI assistant for BlockLua, a Roblox Luau block-based programming environment.
-        You can explain code, find bugs, and DIRECTLY control the workspace by adding, updating, connecting, or clearing blocks.
-        
-        WORKSPACE MANIPULATION:
-        - When a user asks for a block (e.g., "add a while loop"), use the 'addBlock' tool.
-        - To build logic, you MUST connect blocks using 'connectBlocks'. For example, to put a 'print' inside an 'if', add both blocks then connect 'if' (DO input) to 'print'.
-        - When you find an error in the current workspace blocks compared to valid Roblox Luau syntax, use 'updateBlock' to fix fields or 'addBlock' to replace incorrect logic.
-        - Be smart: If a user's intent is slightly ambiguous, choose the most logical block (e.g., if they mention "looping while something is true", use 'loops_while_lua').
-        - IMPORTANT: When adding blocks with inputs, the system will automatically handle basic placeholders for you.
-        - Your goal is to ensure the blocks in the workspace generate valid Roblox Luau code. Compare the 'Workspace (Blocks)' state with the 'Roblox Luau Code' generated from it. If the code is wrong, fix the blocks.
-        
-        REPORTING:
-        - After performing actions, tell the user exactly what you did (e.g., "I fixed the condition in your loop" or "I added a Touch event for you").
-        - If you are creating a complex script, you can call 'addBlock' and 'connectBlocks' multiple times in sequence.
-        
-        CRITICAL:
-        - DO NOT start your response with "Chào bạn" or any generic greetings. Get straight to the point.
-        - If the user asks you to create or add something, you MUST use the tools to do it. Do not just explain how to do it.
-        - Always prioritize the user's specific request for block creation.
-        - Ensure blocks are connected logically. Disconnected blocks are usually useless.
-        - Use ONLY the block types provided in the 'Toolbox' context.
-      `;
-
-      const chat = ai.chats.create({
-        model: "gemini-3.1-pro-preview",
-        history: history,
-        config: {
-          systemInstruction: systemInstruction,
-          maxOutputTokens: 4096,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          tools: tools
-        },
-      });
-
-      // Context about the current environment
-      const workspaceData = workspace.current ? Blockly.serialization.workspaces.save(workspace.current) : {};
-      const explorerData = explorer;
-      const toolboxData = toolboxRef.current;
-
-      const contextPrompt = `
-        Environment Context:
-        - Roblox Luau Code: ${generatedCode}
-        - Explorer (Object Tree): ${JSON.stringify(explorerData)}
-        - Workspace (Blocks): ${JSON.stringify(workspaceData)}
-        - Toolbox (Available Blocks): ${JSON.stringify(toolboxData)}
-
-        User Message: ${messageText}
-      `;
-
-      let result = await chat.sendMessageStream({ message: contextPrompt });
-      
-      // Add empty AI message to start streaming into
-      setAiMessages(prev => [...prev, { role: 'ai', content: "" }]);
-      
-      let fullText = "";
-      let lastChunk: any = null;
-      try {
-        for await (const chunk of result) {
-          lastChunk = chunk;
-          const chunkText = chunk.text || "";
-          fullText += chunkText;
-          setAiMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'ai') {
-              return [...prev.slice(0, -1), { role: 'ai', content: fullText }];
-            }
-            return prev;
-          });
-        }
-      } catch (streamError) {
-        console.error("Streaming error:", streamError);
-      }
-
-      const response = lastChunk;
-
-      // Loop to handle multiple rounds of function calls
-      let rounds = 0;
-      let currentResponse = response;
-      while (currentResponse && currentResponse.functionCalls && rounds < 10) {
-        rounds++;
-        const toolResults = [];
-        for (const call of currentResponse.functionCalls) {
-          if (call.name === 'addBlock') {
-            const { blockType, x, y } = call.args as any;
-            if (workspace.current) {
-              try {
-                const block = workspace.current.newBlock(blockType);
-                block.initSvg();
-                block.render();
-                block.moveBy(x, y);
-
-                // Auto-attach placeholders for all value inputs
-                block.inputList.forEach(input => {
-                  // input.connection.type === 1 is INPUT_VALUE
-                  if (input.connection && input.connection.type === 1 && !input.connection.targetBlock()) {
-                    let placeholderType = 'placeholder_any';
-                    if (input.name === 'CONDITION' || input.name === 'BOOL') placeholderType = 'placeholder_condition';
-                    else if (input.name === 'NUM' || input.name === 'SECONDS' || input.name === 'A' || input.name === 'B') placeholderType = 'placeholder_number';
-                    else if (input.name === 'TEXT' || input.name === 'NAME') placeholderType = 'placeholder_string';
-                    else if (input.name === 'INSTANCE' || input.name === 'PARENT') placeholderType = 'placeholder_instance';
-
-                    try {
-                      const placeholder = workspace.current!.newBlock(placeholderType);
-                      placeholder.initSvg();
-                      placeholder.render();
-                      input.connection?.connect(placeholder.outputConnection!);
-                    } catch (e) {
-                      console.warn("Failed to add placeholder:", e);
-                    }
-                  }
-                });
-                
-                toolResults.push({ name: call.name, result: `Successfully added block ${blockType} with ID ${block.id}` });
-              } catch (e) {
-                toolResults.push({ name: call.name, error: `Failed to add block ${blockType}: ${e}` });
-              }
-            }
-          } else if (call.name === 'connectBlocks') {
-            const { parentBlockId, childBlockId, connectionType, inputName } = call.args as any;
-            if (workspace.current) {
-              const parent = workspace.current.getBlockById(parentBlockId);
-              const child = workspace.current.getBlockById(childBlockId);
-              if (parent && child) {
-                try {
-                  if (connectionType === 'next') {
-                    parent.nextConnection?.connect(child.previousConnection!);
-                  } else if (connectionType === 'input' && inputName) {
-                    const input = parent.getInput(inputName);
-                    if (input) {
-                      input.connection?.connect(child.outputConnection! || child.previousConnection!);
-                    }
-                  }
-                  toolResults.push({ name: call.name, result: `Successfully connected ${childBlockId} to ${parentBlockId}` });
-                } catch (e) {
-                  toolResults.push({ name: call.name, error: `Failed to connect blocks: ${e}` });
-                }
-              } else {
-                toolResults.push({ name: call.name, error: `One or both blocks not found: ${parentBlockId}, ${childBlockId}` });
-              }
-            }
-          } else if (call.name === 'updateBlock') {
-            const { blockId, fieldName, value } = call.args as any;
-            if (workspace.current) {
-              const block = workspace.current.getBlockById(blockId);
-              if (block) {
-                try {
-                  block.setFieldValue(value, fieldName);
-                  toolResults.push({ name: call.name, result: `Successfully updated block ${blockId}` });
-                } catch (e) {
-                  toolResults.push({ name: call.name, error: `Failed to update block ${blockId}: ${e}` });
-                }
-              } else {
-                toolResults.push({ name: call.name, error: `Block ${blockId} not found` });
-              }
-            }
-          } else if (call.name === 'clearWorkspace') {
-            if (workspace.current) {
-              workspace.current.clear();
-              toolResults.push({ name: call.name, result: `Successfully cleared workspace` });
-            }
-          }
-        }
-        
-        // Send all tool results back to AI in one go
-        const toolResultStream = await chat.sendMessageStream({
-          message: `Tool execution results: ${JSON.stringify(toolResults)}. Please continue or provide final response.`
-        });
-
-        // Append tool results to the existing AI message
-        fullText += "\n\n";
-        let toolFollowUpText = "";
-        let lastToolChunk: any = null;
-        for await (const chunk of toolResultStream) {
-          lastToolChunk = chunk;
-          const chunkText = chunk.text || "";
-          toolFollowUpText += chunkText;
-          setAiMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'ai') {
-              return [...prev.slice(0, -1), { role: 'ai', content: fullText + toolFollowUpText }];
-            }
-            return prev;
-          });
-        }
-        fullText += toolFollowUpText;
-        currentResponse = lastToolChunk;
-      }
-
-      // Final check for empty response
-      if (!fullText.trim()) {
-        setAiMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last && last.role === 'ai') {
-            return [...prev.slice(0, -1), { role: 'ai', content: currentLang === 'vi' ? 'AI không có phản hồi.' : 'AI provided no response.' }];
-          }
-          return prev;
-        });
-      }
-    } catch (error) {
-      console.error("AI Chat Error:", error);
-      showToast(currentLang === 'vi' ? 'Lỗi kết nối AI!' : 'AI Connection Error!', 'error');
-    } finally {
-      setIsCheckingCode(false);
-    }
-  };
-
-  const checkCodeWithAI = async () => {
     if (!generatedCode.trim()) {
-      showToast(currentLang === 'vi' ? 'Vui lòng thêm khối lệnh trước!' : 'Please add some blocks first!', 'error');
+      setTestResult({ status: 'done', logs: [{ line: 'N/A', message: 'No code to check', type: 'error' }] });
       return;
     }
-
-    setIsCheckingCode(true);
-    setAiResult(null);
-
+    
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-      
-      const prompt = `
-        You are an expert Roblox Lua (Luau) developer and debugger.
-        Analyze the following code for syntax errors, logical bugs, or common mistakes.
+        const ast = luaparse.parse(generatedCode, { locations: true });
         
-        CODE:
-        ${generatedCode}
-      `;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              status: {
-                type: Type.STRING,
-                description: "The status of the check: 'success', 'warning', or 'error'",
-                enum: ["success", "warning", "error"]
-              },
-              message: {
-                type: Type.STRING,
-                description: "A brief message explaining the result"
-              },
-              details: {
-                type: Type.STRING,
-                description: "Detailed explanation if there are issues"
-              },
-              line: {
-                type: Type.NUMBER,
-                description: "The line number where the issue occurs, or null"
-              }
-            },
-            required: ["status", "message", "details"]
-          }
+        const errors: { line: number, message: string }[] = [];
+        const declared = new Set(['print', 'game', 'workspace', 'Instance', 'Color3', 'Vector3', 'UDim2', 'TweenInfo', 'Enum', 'math', 'table', 'string', 'coroutine', 'wait', 'spawn', 'delay', 'task']);
+    
+        function traverse(node: any, scope: Set<string>) {
+            if (!node || typeof node !== 'object') return;
+            
+            if (node.type === 'LocalStatement') {
+                node.variables.forEach((v: any) => scope.add(v.name));
+            } else if (node.type === 'FunctionDeclaration') {
+                if (node.identifier) scope.add(node.identifier.name);
+            } else if (node.type === 'Identifier') {
+                if (!scope.has(node.name) && !declared.has(node.name)) {
+                    errors.push({ line: node.loc.start.line, message: `Undefined variable or function: ${node.name}` });
+                }
+            }
+    
+            for (const key in node) {
+                 if (key === 'loc') continue;
+                 const child = node[key];
+                 if (Array.isArray(child)) {
+                     child.forEach((c: any) => traverse(c, scope));
+                 } else if (child && typeof child === 'object') {
+                     traverse(child, scope);
+                 }
+            }
         }
-      });
-
-      const resultText = response.text;
-      if (resultText) {
-        const result = JSON.parse(resultText);
-        setAiResult(result);
         
-        if (result.status === 'error' || result.status === 'warning') {
-          setShowControlCenter(false);
-          showToast(result.message, result.status);
+        traverse(ast, new Set());
+        
+        if (errors.length > 0) {
+            setTestResult({ status: 'done', logs: errors.map(e => ({ ...e, type: 'error' })) });
+            // Highlight blocks with error logic
+            allBlocks.forEach(block => {
+                if (block && typeof (block as any).setColour === 'function') {
+                    (block as any).setColour('#ef4444');
+                }
+            });
         } else {
-          showToast(currentLang === 'vi' ? 'Mã chạy tốt!' : 'Code looks good!', 'success');
+            setTestResult({ status: 'done', logs: [{ line: 'N/A', message: 'Code syntax is valid and no undefined variables found!', type: 'success' }] });
+            // Highlight blocks with success
+            allBlocks.forEach(block => {
+                if (block && typeof (block as any).setColour === 'function') {
+                    (block as any).setColour('#22c55e');
+                }
+            });
         }
-      } else {
-        showToast(currentLang === 'vi' ? 'Lỗi khi nhận phản hồi từ AI!' : 'Error receiving AI response!', 'error');
-      }
-    } catch (error) {
-      console.error("AI Check Error:", error);
-      showToast(currentLang === 'vi' ? 'Lỗi kết nối AI!' : 'AI connection error!', 'error');
-    } finally {
-      setIsCheckingCode(false);
+    } catch (e: any) {
+        const error = e as { line: number, message: string };
+        setTestResult({ status: 'done', logs: [{ line: error.line, message: error.message, type: 'error' }] });
+        // Highlight error block
+        allBlocks.forEach(block => {
+            if (block && typeof (block as any).setColour === 'function') {
+                (block as any).setColour('#ef4444');
+            }
+        });
     }
   };
+
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setToast({ message, type });
@@ -9043,13 +8688,6 @@ sync() -- Initial sync on load`;
                       <span className="text-xs font-black uppercase tracking-widest">{currentLang === 'vi' ? 'Kho lưu trữ' : 'Storages'}</span>
                     </button>
                     <button 
-                      onClick={() => setControlCenterTab('ai')}
-                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-all text-gray-500 hover:bg-white/5 hover:text-gray-300`}
-                    >
-                      <Sparkles size={18} />
-                      <span className="text-xs font-black uppercase tracking-widest">{currentLang === 'vi' ? 'AI Phân tích' : 'AI Analysis'}</span>
-                    </button>
-                    <button 
                       onClick={() => setControlCenterTab('achievements')}
                       className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${controlCenterTab === 'achievements' ? 'bg-[#4c97ff] text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300'}`}
                     >
@@ -9129,150 +8767,23 @@ sync() -- Initial sync on load`;
                     </div>
                   )}
 
-                  {controlCenterTab === 'ai' && (
-                    <div className="flex-1 flex h-full bg-[#0a0a0a] relative overflow-hidden">
-                      {/* Chat Sidebar */}
-                      <div className="w-64 border-r border-white/5 bg-black/20 flex flex-col">
-                        <div className="p-4 border-b border-white/5">
-                          <button 
-                            onClick={createNewSession}
-                            className="w-full py-2.5 bg-[#4c97ff]/10 hover:bg-[#4c97ff]/20 text-[#4c97ff] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                          >
-                            <Plus size={14} />
-                            {currentLang === 'vi' ? 'Cuộc hội thoại mới' : 'New Chat'}
-                          </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-1">
-                          {chatSessions.map(session => (
-                            <div 
-                              key={session.id}
-                              onClick={() => setCurrentSessionId(session.id)}
-                              className={`group p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between ${currentSessionId === session.id ? 'bg-white/5 text-white' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300'}`}
-                            >
-                              <div className="flex items-center gap-3 overflow-hidden">
-                                <MessageSquare size={14} className="shrink-0" />
-                                <span className="text-[10px] font-bold truncate">{session.title}</span>
-                              </div>
-                              <button 
-                                onClick={(e) => deleteSession(session.id, e)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Chat Main Area */}
-                      <div className="flex-1 flex flex-col relative">
-                        {/* Close Button for Full Screen Mode */}
-                        <button 
-                          onClick={() => setControlCenterTab('storage')}
-                          className="absolute top-4 right-4 z-[1001] p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl transition-all border border-white/5"
-                        >
-                          <X size={20} />
+                  {controlCenterTab === 'test' && (
+                    <div className="flex-1 p-8 flex flex-col gap-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-black text-white tracking-tight">{currentLang === 'vi' ? 'KIỂM TRA CODE' : 'TEST CODE'}</h2>
+                        <button onClick={testCode} className="px-6 py-3 bg-[#4c97ff] rounded-xl text-white font-black text-xs uppercase tracking-widest">
+                          {currentLang === 'vi' ? 'Kiểm tra' : 'Check'}
                         </button>
-
-                        {/* Chat Header */}
-                        <div className="p-3 border-b border-white/5 bg-black/40">
-                          <div className="max-w-2xl mx-auto flex items-center gap-2">
-                            <div className="w-7 h-7 bg-[#4c97ff]/20 rounded-lg flex items-center justify-center">
-                              <Sparkles className="text-[#4c97ff]" size={14} />
-                            </div>
-                            <div>
-                              <h2 className="text-base font-black text-white tracking-tight uppercase">AI ASSISTANT</h2>
-                              <p className="text-[9px] text-gray-500 font-bold tracking-widest uppercase mt-0.5">
-                                {currentLang === 'vi' ? 'Phân tích code và hỗ trợ lập trình' : 'Code analysis and programming support'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto p-3 custom-scrollbar space-y-3">
-                          {aiMessages.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-3">
-                              <div className="w-14 h-14 bg-white/5 rounded-xl flex items-center justify-center">
-                                <Sparkles className="text-gray-600" size={28} />
-                              </div>
-                              <div>
-                                <h3 className="text-sm font-black text-white tracking-tight uppercase">
-                                  {currentLang === 'vi' ? 'Bắt đầu trò chuyện' : 'Start Chatting'}
-                                </h3>
-                                <p className="text-[10px] text-gray-500 mt-1 leading-relaxed">
-                                  {currentLang === 'vi' 
-                                    ? 'Tôi có thể giúp bạn giải thích code, tìm lỗi hoặc hướng dẫn bạn cách sử dụng các khối lệnh.' 
-                                    : 'I can help you explain code, find bugs, or guide you on how to use blocks.'}
-                                </p>
-                              </div>
-                            </div>
-                          ) : (
-                            aiMessages.map((msg, idx) => (
-                              <motion.div 
-                                key={idx}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                              >
-                                <div className={`max-w-[90%] p-3 rounded-xl ${
-                                  msg.role === 'user' 
-                                    ? 'bg-[#4c97ff] text-white rounded-tr-none shadow-lg shadow-blue-500/20' 
-                                    : 'bg-white/5 text-gray-200 border border-white/5 rounded-tl-none'
-                                }`}>
-                                  <div className="markdown-body text-[11px] leading-relaxed">
-                                    <Markdown>{msg.content}</Markdown>
-                                  </div>
+                      </div>
+                      <div className="bg-black/20 p-6 rounded-2xl border border-white/5 space-y-4">
+                        <h3 className="text-xs font-black text-white tracking-widest uppercase">Console</h3>
+                        <div className="h-64 overflow-y-auto custom-scrollbar p-4 bg-black rounded-xl font-mono text-[10px]">
+                            {testResult.status === 'testing' && <div className="text-gray-500">Testing...</div>}
+                            {testResult.logs.map((log, i) => (
+                                <div key={i} className={log.type === 'error' ? 'text-red-500' : 'text-green-500'}>
+                                    {log.type === 'error' ? `[Line ${log.line}] Error: ${log.message}` : log.message}
                                 </div>
-                              </motion.div>
-                            ))
-                          )}
-                          {isCheckingCode && (
-                            <div className="flex justify-start">
-                              <div className="bg-white/5 p-3 rounded-xl rounded-tl-none border border-white/5 flex items-center gap-2">
-                                <div className="flex gap-1">
-                                  <div className="w-1 h-1 bg-[#4c97ff] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                                  <div className="w-1 h-1 bg-[#4c97ff] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                                  <div className="w-1 h-1 bg-[#4c97ff] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                                </div>
-                                <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">AI is thinking...</span>
-                              </div>
-                            </div>
-                          )}
-                          <div ref={chatEndRef} />
-                        </div>
-
-                        {/* Input Area */}
-                        <div className="p-3 bg-black/40 border-t border-white/5">
-                          <div className="max-w-2xl mx-auto relative flex items-end gap-2">
-                            <div className="flex-1 relative">
-                              <textarea 
-                                value={aiInput}
-                                onChange={(e) => {
-                                  setAiInput(e.target.value);
-                                  e.target.style.height = 'auto';
-                                  const newHeight = Math.min(e.target.scrollHeight, 100);
-                                  e.target.style.height = newHeight + 'px';
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    sendChatMessage();
-                                  }
-                                }}
-                                placeholder={currentLang === 'vi' ? "Nhập tin nhắn..." : "Type a message..."}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4 text-white text-[11px] focus:outline-none focus:border-[#4c97ff]/50 transition-all resize-none custom-scrollbar min-h-[40px] max-h-[100px]"
-                                rows={1}
-                              />
-                            </div>
-                            <button 
-                              onClick={() => sendChatMessage()}
-                              disabled={!aiInput.trim() || isCheckingCode}
-                              className="p-2.5 bg-[#4c97ff] hover:bg-[#3d86f0] disabled:bg-gray-800 text-white rounded-xl transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center"
-                            >
-                              <Play size={16} fill="currentColor" />
-                            </button>
-                          </div>
+                            ))}
                         </div>
                       </div>
                     </div>
@@ -9477,24 +8988,17 @@ sync() -- Initial sync on load`;
                     <FileCode2 size={12} /> LocalScript
                   </button>
                   <div className="text-[10px] text-gray-600 font-mono">ENCODING: UTF-8</div>
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedCode);
-                      showToast(currentLang === 'vi' ? 'Đã sao chép mã!' : 'Code copied to clipboard!');
-                      
-                      // Speedrunner check
-                      const sessionStart = (window as any).sessionStartTime || Date.now();
-                      if (Date.now() - sessionStart < 30000) {
-                        unlockAchievement('speedrunner');
-                      }
-                    }}
-                    className="text-[10px] font-black text-[#4c97ff] hover:text-white transition-colors uppercase tracking-widest"
-                  >
-                    Copy Code
-                  </button>
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={testCode}
+                      className="text-[10px] font-black text-rose-500 hover:text-white transition-colors uppercase tracking-widest flex items-center gap-1.5"
+                    >
+                      <CheckCircle size={12} /> {currentLang === 'vi' ? 'Kiểm tra Code' : 'Test Code'}
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="flex-1 overflow-auto bg-[#1e1e1e] custom-scrollbar">
+              <div className="flex-1 overflow-auto bg-[#1e1e1e] custom-scrollbar flex flex-col">
                 <SyntaxHighlighter 
                   language="lua" 
                   style={robloxTheme}
@@ -9504,13 +9008,28 @@ sync() -- Initial sync on load`;
                     fontSize: '14px',
                     lineHeight: '1.6',
                     background: 'transparent',
-                    fontFamily: 'JetBrains Mono, monospace'
+                    fontFamily: 'JetBrains Mono, monospace',
+                    flex: 1
                   }}
                   showLineNumbers={true}
                   lineNumberStyle={{ minWidth: '3em', paddingRight: '1em', color: '#444', textAlign: 'right', userSelect: 'none' }}
                 >
                   {generatedCode}
                 </SyntaxHighlighter>
+                
+                {testResult.status !== 'idle' && (
+                  <div className="border-t border-black/40 bg-black/50 p-4">
+                      <h3 className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2">Output</h3>
+                      <div className="max-h-40 overflow-y-auto custom-scrollbar font-mono text-[11px] space-y-1">
+                          {testResult.status === 'testing' && <div className="text-gray-500">Testing...</div>}
+                          {testResult.logs.map((log, i) => (
+                              <div key={i} className={log.type === 'error' ? 'text-red-400' : 'text-emerald-400'}>
+                                  {log.type === 'error' ? `[Line ${log.line}] Error: ${log.message}` : `> ${log.message}`}
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
