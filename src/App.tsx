@@ -7308,8 +7308,8 @@ export default function App() {
       'base': Blockly.Themes.Zelos,
       'componentStyles': {
         'workspaceBackgroundColour': '#1e1e1e',
-        'toolboxBackgroundColour': '#333',
-        'toolboxForegroundColour': '#fff',
+        'toolboxBackgroundColour': '#000000',
+        'toolboxForegroundColour': '#ffffff',
         'flyoutBackgroundColour': '#252526',
         'flyoutForegroundColour': '#fff',
         'insertionMarkerColour': '#fff',
@@ -9206,8 +9206,8 @@ sync() -- Initial sync on load`;
         .blocklyToolboxDiv *,
         [class*="blocklyToolbox"],
         [id*="blocklyToolbox"] {
-          background-color: #ffffff !important;
-          color: #000000 !important;
+          background-color: #000000 !important;
+          color: #ffffff !important;
           border-left: none !important;
           border-right: none !important;
         }
@@ -9233,7 +9233,6 @@ sync() -- Initial sync on load`;
         .blocklyTreeRow:before,
         .blocklyTreeRow:after,
         .blocklyTreeSeparator,
-        .blocklyTreeIcon,
         [class*="blocklyTreeRow"]:before,
         [class*="blocklyTreeRow"]:after {
           display: none !important;
@@ -9249,13 +9248,13 @@ sync() -- Initial sync on load`;
           font-family: "Inter", sans-serif !important;
           font-size: 11px !important;
           font-weight: 600 !important; /* Reduced from 800 */
-          color: #000000 !important;
+          color: #ffffff !important;
           opacity: 1 !important;
           margin-left: 10px !important;
         }
 
         .blocklyTreeSelected {
-          background-color: rgba(0, 0, 0, 0.05) !important;
+          background-color: rgba(255, 255, 255, 0.1) !important;
         }
 
         .blocklyTreeSelected .blocklyTreeRow::after {

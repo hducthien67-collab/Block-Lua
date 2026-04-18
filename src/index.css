@@ -99,11 +99,13 @@ html, body {
   font-style: italic !important;
 }
 
-/* Fix toolbox width */
+/* Fix toolbox width and background */
 .blocklyToolboxDiv {
   max-width: 180px !important;
   width: 180px !important;
   overflow-x: hidden !important;
+  background-color: #000000 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
 .blocklyTreeLabel {
@@ -233,40 +235,69 @@ html, body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Toolbox Category Styling */
+/* Force black background on all toolbox related elements */
+.blocklyToolboxDiv,
+.blocklyTreeRoot,
+.blocklyToolboxContents,
+.blocklyTreeRow,
+.blocklyTreeRow.blocklyTreeSelected {
+  background-color: #000000 !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Category alignment and spacing */
 .blocklyTreeRow {
-  height: 36px !important;
-  line-height: 36px !important;
-  margin: 2px 8px !important;
-  border-radius: 8px !important;
-  padding-left: 12px !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  border: 1px solid transparent !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  margin: 0 !important;
+  padding: 4px 12px !important;
+  transition: background-color 0.2s !important;
   position: relative !important;
   display: flex !important;
   align-items: center !important;
+  cursor: pointer !important;
 }
 
 .blocklyTreeRow:hover {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-  transform: translateX(2px);
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  transform: none !important;
 }
 
 .blocklyTreeSelected {
-  background-color: rgba(255, 255, 255, 0.12) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .blocklyTreeLabel {
   font-family: 'Inter', sans-serif !important;
   font-size: 13px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.01em !important;
+  font-weight: 500 !important;
+  letter-spacing: normal !important;
   margin-left: 8px !important;
+  color: #ffffff !important;
 }
 
-/* Hide default Blockly tree icons if any */
+/* Style the icon as a colored square */
 .blocklyTreeIcon {
-  display: none !important;
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  margin-right: 4px !important;
+  border-radius: 4px !important;
+  background-color: var(--category-color, #ccc) !important;
+  background-image: none !important;
+}
+
+/* Fix toolbox background and border */
+.blocklyToolboxDiv {
+  max-width: 180px !important;
+  width: 180px !important;
+  overflow-x: hidden !important;
+  background-color: #121212 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding-top: 8px !important;
 }
