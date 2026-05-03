@@ -131,8 +131,8 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, getSugg
         searchInput.type = 'text';
         searchInput.placeholder = 'Search variables...';
         searchInput.style.width = '100%';
-        searchInput.style.padding = '10px 14px';
-        searchInput.style.fontSize = '12px';
+        searchInput.style.padding = '12px 16px';
+        searchInput.style.fontSize = '15px';
         searchInput.style.border = '1px solid rgba(255,255,255,0.08)';
         searchInput.style.borderRadius = '12px';
         searchInput.style.outline = 'none';
@@ -187,7 +187,7 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, getSugg
             
             // Content Wrapper for centering text in pill
             const content = document.createElement('div');
-            content.style.padding = '8px 16px';
+            content.style.padding = '10px 18px';
             content.style.borderRadius = '999px'; // Pill shape
             content.style.border = '1px solid rgba(255,255,255,0.05)';
             content.style.background = 'rgba(255,255,255,0.03)';
@@ -198,8 +198,8 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, getSugg
 
             // Variable Indicator Icon (Circle)
             const icon = document.createElement('div');
-            icon.style.width = '6px';
-            icon.style.height = '6px';
+            icon.style.width = '7px';
+            icon.style.height = '7px';
             icon.style.borderRadius = 'full';
             icon.style.background = '#4c97ff';
             content.appendChild(icon);
@@ -219,7 +219,7 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, getSugg
             
             item.appendChild(content);
             item.style.cursor = 'pointer';
-            item.style.fontSize = '13px';
+            item.style.fontSize = '15px';
             item.style.color = '#bbb';
             item.style.padding = '2px';
             

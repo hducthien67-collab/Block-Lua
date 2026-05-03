@@ -40,7 +40,7 @@ export const TableEditorModal: React.FC<TableEditorModalProps> = ({ initialData,
                   newData[index] = e.target.value;
                   setData(newData);
                 }}
-                className="flex-1 bg-[#222] border border-[#1a1a1a] rounded p-1 text-xs text-gray-200"
+                className="flex-1 bg-[#222] border border-[#1a1a1a] rounded p-2 text-sm text-gray-200"
               />
               <button 
                 onClick={() => setData(data.filter((_, i) => i !== index))}

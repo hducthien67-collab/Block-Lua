@@ -102,25 +102,27 @@ html, body {
 .blocklyEditableText > tspan {
   fill: #ffffff !important;
   color: #ffffff !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
   stroke: none !important;
 }
 
 .blocklyHtmlInput {
-  background-color: rgba(0, 0, 0, 0.3) !important;
-  border: none !important;
-  border-radius: 4px !important;
+  background-color: rgba(30, 30, 30, 0.95) !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 10px !important;
   font-family: 'Inter', sans-serif !important;
   outline: none !important;
   color: #ffffff !important;
+  padding: 12px 20px !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7) !important;
 }
 
 .blocklyEditableText rect {
-  fill: rgba(0, 0, 0, 0.3) !important;
+  fill: rgba(0, 0, 0, 0.5) !important;
   fill-opacity: 1 !important;
-  rx: 4px !important;
-  ry: 4px !important;
+  rx: 8px !important;
+  ry: 8px !important;
 }
 
 .faded-placeholder-text {
@@ -251,11 +253,11 @@ html, body {
 
 /* Style the dropdown items */
 .blocklyDropDownDiv .goog-menuitem {
-  padding: 8px 16px !important;
+  padding: 10px 18px !important;
   color: #cccccc !important;
   font-family: 'Inter', sans-serif !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
   border-radius: 6px !important;
   margin-bottom: 2px !important;
   transition: all 0.2s !important;
@@ -330,8 +332,8 @@ html, body {
 
 .blocklyTreeLabel {
   font-family: 'Inter', sans-serif !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
   letter-spacing: normal !important;
   margin-left: 8px !important;
   color: #ffffff !important;

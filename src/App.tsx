@@ -8,6 +8,12 @@ import * as Blockly from 'blockly';
 import { luaGenerator, Order } from 'blockly/lua';
 
 class CustomZelosConstantProvider extends Blockly.zelos.ConstantProvider {
+  constructor() {
+    super();
+    this.FIELD_TEXT_FONTSIZE = 20;
+    this.FIELD_TEXT_HEIGHT = 36;
+    this.FIELD_TEXT_FONTWEIGHT = '700';
+  }
   shapeFor(connection: Blockly.RenderedConnection) {
     const shape = super.shapeFor(connection);
     if (shape === this.HEXAGONAL) {
@@ -58,7 +64,6 @@ import {
   PlayCircle,
   Library,
   Smartphone,
-  Tablet,
   LayoutDashboard,
   HelpCircle,
   Eye,
@@ -672,32 +677,8 @@ export default function App() {
     }))
   );
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  
-  const [deviceStep, setDeviceStep] = useState<'selection' | 'confirmation' | 'loading' | 'orientation' | 'completed'>('selection');
-  const [selectedDevice, setSelectedDevice] = useState<'pc' | 'phone' | 'tablet' | null>(null);
-  const [detectedDevice, setDetectedDevice] = useState<'pc' | 'phone' | 'tablet' | null>(null);
-  const [loadingProgress, setLoadingProgress] = useState(0);
   const [showTutorialModal, setShowTutorialModal] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
-
-  // Adjust sidebar for mobile devices
-  useEffect(() => {
-    if (selectedDevice === 'phone' || selectedDevice === 'tablet') {
-      setSidebarOpen(false);
-    }
-  }, [selectedDevice]);
-
-  // Auto-detection
-  useEffect(() => {
-    const ua = navigator.userAgent.toLowerCase();
-    if (/tablet|ipad|playbook|silk/i.test(ua)) {
-      setDetectedDevice('tablet');
-    } else if (/mobile|iphone|ipod|android|blackberry|phone/i.test(ua)) {
-      setDetectedDevice('phone');
-    } else {
-      setDetectedDevice('pc');
-    }
-  }, []);
 
   const tutorials = [
     { title: currentLang === 'vi' ? 'Chào mừng!' : 'Welcome!', content: currentLang === 'vi' ? 'Chào mừng bạn đến với BlockLua! Đây là nơi bạn có thể tạo game Roblox bằng các khối lệnh trực quan.' : 'Welcome to BlockLua! This is where you can create Roblox games using visual blocks.' },
@@ -8281,277 +8262,40 @@ end)`;
 
   return (
     <div 
-      className={`flex flex-col h-screen w-screen bg-[#1e1e1e] overflow-hidden font-sans text-gray-200 no-select ${enableEffects ? 'effects-enabled' : ''} device-${selectedDevice || 'unknown'}`}
+      className={`flex flex-col h-screen w-screen bg-[#1e1e1e] overflow-hidden font-sans text-gray-200 no-select ${enableEffects ? 'effects-enabled' : ''}`}
     >
       <AnimatePresence>
-        {deviceStep !== 'completed' && (
-          <motion.div
-            key="device-splash"
-            initial={{ opacity: 1 }}
+        {(showMenu || showSettings) && (
+          <div 
+            className="fixed inset-0 z-[90]" 
+            onClick={() => {
+              setShowMenu(false);
+              setShowSettings(false);
+            }}
+          />
+        )}
+        {selectorTarget && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10000] bg-[#050505] flex items-center justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-md flex items-center justify-center pointer-events-auto"
+            onClick={() => {
+              setSelectorTarget(null);
+              setExportScriptType(null);
+            }}
           >
-            {/* Background elements */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(76,151,255,0.05)_0%,transparent_70%)]" />
-            <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4c97ff 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }} />
-
-            <AnimatePresence mode="wait">
-              {deviceStep === 'selection' && (
-                <motion.div
-                  key="selection"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="relative z-10 w-full max-w-2xl bg-[#0f0f0f] border border-white/10 rounded-[30px] md:rounded-[40px] p-6 md:p-12 shadow-2xl text-center my-auto max-h-[95vh] overflow-y-auto hide-scrollbar"
-                >
-                  <motion.div 
-                    initial={{ scale: 0 }} 
-                    animate={{ scale: 1 }} 
-                    className="w-12 h-12 md:w-16 md:h-16 bg-[#4c97ff]/20 rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6"
-                  >
-                    <LayoutDashboard className="text-[#4c97ff]" size={28} />
-                  </motion.div>
-                  <h1 className="text-2xl md:text-4xl font-black text-white mb-2 tracking-tight">
-                    {currentLang === 'vi' ? 'Bạn đang sử dụng thiết bị nào?' : 'Which device are you using?'}
-                  </h1>
-                  <p className="text-gray-500 font-bold uppercase tracking-[0.2em] text-[8px] md:text-[10px] mb-6 md:mb-10">
-                    {currentLang === 'vi' ? 'Tối ưu hóa giao diện cho trải nghiệm tốt nhất' : 'Optimize interface for the best experience'}
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6 mb-8 md:mb-10">
-                    {[
-                      { id: 'pc' as const, label: currentLang === 'vi' ? 'MÁY TÍNH' : 'DESKTOP', icon: <Monitor size={24} /> },
-                      { id: 'tablet' as const, label: 'IPAD / TABLET', icon: <Tablet size={24} /> },
-                      { id: 'phone' as const, label: currentLang === 'vi' ? 'ĐIỆN THOẠI' : 'PHONE', icon: <Smartphone size={24} /> }
-                    ].map((device) => {
-                      const isSuggested = detectedDevice === device.id;
-                      const isSelected = selectedDevice === device.id;
-                      
-                      return (
-                        <motion.button
-                          key={device.id}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setSelectedDevice(device.id)}
-                          className={`relative p-5 md:p-8 rounded-2xl md:rounded-3xl border-2 transition-all flex flex-row sm:flex-col items-center justify-center sm:justify-start gap-4 ${
-                            isSelected 
-                              ? 'bg-[#4c97ff]/10 border-[#4c97ff] text-white shadow-[0_0_20px_rgba(76,151,255,0.1)]' 
-                              : 'bg-white/5 border-white/5 text-gray-500 hover:border-white/20'
-                          }`}
-                        >
-                          {isSuggested && (
-                            <motion.div 
-                              animate={{ scale: [1, 1.2, 1] }}
-                              transition={{ repeat: Infinity, duration: 2 }}
-                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white font-black shadow-lg z-20 text-xs"
-                            >
-                              !
-                            </motion.div>
-                          )}
-                          <div className={isSelected ? 'text-[#4c97ff]' : 'text-current'}>
-                            {device.icon}
-                          </div>
-                          <span className="text-[10px] font-black uppercase tracking-widest">{device.label}</span>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-
-                  <motion.button
-                    disabled={!selectedDevice}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => setDeviceStep('confirmation')}
-                    className="w-full py-4 md:py-5 bg-[#4c97ff] disabled:bg-gray-800 disabled:opacity-50 text-white font-black rounded-xl md:rounded-2xl shadow-xl shadow-blue-500/10 transition-all uppercase tracking-[0.2em] md:tracking-[0.3em] text-[10px] md:text-xs"
-                  >
-                    {currentLang === 'vi' ? 'XÁC NHẬN LỰA CHỌN' : 'CONFIRM SELECTION'}
-                  </motion.button>
-                </motion.div>
-              )}
-
-              {deviceStep === 'confirmation' && (
-                <motion.div
-                  key="confirmation"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="relative z-10 w-full max-w-md bg-[#0f0f0f] border border-white/10 rounded-[30px] md:rounded-[40px] p-6 md:p-10 shadow-2xl text-center my-auto"
-                >
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-yellow-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6">
-                    <AlertTriangle className="text-yellow-500" size={28} />
-                  </div>
-                  <h2 className="text-xl md:text-2xl font-black text-white mb-6">
-                    {currentLang === 'vi' ? 'Bạn chắc chắn chứ?' : 'Are you sure?'}
-                  </h2>
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => setDeviceStep('selection')}
-                      className="flex-1 py-3 md:py-4 bg-white/5 hover:bg-white/10 text-gray-400 font-black rounded-xl md:rounded-2xl uppercase tracking-widest text-[10px]"
-                    >
-                      {currentLang === 'vi' ? 'KHÔNG' : 'NO'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setDeviceStep('loading');
-                        let progress = 0;
-                        const interval = setInterval(() => {
-                          progress += Math.random() * 15;
-                          if (progress >= 100) {
-                            progress = 100;
-                            setLoadingProgress(100);
-                            clearInterval(interval);
-                            setTimeout(() => {
-                              if (selectedDevice === 'pc') {
-                                setDeviceStep('completed');
-                              } else {
-                                setDeviceStep('orientation');
-                              }
-                            }, 1000);
-                          } else {
-                            setLoadingProgress(Math.floor(progress));
-                          }
-                        }, 250);
-                      }}
-                      className="flex-1 py-3 md:py-4 bg-[#4c97ff] text-white font-black rounded-xl md:rounded-2xl shadow-lg shadow-blue-500/20 uppercase tracking-widest text-[10px]"
-                    >
-                      {currentLang === 'vi' ? 'CÓ, TIẾP TỤC' : 'YES, CONTINUE'}
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {deviceStep === 'loading' && (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="relative z-10 w-full max-w-sm text-center my-auto"
-                >
-                  <div className="relative w-24 h-24 md:w-32 md:h-32 mx-auto mb-8">
-                    <svg className="w-full h-full transform -rotate-90">
-                      <circle
-                        cx="50%"
-                        cy="50%"
-                        r="45%"
-                        stroke="rgba(255,255,255,0.05)"
-                        strokeWidth="8"
-                        fill="transparent"
-                      />
-                      <motion.circle
-                        cx="50%"
-                        cy="50%"
-                        r="45%"
-                        stroke="#4c97ff"
-                        strokeWidth="8"
-                        fill="transparent"
-                        strokeDasharray="283"
-                        animate={{ strokeDashoffset: 283 - (283 * loadingProgress) / 100 }}
-                        transition={{ type: 'spring', stiffness: 50, damping: 20 }}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-2xl md:text-3xl font-black text-white">{loadingProgress}%</span>
-                    </div>
-                  </div>
-                  <h3 className="text-base md:text-lg font-black text-white uppercase tracking-[0.3em] mb-2">
-                    {currentLang === 'vi' ? 'ĐANG TẢI GIAO DIỆN' : 'LOADING INTERFACE'}
-                  </h3>
-                  <div className="flex justify-center gap-1">
-                    {[0, 1, 2].map(i => (
-                      <motion.div
-                        key={i}
-                        animate={{ 
-                          scale: [1, 1.5, 1],
-                          opacity: [0.3, 1, 0.3]
-                        }}
-                        transition={{ 
-                          duration: 1, 
-                          repeat: Infinity, 
-                          delay: i * 0.2 
-                        }}
-                        className="w-1.5 h-1.5 bg-[#4c97ff] rounded-full"
-                      />
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {deviceStep === 'orientation' && (
-                <motion.div
-                  key="orientation"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="relative z-10 w-full max-w-md bg-[#0f0f0f] border border-white/10 rounded-[30px] md:rounded-[40px] p-6 md:p-10 shadow-2xl text-center my-auto"
-                >
-                  <motion.div
-                    animate={{ rotate: [0, 90, 0] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    className="w-16 h-32 md:w-24 md:h-48 bg-white/5 border-2 border-[#4c97ff] rounded-2xl md:rounded-3xl mx-auto mb-6 md:mb-10 flex items-center justify-center"
-                  >
-                    <Smartphone size={32} className="text-[#4c97ff]/50" />
-                  </motion.div>
-                  <h2 className="text-xl md:text-2xl font-black text-white mb-2 md:mb-4">
-                    {currentLang === 'vi' ? 'Vui lòng quay ngang thiết bị' : 'Please rotate your device'}
-                  </h2>
-                  <p className="text-xs md:text-base text-gray-500 font-bold mb-6 md:mb-8 leading-relaxed">
-                    {currentLang === 'vi' 
-                      ? 'Để có trải nghiệm lập trình tốt nhất trên di động, vui lòng để thiết bị nằm ngang.' 
-                      : 'For the best mobile programming experience, please use landscape orientation.'}
-                  </p>
-                  <button
-                    onClick={() => setDeviceStep('completed')}
-                    className="w-full py-4 md:py-5 bg-[#4c97ff] text-white font-black rounded-xl md:rounded-2xl shadow-xl shadow-blue-500/20 transition-all uppercase tracking-[0.2em] md:tracking-[0.3em] text-[10px] md:text-xs"
-                  >
-                    {currentLang === 'vi' ? 'TÔI ĐÃ SẴN SÀNG' : 'I AM READY'}
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="bg-[#4c97ff] text-white px-6 py-3 rounded-2xl font-black tracking-widest shadow-2xl flex items-center gap-3 animate-bounce"
+            >
+              <MousePointer2 size={24} />
+              {currentLang === 'vi' ? 'CHỌN ĐỐI TƯỢNG TRONG EXPLORER' : 'SELECT AN OBJECT IN EXPLORER'}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <AnimatePresence>
-        {deviceStep === 'completed' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1 }}
-            className="flex flex-col h-full w-full"
-          >
-            <AnimatePresence>
-              {(showMenu || showSettings) && (
-                <div 
-                  className="fixed inset-0 z-[90]" 
-                  onClick={() => {
-                    setShowMenu(false);
-                    setShowSettings(false);
-                  }}
-                />
-              )}
-              {selectorTarget && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-md flex items-center justify-center pointer-events-auto"
-                  onClick={() => {
-                    setSelectorTarget(null);
-                    setExportScriptType(null);
-                  }}
-                >
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    className="bg-[#4c97ff] text-white px-6 py-3 rounded-2xl font-black tracking-widest shadow-2xl flex items-center gap-3 animate-bounce"
-                  >
-                    <MousePointer2 size={24} />
-                    {currentLang === 'vi' ? 'CHỌN ĐỐI TƯỢNG TRONG EXPLORER' : 'SELECT AN OBJECT IN EXPLORER'}
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
       {/* Header */}
       <motion.div 
@@ -9790,9 +9534,9 @@ end)`;
                   style={robloxTheme}
                   customStyle={{
                     margin: 0,
-                    padding: '24px',
-                    fontSize: '14px',
-                    lineHeight: '1.6',
+                    padding: '32px',
+                    fontSize: '16px',
+                    lineHeight: '1.7',
                     background: 'transparent',
                     fontFamily: 'JetBrains Mono, monospace',
                     flex: 1
@@ -10691,9 +10435,6 @@ end)`;
           >
             {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
             <span className="text-sm font-bold tracking-wide">{toast.message}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
