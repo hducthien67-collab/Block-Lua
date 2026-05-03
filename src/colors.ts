@@ -37,6 +37,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'RunService': '#2E7D32', // Muted Dark Green
   'Lighting': '#FFD600', // Unique Bright Gold
   'Effects': '#AD1457', // Muted Deep Pink
+  'Optimization': '#00BFA5', // Unique Teal/Green for performance
   'Workspace': '#00796B', // Unique Dark Teal
   'MaterialService': '#2E7D32', // Unique Forest Green
   'NetworkClient': '#0288D1', // Unique Blue
@@ -61,7 +62,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'HttpService': '#4E342E', // Unique Brown
   'MarketplaceService': '#2E7D32', // Unique Green
   'TeleportService': '#4527A0', // Unique Purple
-  'BadgeService': '#FFEA00', // Unique Yellow
+  'BadgeService': '#FBC02D', // Muted Gold
   'PathfindingService': '#004D40', // Unique Teal
   'ProximityPromptService': '#BF360C', // Unique Rust
   'TextService': '#D84315', // Unique Orange

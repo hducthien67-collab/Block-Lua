@@ -36,7 +36,7 @@ const CATEGORY_DATA: { [key: string]: { icon: string, color: string } } = {
   'AnimationClipProvider': { icon: 'Play', color: '#8E24AA' },
   'AssetService': { icon: 'Save', color: '#283593' },
   'AvatarEditorService': { icon: 'User', color: '#FF8F00' },
-  'BadgeService': { icon: 'CheckCircle', color: '#FFEA00' },
+  'BadgeService': { icon: 'CheckCircle', color: '#FBC02D' },
   'BrowserService': { icon: 'Globe', color: '#1976D2' },
   'ChangeHistoryService': { icon: 'RefreshCw', color: '#0097A7' },
   'Chat': { icon: 'MessageSquare', color: '#00838F' },
@@ -104,6 +104,7 @@ const CATEGORY_DATA: { [key: string]: { icon: string, color: string } } = {
   'UserInputService': { icon: 'MousePointer2', color: '#0097A7' },
   'VRService': { icon: 'Eye', color: '#7E57C2' },
   'Workspace': { icon: 'Globe', color: '#29B6F6' },
+  'Raycast': { icon: 'Zap', color: '#8D6E63' },
 };
 
 const rawToolbox = {
@@ -228,6 +229,22 @@ const rawToolbox = {
         { kind: 'block', type: 'datastore_use' },
         { kind: 'block', type: 'datastore_get' },
         { kind: 'block', type: 'datastore_save' }
+      ]
+    },
+    {
+      kind: 'category',
+      name: 'Raycast',
+      contents: [
+        { kind: 'label', text: 'Raycast Params' },
+        { kind: 'block', type: 'raycast_params_create' },
+        { kind: 'block', type: 'raycast_params_set_filter' },
+        { kind: 'block', type: 'raycast_params_set_type' },
+        { kind: 'label', text: 'Casting Functions' },
+        { kind: 'block', type: 'raycast_workspace_raycast' },
+        { kind: 'block', type: 'raycast_workspace_spherecast' },
+        { kind: 'block', type: 'raycast_workspace_blockcast' },
+        { kind: 'label', text: 'Results' },
+        { kind: 'block', type: 'raycast_get_result_property' },
       ]
     },
     // New Service Categories

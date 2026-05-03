@@ -67,12 +67,14 @@ const createVarLabel = (name: string, _color: string) => {
 };
 
 // Helper for variable autocomplete
-export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggestions: string[]) => {
+export const addAutocomplete = (block: Blockly.Block, fieldName: string, getSuggestions: () => string[]) => {
   const varField = block.getField(fieldName);
   if (varField) {
     (varField as any).showEditor_ = function(this: any, e?: Event) {
       const workspace = this.getSourceBlock()?.workspace;
       if (!workspace) return;
+      
+      const suggestions = getSuggestions();
       
       // Capture mouse position
       let mouseX: number | undefined;
@@ -100,52 +102,48 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
         container.id = 'autocomplete-dropdown';
         container.style.position = 'fixed';
         container.style.zIndex = '20000';
-        container.style.background = '#252525';
-        container.style.backdropFilter = 'blur(10px)';
-        (container.style as any).webkitBackdropFilter = 'blur(10px)';
+        container.style.background = 'rgba(20, 20, 20, 0.95)';
+        container.style.backdropFilter = 'blur(16px)';
+        (container.style as any).webkitBackdropFilter = 'blur(16px)';
         container.style.border = '1px solid rgba(255,255,255,0.1)';
-        container.style.borderRadius = '12px';
-        container.style.boxShadow = '0 8px 32px rgba(0,0,0,0.4)';
-        container.style.minWidth = '200px';
-        container.style.padding = '8px';
+        container.style.borderRadius = '16px';
+        container.style.boxShadow = '0 12px 40px rgba(0,0,0,0.6)';
+        container.style.minWidth = '240px';
+        container.style.padding = '12px';
         container.style.display = 'flex';
         container.style.flexDirection = 'column';
-        container.style.gap = '6px';
+        container.style.gap = '8px';
         container.style.opacity = '0';
-        container.style.transform = 'translateY(5px)';
-        container.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+        container.style.transform = 'scale(0.95) translateY(10px)';
+        container.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
         container.style.fontFamily = 'Inter, sans-serif';
         
         // Search Header
         const searchWrapper = document.createElement('div');
-        searchWrapper.style.padding = '4px';
+        searchWrapper.style.padding = '0';
         searchWrapper.style.position = 'sticky';
         searchWrapper.style.top = '0';
         searchWrapper.style.background = 'transparent';
         searchWrapper.style.zIndex = '1';
+        searchWrapper.style.marginBottom = '4px';
 
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
-        searchInput.placeholder = 'Search...';
+        searchInput.placeholder = 'Search variables...';
         searchInput.style.width = '100%';
-        searchInput.style.padding = '8px 12px';
+        searchInput.style.padding = '10px 14px';
         searchInput.style.fontSize = '12px';
-        searchInput.style.border = '1px solid rgba(255,255,255,0.05)';
-        searchInput.style.borderRadius = '8px';
+        searchInput.style.border = '1px solid rgba(255,255,255,0.08)';
+        searchInput.style.borderRadius = '12px';
         searchInput.style.outline = 'none';
-        searchInput.style.background = 'rgba(255,255,255,0.05)';
+        searchInput.style.background = 'rgba(255,255,255,0.03)';
         searchInput.style.color = 'white';
         searchInput.style.transition = 'all 0.2s';
         
         searchInput.onfocus = () => {
           searchInput.style.borderColor = '#4c97ff';
-          searchInput.style.background = 'rgba(255,255,255,0.08)';
-          searchInput.style.boxShadow = '0 0 0 2px rgba(76, 151, 255, 0.2)';
-        };
-        searchInput.onblur = () => {
-          searchInput.style.borderColor = 'rgba(255,255,255,0.05)';
-          searchInput.style.background = 'rgba(255,255,255,0.05)';
-          searchInput.style.boxShadow = 'none';
+          searchInput.style.background = 'rgba(255,255,255,0.06)';
+          searchInput.style.boxShadow = '0 0 0 4px rgba(76, 151, 255, 0.15)';
         };
         
         searchWrapper.appendChild(searchInput);
@@ -153,10 +151,10 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
 
         const listContainer = document.createElement('div');
         listContainer.style.overflowY = 'auto';
-        listContainer.style.maxHeight = '120px';
+        listContainer.style.maxHeight = '140px';
         listContainer.style.display = 'flex';
         listContainer.style.flexDirection = 'column';
-        listContainer.style.gap = '2px';
+        listContainer.style.gap = '4px';
         listContainer.style.padding = '2px';
         listContainer.style.scrollbarWidth = 'thin';
         listContainer.style.scrollbarColor = 'rgba(255,255,255,0.1) transparent';
@@ -169,23 +167,14 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
           const searchTerm = filter.toLowerCase();
           
           const filtered = suggestions
-            .filter(v => v.toLowerCase().includes(searchTerm))
-            .sort((a, b) => {
-              const aLow = a.toLowerCase();
-              const bLow = b.toLowerCase();
-              const aStarts = aLow.startsWith(searchTerm);
-              const bStarts = bLow.startsWith(searchTerm);
-              if (aStarts && !bStarts) return -1;
-              if (!aStarts && bStarts) return 1;
-              return aLow.localeCompare(bLow);
-            });
+            .filter(v => v.toLowerCase().includes(searchTerm));
           
           if (filtered.length === 0) {
             const item = document.createElement('div');
-            item.textContent = filter === '' ? 'No matches found' : 'No matches found';
-            item.style.padding = '16px';
+            item.textContent = filter === '' ? 'No variables defined yet' : 'No matches found';
+            item.style.padding = '20px';
             item.style.fontSize = '12px';
-            item.style.color = '#666';
+            item.style.color = '#555';
             item.style.fontStyle = 'italic';
             item.style.textAlign = 'center';
             listContainer.appendChild(item);
@@ -196,30 +185,43 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
             const item = document.createElement('div');
             item.id = `autocomplete-item-${idx}`;
             
+            // Content Wrapper for centering text in pill
+            const content = document.createElement('div');
+            content.style.padding = '8px 16px';
+            content.style.borderRadius = '999px'; // Pill shape
+            content.style.border = '1px solid rgba(255,255,255,0.05)';
+            content.style.background = 'rgba(255,255,255,0.03)';
+            content.style.transition = 'all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
+            content.style.display = 'flex';
+            content.style.alignItems = 'center';
+            content.style.gap = '8px';
+
+            // Variable Indicator Icon (Circle)
+            const icon = document.createElement('div');
+            icon.style.width = '6px';
+            icon.style.height = '6px';
+            icon.style.borderRadius = 'full';
+            icon.style.background = '#4c97ff';
+            content.appendChild(icon);
+
+            const textSpan = document.createElement('span');
             // Highlight match
             if (searchTerm && v.toLowerCase().includes(searchTerm)) {
               const index = v.toLowerCase().indexOf(searchTerm);
               const before = v.substring(0, index);
               const match = v.substring(index, index + searchTerm.length);
               const after = v.substring(index + searchTerm.length);
-              item.innerHTML = `${before}<span style="color: #4c97ff; font-weight: 700;">${match}</span>${after}`;
+              textSpan.innerHTML = `${before}<span style="color: #4c97ff; font-weight: 800;">${match}</span>${after}`;
             } else {
-              item.textContent = v;
+              textSpan.textContent = v;
             }
+            content.appendChild(textSpan);
             
-            // Dim 'workspace'
-            if (v.toLowerCase() === 'workspace') {
-              item.className = 'faded-placeholder-text';
-            }
-            
-            item.style.padding = '10px 14px';
+            item.appendChild(content);
             item.style.cursor = 'pointer';
             item.style.fontSize = '13px';
-            item.style.color = '#ccc';
-            item.style.borderRadius = '8px';
-            item.style.transition = 'all 0.2s';
-            item.style.marginBottom = '1px';
-            item.style.fontWeight = '500';
+            item.style.color = '#bbb';
+            item.style.padding = '2px';
             
             const selectItem = () => {
               this.setValue(v);
@@ -229,10 +231,6 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
 
             item.onmouseover = () => {
               selectedIndex = idx;
-              updateSelection();
-            };
-            item.onmouseout = () => {
-              selectedIndex = -1;
               updateSelection();
             };
             item.onmousedown = (e) => {
@@ -246,15 +244,20 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
           const updateSelection = () => {
             const items = listContainer.querySelectorAll('div[id^="autocomplete-item-"]');
             items.forEach((item: any, idx) => {
+              const content = item.firstChild as HTMLElement;
               if (idx === selectedIndex) {
-                item.style.background = '#4c97ff';
-                item.style.color = 'white';
-                item.style.transform = 'translateX(4px)';
+                content.style.background = '#4c97ff';
+                content.style.borderColor = 'rgba(255,255,255,0.2)';
+                content.style.color = 'white';
+                content.style.transform = 'scale(1.02) translateX(4px)';
+                content.style.boxShadow = '0 4px 15px rgba(76, 151, 255, 0.4)';
                 item.scrollIntoView({ block: 'nearest' });
               } else {
-                item.style.background = 'transparent';
-                item.style.color = '#ccc';
-                item.style.transform = 'translateX(0)';
+                content.style.background = 'rgba(255,255,255,0.03)';
+                content.style.borderColor = 'rgba(255,255,255,0.05)';
+                content.style.color = '#bbb';
+                content.style.transform = 'scale(1) translateX(0)';
+                content.style.boxShadow = 'none';
               }
             });
           };
@@ -269,33 +272,27 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
               updateSelection();
             } else if (key === 'Enter') {
               if (selectedIndex >= 0 && selectedIndex < filtered.length) {
-                const v = filtered[selectedIndex];
-                this.setValue(v);
-                this.render_();
-                (Blockly as any).WidgetDiv.hide();
+                selectItemAtIndex(selectedIndex);
               } else if (filtered.length > 0) {
-                const v = filtered[0];
-                this.setValue(v);
-                this.render_();
-                (Blockly as any).WidgetDiv.hide();
-              } else {
-                const v = searchInput.value;
-                if (v) {
-                  this.setValue(v);
-                  this.render_();
-                }
-                (Blockly as any).WidgetDiv.hide();
+                selectItemAtIndex(0);
               }
             }
+          };
+
+          const selectItemAtIndex = (i: number) => {
+            const v = filtered[i];
+            this.setValue(v);
+            this.render_();
+            (Blockly as any).WidgetDiv.hide();
           };
         };
 
         const positionDropdown = () => {
           const rect = htmlInput.getBoundingClientRect();
-          container.style.minWidth = Math.max(220, rect.width) + 'px';
+          container.style.minWidth = Math.max(260, rect.width) + 'px';
           
           let targetX = mouseX !== undefined ? mouseX : rect.left;
-          let targetY = mouseY !== undefined ? mouseY + 10 : rect.bottom + 4;
+          let targetY = mouseY !== undefined ? mouseY + 15 : rect.bottom + 8;
 
           container.style.left = targetX + 'px';
           container.style.top = targetY + 'px';
@@ -304,22 +301,22 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
           const dropdownRect = container.getBoundingClientRect();
           
           if (targetX + dropdownRect.width > window.innerWidth) {
-            container.style.left = (window.innerWidth - dropdownRect.width - 16) + 'px';
+            container.style.left = (window.innerWidth - dropdownRect.width - 20) + 'px';
           }
           if (targetY + dropdownRect.height > window.innerHeight) {
-            container.style.top = (targetY - dropdownRect.height - 20) + 'px';
+            container.style.top = (rect.top - dropdownRect.height - 12) + 'px';
           }
 
           requestAnimationFrame(() => {
             container.style.opacity = '1';
-            container.style.transform = 'translateY(0)';
+            container.style.transform = 'scale(1) translateY(0)';
           });
         };
 
         updateDropdown('');
         positionDropdown();
         
-        setTimeout(() => searchInput.focus(), 50);
+        setTimeout(() => searchInput.focus(), 60);
 
         searchInput.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') {
@@ -343,7 +340,9 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
         htmlInput.addEventListener('input', inputHandler);
 
         const clickOutsideHandler = (e: Event) => {
-          if (!container.contains(e.target as Node) && e.target !== htmlInput) {
+          // If interaction is on workspace, hide the dropdown
+          const isWorkspaceClick = (e.target as HTMLElement).closest('.blocklySvg');
+          if ((!container.contains(e.target as Node) && e.target !== htmlInput) || isWorkspaceClick) {
             (Blockly as any).WidgetDiv.hide();
           }
         };
@@ -366,7 +365,7 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
           
           if (container.parentNode) {
             container.style.opacity = '0';
-            container.style.transform = 'translateY(10px)';
+            container.style.transform = 'scale(0.95) translateY(14px)';
             setTimeout(() => {
               if (container.parentNode) container.parentNode.removeChild(container);
             }, 200);
@@ -381,12 +380,20 @@ export const addAutocomplete = (block: Blockly.Block, fieldName: string, suggest
 };
 
 export const addVariableAutocomplete = (block: Blockly.Block, fieldName: string) => {
-  const workspace = block.workspace;
-  const vars = workspace.getAllBlocks(false)
-    .filter(b => b.type === 'variables_create')
-    .map(b => b.getFieldValue('VAR'))
-    .filter((v, i, a) => v && a.indexOf(v) === i);
-  addAutocomplete(block, fieldName, vars);
+  const getVars = () => {
+    let workspace = block.workspace;
+    if ((workspace as any).isFlyout) {
+      workspace = (workspace as any).targetWorkspace;
+    }
+    if (!workspace) return [];
+    
+    return workspace.getAllBlocks(false)
+      .filter(b => b.type === 'variables_create')
+      .map(b => b.getFieldValue('VAR'))
+      .filter((v, i, a) => v && a.indexOf(v) === i);
+  };
+  
+  addAutocomplete(block, fieldName, getVars);
 };
 
 export const defineCustomBlocks = () => {
@@ -633,6 +640,61 @@ export const defineCustomBlocks = () => {
       this.setNextStatement(true, null);
       this.setColour(getCategoryColor('World'));
       this.setInputsInline(true);
+    }
+  };
+
+  // --- Optimization Blocks ---
+  Blockly.Blocks['opt_task_wait'] = {
+    init: function() {
+      this.appendDummyInput().appendField("task.wait");
+      this.appendValueInput("SECONDS").setCheck("Number");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Optimization'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['opt_task_spawn'] = {
+    init: function() {
+      this.appendDummyInput().appendField("task.spawn");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Optimization'));
+    }
+  };
+
+  Blockly.Blocks['opt_task_defer'] = {
+    init: function() {
+      this.appendDummyInput().appendField("task.defer");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Optimization'));
+    }
+  };
+
+  Blockly.Blocks['opt_task_delay'] = {
+    init: function() {
+      this.appendDummyInput().appendField("task.delay");
+      this.appendValueInput("SECONDS").setCheck("Number");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Optimization'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['opt_debug_profile'] = {
+    init: function() {
+      this.appendDummyInput().appendField("profile section")
+          .appendField(new Blockly.FieldTextInput("SectionName"), "NAME");
+      this.appendStatementInput("DO").setCheck(null);
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Optimization'));
     }
   };
 
@@ -957,7 +1019,7 @@ export const defineCustomBlocks = () => {
   Blockly.Blocks['variables_create'] = {
     init: function() {
       this.appendDummyInput()
-          .appendField("variable create")
+          .appendField("create")
           .appendField(new Blockly.FieldTextInput("x"), "VAR")
           .appendField("with value");
       this.appendValueInput("VALUE").setCheck(null);
@@ -971,7 +1033,7 @@ export const defineCustomBlocks = () => {
   Blockly.Blocks['variables_set_custom'] = {
     init: function() {
       this.appendDummyInput()
-          .appendField("variable set")
+          .appendField("set")
           .appendField(new Blockly.FieldTextInput("x"), "VAR")
           .appendField("to");
       this.appendValueInput("VALUE").setCheck(null);
@@ -979,13 +1041,14 @@ export const defineCustomBlocks = () => {
       this.setNextStatement(true, null);
       this.setColour(getCategoryColor('Variables'));
       this.setInputsInline(true);
+      addVariableAutocomplete(this, "VAR");
     }
   };
 
   Blockly.Blocks['variables_change_custom'] = {
     init: function() {
       this.appendDummyInput()
-          .appendField("variable change")
+          .appendField("change")
           .appendField(new Blockly.FieldTextInput("x"), "VAR")
           .appendField("by");
       this.appendValueInput("VALUE").setCheck(null);
@@ -993,6 +1056,7 @@ export const defineCustomBlocks = () => {
       this.setNextStatement(true, null);
       this.setColour(getCategoryColor('Variables'));
       this.setInputsInline(true);
+      addVariableAutocomplete(this, "VAR");
     }
   };
 
@@ -1003,6 +1067,7 @@ export const defineCustomBlocks = () => {
           .appendField(new Blockly.FieldTextInput("x"), "VAR");
       this.setOutput(true, null);
       this.setColour(getCategoryColor('Variables'));
+      addVariableAutocomplete(this, "VAR");
     }
   };
 
@@ -3349,6 +3414,97 @@ export const defineCustomBlocks = () => {
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(getCategoryColor('Effects'));
+      this.setInputsInline(true);
+    }
+  };
+
+  // --- RAYCAST BLOCKS ---
+  Blockly.Blocks['raycast_params_create'] = {
+    init: function() {
+      this.appendDummyInput().appendField("Create RaycastParams");
+      this.setOutput(true, "RaycastParams");
+      this.setColour(getCategoryColor('Raycast'));
+    }
+  };
+
+  // Alias to fix potential "raycast_params_new" error
+  Blockly.Blocks['raycast_params_new'] = Blockly.Blocks['raycast_params_create'];
+
+  Blockly.Blocks['raycast_params_set_filter'] = {
+    init: function() {
+      this.appendValueInput("PARAMS").setCheck("RaycastParams").appendField("on params");
+      this.appendValueInput("LIST").setCheck("Array").appendField("set filter instances to");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Raycast'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['raycast_params_set_type'] = {
+    init: function() {
+      this.appendValueInput("PARAMS").setCheck("RaycastParams").appendField("on");
+      this.appendDummyInput()
+          .appendField("set filter type to")
+          .appendField(new Blockly.FieldDropdown([
+            ["Exclude (Ignore)", "Enum.RaycastFilterType.Exclude"],
+            ["Include (Only)", "Enum.RaycastFilterType.Include"]
+          ]), "TYPE");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(getCategoryColor('Raycast'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['raycast_workspace_raycast'] = {
+    init: function() {
+      this.appendValueInput("ORIGIN").setCheck("Vector3").appendField("Raycast from");
+      this.appendValueInput("DIRECTION").setCheck("Vector3").appendField("direction");
+      this.appendValueInput("PARAMS").setCheck("RaycastParams").appendField("with params");
+      this.setOutput(true, "RaycastResult");
+      this.setColour(getCategoryColor('Raycast'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['raycast_workspace_spherecast'] = {
+    init: function() {
+      this.appendValueInput("ORIGIN").setCheck("Vector3").appendField("Spherecast from");
+      this.appendValueInput("RADIUS").setCheck("Number").appendField("radius");
+      this.appendValueInput("DIRECTION").setCheck("Vector3").appendField("direction");
+      this.appendValueInput("PARAMS").setCheck("RaycastParams").appendField("with params");
+      this.setOutput(true, "RaycastResult");
+      this.setColour(getCategoryColor('Raycast'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['raycast_workspace_blockcast'] = {
+    init: function() {
+      this.appendValueInput("CFRAME").setCheck("CFrame").appendField("Blockcast from CFrame");
+      this.appendValueInput("SIZE").setCheck("Vector3").appendField("size");
+      this.appendValueInput("DIRECTION").setCheck("Vector3").appendField("direction");
+      this.appendValueInput("PARAMS").setCheck("RaycastParams").appendField("with params");
+      this.setOutput(true, "RaycastResult");
+      this.setColour(getCategoryColor('Raycast'));
+      this.setInputsInline(true);
+    }
+  };
+
+  Blockly.Blocks['raycast_get_result_property'] = {
+    init: function() {
+      this.appendValueInput("RESULT").setCheck("RaycastResult").appendField("get");
+      this.appendDummyInput().appendField(new Blockly.FieldDropdown([
+        ["Instance (Hit part)", "Instance"],
+        ["Position (Hit position)", "Position"],
+        ["Normal (Surface direction)", "Normal"],
+        ["Distance", "Distance"],
+        ["Material", "Material"]
+      ]), "PROP");
+      this.appendDummyInput().appendField("from result");
+      this.setOutput(true, null);
+      this.setColour(getCategoryColor('Raycast'));
       this.setInputsInline(true);
     }
   };

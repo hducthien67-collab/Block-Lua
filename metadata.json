@@ -1,5 +1,5 @@
 {
-  "name": "BlockLua Web",
-  "description": "A professional Blockly-based IDE for Roblox Luau with a modern dark theme, real-time code generation, and interactive onboarding tutorial.",
+  "name": "BlockLua Pro",
+  "description": "Nền tảng lập trình Roblox chuyên nghiệp sử dụng khối lệnh (Blockly) tiếng Việt. Hỗ trợ tạo mã Luau, lưu trữ đám mây và tích hợp AI.",
   "requestFramePermissions": []
 }

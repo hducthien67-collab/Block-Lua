@@ -8,8 +8,18 @@
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
+        "username": { "type": "string" },
         "photoURL": { "type": "string" },
+        "birthDate": {
+          "type": "object",
+          "properties": {
+            "day": { "type": "number" },
+            "month": { "type": "number" },
+            "year": { "type": "number" }
+          }
+        },
         "hasSeenTutorial": { "type": "boolean" },
+        "achievements": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email"]
@@ -25,9 +35,24 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["slotIndex", "data"]
+    },
+    "UsernameMapping": {
+      "title": "Username Mapping",
+      "description": "Mapping from username to email and uid",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["username", "email", "uid"]
     }
   },
   "firestore": {
+    "/usernames/{username}": {
+      "schema": "UsernameMapping",
+      "description": "Global unique username mappings"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profile documents"

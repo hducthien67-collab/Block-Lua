@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot, query, where, Timestamp, getDocFromServer } from 'firebase/firestore';

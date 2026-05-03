@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
 
 .effects-enabled button,
 .effects-enabled input,
@@ -25,6 +25,35 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: "kern" 1, "liga" 1;
+}
+
+/* Hide scrollbars globally */
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-corner {
+  display: none !important;
+  background: transparent !important;
+}
+
+.custom-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  overflow: -moz-scrollbars-none !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  display: none !important;
 }
 
 .markdown-body {
@@ -117,19 +146,22 @@ html, body {
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
+  height: 0px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+.custom-scrollbar::-webkit-scrollbar-corner,
+.custom-scrollbar::-webkit-scrollbar-track-piece,
+.custom-scrollbar::-webkit-scrollbar-track,
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  display: none !important;
+  background: transparent !important;
+  border: none !important;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+.custom-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overflow-x: hidden !important;
 }
 
 .search-panel {
@@ -177,14 +209,38 @@ html, body {
   margin-left: 12px !important;
 }
 
-/* Fix Blockly Dropdown Menu */
+.blocklyWorkspace {
+  contain: layout style;
+  will-change: transform;
+}
+
+.blocklySvg {
+  display: block;
+  contain: strict;
+}
+
+.blocklyBlockCanvas, .blocklyBubbleCanvas {
+  will-change: transform;
+}
+
+/* Reduced transparency for performance */
 .blocklyDropDownDiv {
   background-color: #1a1a1a !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 12px !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
   padding: 6px !important;
-  backdrop-filter: blur(10px);
+  /* Faster than glassmorphism on weak devices */
+  background: rgba(26, 26, 26, 0.95) !important;
+}
+
+.blocklyToolboxDiv {
+  contain: content;
+}
+
+/* Optimize cursor performance */
+.blocklyFlyoutBackground {
+  fill-opacity: 0.95 !important;
 }
 
 .blocklyDropDownContent {

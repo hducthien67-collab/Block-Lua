@@ -440,6 +440,34 @@ export const defineCustomGenerators = () => {
     return `game:GetService("MarketplaceService"):PromptGamePassPurchase(${player}, ${id})\n`;
   };
 
+  // Optimization Generators
+  luaGenerator.forBlock['opt_task_wait'] = function(block: any) {
+    const seconds = luaGenerator.valueToCode(block, 'SECONDS', Order.NONE) || '0';
+    return `task.wait(${seconds})\n`;
+  };
+
+  luaGenerator.forBlock['opt_task_spawn'] = function(block: any) {
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return `task.spawn(function()\n${branch}end)\n`;
+  };
+
+  luaGenerator.forBlock['opt_task_defer'] = function(block: any) {
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return `task.defer(function()\n${branch}end)\n`;
+  };
+
+  luaGenerator.forBlock['opt_task_delay'] = function(block: any) {
+    const seconds = luaGenerator.valueToCode(block, 'SECONDS', Order.NONE) || '1';
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return `task.delay(${seconds}, function()\n${branch}end)\n`;
+  };
+
+  luaGenerator.forBlock['opt_debug_profile'] = function(block: any) {
+    const name = block.getFieldValue('NAME');
+    const branch = luaGenerator.statementToCode(block, 'DO');
+    return `debug.profilebegin("${name}")\n${branch}debug.profileend()\n`;
+  };
+
   // TeleportService Generators
   luaGenerator.forBlock['teleportservice_teleport'] = function(block: any) {
     const placeId = luaGenerator.valueToCode(block, 'PLACEID', Order.NONE) || '0';
@@ -862,6 +890,56 @@ export const defineCustomGenerators = () => {
   luaGenerator.forBlock['effects_create_trail'] = function(block: any) {
     const parent = luaGenerator.valueToCode(block, 'PARENT', Order.NONE) || 'nil';
     const code = `(function()\n\tlocal trail = Instance.new("Trail")\n\ttrail.Parent = ${parent}\n\treturn trail\nend)()`;
+    return [code, Order.ATOMIC];
+  };
+
+  // --- RAYCAST GENERATORS ---
+  luaGenerator.forBlock['raycast_params_create'] = function() {
+    return ['RaycastParams.new()', Order.ATOMIC];
+  };
+
+  luaGenerator.forBlock['raycast_params_set_filter'] = function(block: any) {
+    const params = luaGenerator.valueToCode(block, 'PARAMS', Order.NONE) || 'nil';
+    const list = luaGenerator.valueToCode(block, 'LIST', Order.NONE) || '{}';
+    return `${params}.FilterDescendantsInstances = ${list}\n`;
+  };
+
+  luaGenerator.forBlock['raycast_params_set_type'] = function(block: any) {
+    const params = luaGenerator.valueToCode(block, 'PARAMS', Order.NONE) || 'nil';
+    const type = block.getFieldValue('TYPE');
+    return `${params}.FilterType = ${type}\n`;
+  };
+
+  luaGenerator.forBlock['raycast_workspace_raycast'] = function(block: any) {
+    const origin = luaGenerator.valueToCode(block, 'ORIGIN', Order.NONE) || 'Vector3.new(0, 0, 0)';
+    const direction = luaGenerator.valueToCode(block, 'DIRECTION', Order.NONE) || 'Vector3.new(0, -10, 0)';
+    const params = luaGenerator.valueToCode(block, 'PARAMS', Order.NONE) || 'nil';
+    const code = `workspace:Raycast(${origin}, ${direction}, ${params})`;
+    return [code, Order.ATOMIC];
+  };
+
+  luaGenerator.forBlock['raycast_workspace_spherecast'] = function(block: any) {
+    const origin = luaGenerator.valueToCode(block, 'ORIGIN', Order.NONE) || 'Vector3.new(0, 0, 0)';
+    const radius = luaGenerator.valueToCode(block, 'RADIUS', Order.NONE) || '1';
+    const direction = luaGenerator.valueToCode(block, 'DIRECTION', Order.NONE) || 'Vector3.new(0, -10, 0)';
+    const params = luaGenerator.valueToCode(block, 'PARAMS', Order.NONE) || 'nil';
+    const code = `workspace:Spherecast(${origin}, ${radius}, ${direction}, ${params})`;
+    return [code, Order.ATOMIC];
+  };
+
+  luaGenerator.forBlock['raycast_workspace_blockcast'] = function(block: any) {
+    const cframe = luaGenerator.valueToCode(block, 'CFRAME', Order.NONE) || 'CFrame.new()';
+    const size = luaGenerator.valueToCode(block, 'SIZE', Order.NONE) || 'Vector3.new(1, 1, 1)';
+    const direction = luaGenerator.valueToCode(block, 'DIRECTION', Order.NONE) || 'Vector3.new(0, -10, 0)';
+    const params = luaGenerator.valueToCode(block, 'PARAMS', Order.NONE) || 'nil';
+    const code = `workspace:Blockcast(${cframe}, ${size}, ${direction}, ${params})`;
+    return [code, Order.ATOMIC];
+  };
+
+  luaGenerator.forBlock['raycast_get_result_property'] = function(block: any) {
+    const result = luaGenerator.valueToCode(block, 'RESULT', Order.NONE) || 'nil';
+    const prop = block.getFieldValue('PROP');
+    const code = `${result} and ${result}.${prop}`;
     return [code, Order.ATOMIC];
   };
 };

@@ -41,8 +41,17 @@ service cloud.firestore {
              data.uid == request.auth.uid &&
              data.email is string &&
              (!('displayName' in data) || data.displayName is string) &&
+             (!('username' in data) || data.username is string) &&
              (!('photoURL' in data) || data.photoURL is string) &&
-             (!('hasSeenTutorial' in data) || data.hasSeenTutorial is bool);
+             (!('birthDate' in data) || (
+               data.birthDate is map && 
+               data.birthDate.day is number && 
+               data.birthDate.month is number && 
+               data.birthDate.year is number
+             )) &&
+             (!('hasSeenTutorial' in data) || data.hasSeenTutorial is bool) &&
+             (!('achievements' in data) || data.achievements is list) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     function isValidSlot(data) {
@@ -61,6 +70,12 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow write: if isOwner(userId) && isValidSlot(request.resource.data);
       }
+    }
+
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false; // Immutable usernames
     }
   }
 }

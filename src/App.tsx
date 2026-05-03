@@ -37,6 +37,7 @@ import {
   Save, 
   Trash2, 
   Plus,
+  Server,
   MessageSquare,
   X,
   Info,
@@ -57,6 +58,7 @@ import {
   PlayCircle,
   Library,
   Smartphone,
+  Tablet,
   LayoutDashboard,
   HelpCircle,
   Eye,
@@ -69,7 +71,11 @@ import {
   Zap,
   Trophy,
   Database,
-  Terminal
+  Terminal,
+  Mail,
+  Lock,
+  LogIn,
+  UserPlus
 } from 'lucide-react';
 import * as luaparse from 'luaparse';
 import { useExplorer } from './explorer';
@@ -89,6 +95,9 @@ import {
   signInWithPopup, 
   signOut, 
   onAuthStateChanged, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   User as FirebaseUser 
 } from 'firebase/auth';
 import { 
@@ -120,7 +129,8 @@ const CATEGORIES = [
   { name: 'Part' },
   { name: 'Character' },
   { name: 'Model' },
-  { name: 'Gui' },
+  { name: 'Raycast' },
+  { name: 'GUI' },
   { name: 'ClickDetector' },
   { name: 'Marketplace' },
   { name: 'Tweening' },
@@ -134,6 +144,7 @@ const CATEGORIES = [
   { name: 'Input' },
   { name: 'Camera' },
   { name: 'Effects' },
+  { name: 'Optimization' },
   { name: 'AdService' },
   { name: 'AnalyticsService' },
   { name: 'AnimationClipProvider' },
@@ -212,7 +223,7 @@ const CATEGORIES = [
   color: getCategoryColor(cat.name)
 }));
 
-const BlocklyPreview = ({ blockType }: { blockType: string }) => {
+const BlocklyPreview = React.memo(({ blockType }: { blockType: string }) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null);
 
@@ -294,61 +305,306 @@ const BlocklyPreview = ({ blockType }: { blockType: string }) => {
   }, [blockType]);
 
   return <div ref={previewRef} className="w-full h-full" />;
-};
+});
 
 const getBlockDescription = (block: any, lang: string) => {
   const type = block.type.toLowerCase();
   const name = block.name;
   
+  // Variables Custom
+  if (type.startsWith('variables_')) {
+    if (type.includes('create')) {
+      return lang === 'vi'
+        ? "Khởi tạo một biến mới và gán giá trị bắt đầu cho nó. Biến là linh hồn của kịch bản, giúp bạn lưu trữ các dữ liệu thay đổi như: Số tiền người chơi có, Tên của thú cưng, hoặc Trạng thái cửa đang đóng hay mở. Việc 'khai báo' biến ở đầu kịch bản giúp máy tính hiểu được bạn sẽ dùng tên này để đại diện cho một giá trị nào đó trong suốt vòng đời của Script. Lưu ý: Tên biến phải duy nhất, không bắt đầu bằng số và không được trùng với các từ khóa hệ thống như 'local', 'if', 'then'..."
+        : "Initializes a new variable and assigns it a starting value. Variables are the soul of your script, allowing you to store dynamic data like: Player's balance, Pet's name, or if a Door is open/closed. Declaring a variable at the start helps the computer understand that this name represents a specific value throughout the Script's lifecycle. Note: Variable names must be unique, cannot start with a number, and must not conflict with system keywords like 'local', 'if', 'then'...";
+    }
+    if (type.includes('set')) {
+      return lang === 'vi'
+        ? "Gán một giá trị mới hoàn toàn cho một biến đã tồn tại. Khối này sẽ ghi đè (thay thế) giá trị cũ bằng giá trị mới mà bạn cung cấp. Ví dụ: Khi người chơi nhặt được một thanh kiếm mới, bạn có thể 'Set' biến 'VũKhíHiệnTại' thành tên thanh kiếm đó. Đây là cách cơ bản nhất để cập nhật dữ liệu trong game. Bạn cần đảm bảo đã tạo biến bằng khối 'create' trước khi sử dụng khối này để tránh lỗi 'Unknown variable'."
+        : "Assigns a brand-new value to an existing variable. This block overwrites (replaces) the old value with the new one you provide. Example: When a player picks up a new sword, you can 'Set' the 'CurrentWeapon' variable to that sword's name. This is the most fundamental way to update game data. Ensure you've created the variable using the 'create' block before using this to avoid 'Unknown variable' errors.";
+    }
+    if (type.includes('change')) {
+      return lang === 'vi'
+        ? "Thay đổi giá trị của một biến kiểu số bằng cách cộng thêm hoặc trừ đi một giá trị cụ thể. Đây là 'xương sống' của hệ thống vật lý và kinh tế trong game như tính điểm, kinh nghiệm hoặc tiền tệ. Ví dụ: Khối 'change Money by 50' sẽ lấy số tiền hiện có và cộng thêm 50. Nếu bạn muốn trừ điểm, hãy nhập số âm như '-10'. Khối này chỉ hoạt động hiệu quả và logic với các biến đang chứa giá trị kiểu Số (Number)."
+        : "Modifies a numeric variable by adding or subtracting a specific value. This is the 'backbone' of physics and economy systems in games, such as scoring, experience, or currency. Example: 'change Money by 50' takes existing money and adds 50. To subtract points, enter a negative number like '-10'. This block only works effectively and logically with variables currently holding Number values.";
+    }
+    if (type.includes('get')) {
+      return lang === 'vi'
+        ? "Truy xuất (đọc) giá trị hiện tại của một biến để sử dụng cho mục đích khác. Khối này không làm thay đổi dữ liệu gốc mà chỉ 'mượn' thông tin để bạn thực hiện các phép tính hoặc so sánh logic. Ví dụ: Lấy biến 'CấpĐộ' để kiểm tra xem 'CấpĐộ > 10' thì mới cho mở cửa. Bạn có thể kéo khối này vào bất kỳ ô trống nào yêu cầu giá trị đầu vào (Input slot)."
+        : "Retrieves (reads) the current value of a variable for other purposes. This block does not change the original data but 'borrows' information for you to perform calculations or logic comparisons. Example: Get the 'Level' variable to check 'Level > 10' before allowing a door to open. You can drag this block into any empty input slot.";
+    }
+  }
+
+  // Raycast
+  if (type.startsWith('raycast_')) {
+    if (type.includes('create')) {
+      return lang === 'vi'
+        ? "Tạo một đối tượng RaycastParams (Tham số bắn tia). Đây là một 'bản danh sách quy tắc' để định cấu hình cho các hoạt động bắn tia (Raycast). Bạn có thể thiết lập danh sách các đối tượng cần bỏ qua (Ignore) hoặc chỉ chạm vào một vài đối tượng định sẵn (Include). Đây là bước chuẩn bị sống còn để tia cast hoạt động chính xác, ví dụ như giúp tia đạn xuyên qua lá cây hoặc không bao giờ tự bắn trúng bản thân người bắn."
+        : "Creates a RaycastParams object. This is a 'rule list' to configure raycasting operations. You can set up a list of instances to ignore or only include specific targets. This is a vital setup step to ensure your rays function correctly, such as allowing bullets to pass through leaves or preventing a ray from hitting the character firing it.";
+    }
+    if (type.includes('workspace_raycast')) {
+      return lang === 'vi'
+        ? "Bắn một tia tàng hình từ vị trí gốc (Origin) theo một hướng và chiều dài xác định (Direction). Nếu tia này chạm vào bất kỳ vật thể nào có tính chất va chạm trong không gian 3D, nó sẽ trả về một 'RaycastResult' chứa thông tin cực kỳ chi tiết: Vật thể đó là gì, tọa độ chính xác điểm chạm, bề mặt đó hướng về đâu. Đây là công nghệ hiện đại nhất để làm súng (Hitscan gun), kiểm tra khoảng cách rơi, hoặc làm AI xác định mục tiêu."
+        : "Fires an invisible ray from an origin point in a specific direction and length. If the ray hits any collidable object in 3D space, it returns a 'RaycastResult' containing extremely detailed info: What object was hit, exact hit coordinates, and surface normal. This is the state-of-the-art technology for Hitscan guns, fall-distance checks, or AI targeting systems.";
+    }
+    if (type.includes('get_result_property')) {
+      return lang === 'vi'
+        ? "Trích xuất thông tin từ kết quả của một lần bắn tia thành công. Kết quả RaycastResult là một gói dữ liệu lớn, khối này giúp bạn 'mở gói' để lấy ra đúng thứ bạn cần như: part bị trúng (Instance), vị trí trúng (Position - Vector3), hay chất liệu của vật đó (Material). Nếu tia không trúng gì, kết quả sẽ là 'nil' (trống rỗng)."
+        : "Extracts specific information from a successful RaycastResult. The result is a large data package; this block helps you 'unpack' exactly what you need, such as: hit part (Instance), hit position (Vector3), or the surface Material. If the ray hits nothing, the result will be 'nil'.";
+    }
+  }
+
   // Events
-  if (type.includes('event')) {
-    if (type.includes('touched')) {
-      return lang === 'vi'
-        ? `Sự kiện này kích hoạt khi một đối tượng khác chạm vào đối tượng này. Nó trả về đối tượng đã chạm vào (OtherPart). Rất hữu ích để tạo bẫy, cửa tự động hoặc vùng hồi máu.`
-        : `This event triggers when another object touches this object. It returns the object that touched it (OtherPart). Useful for creating traps, automatic doors, or healing zones.`;
-    }
-    if (type.includes('click')) {
-      return lang === 'vi'
-        ? `Sự kiện này kích hoạt khi người chơi click chuột vào đối tượng (phải có ClickDetector). Cho phép bạn tạo các nút bấm, công tắc hoặc vật phẩm có thể tương tác.`
-        : `This event triggers when a player clicks on the object (requires a ClickDetector). Allows you to create buttons, switches, or interactive items.`;
-    }
-    return lang === 'vi' 
-      ? `Sự kiện "${name}" sẽ tự động chạy đoạn mã bên trong khi điều kiện tương ứng xảy ra trong trò chơi. Đây là điểm bắt đầu của hầu hết các kịch bản.`
-      : `The "${name}" event will automatically run the code inside when the corresponding condition occurs in the game. This is the starting point for most scripts.`;
+  if (type.startsWith('event_')) {
+    if (type.includes('touched')) return lang === 'vi' ? "Kích hoạt khi một vật thể chạm vào vật thể được chỉ định. Đây là cách phổ biến nhất để tạo bẫy chông, cửa tự động, hoặc nhặt vật phẩm. Biến 'otherPart' sẽ cho bạn biết cái gì đã chạm vào nó (ví dụ: chân nhân vật)." : "Triggers when an object touches the specified object. The most common way to create spikes, automatic doors, or item pickups. The 'otherPart' variable tells you exactly what made the contact (e.g., player's leg).";
+    if (type.includes('game_start')) return lang === 'vi' ? "Khối sự kiện 'Tối Thượng' - Nó sẽ chạy ngay lập tức khi Script bắt đầu hoạt động. Thường dùng để thiết lập các giá trị ban đầu, tạo biến, hoặc khởi tạo các hệ thống quan trọng của trò chơi ngay khi Server khởi động." : "The 'Ultimate' event block - It runs immediately when the Script starts. Typically used to set up initial values, create variables, or initialize core game systems as soon as the Server boots.";
+    if (type.includes('player_joined')) return lang === 'vi' ? "Theo dõi khi có một người chơi mới tham gia vào máy chủ. Bạn có thể dùng khối này để chào mừng người chơi, tặng thưởng cho họ, hoặc tải dữ liệu cũ của họ lên." : "Monitors when a new player joins the server. Use this to welcome players, grant rewards, or load their previous data.";
   }
-  
-  // Properties (Set/Get)
-  if (type.includes('set_')) {
-    const prop = name.replace('set ', '').replace('đặt ', '');
-    return lang === 'vi'
-      ? `Khối lệnh này cho phép bạn thay đổi giá trị của thuộc tính "${prop}". Ví dụ: đổi màu sắc, độ trong suốt, hoặc vị trí của một khối Part.`
-      : `This block allows you to change the value of the "${prop}" property. For example: changing the color, transparency, or position of a Part.`;
-  }
-  if (type.includes('get_')) {
-    const prop = name.replace('get ', '').replace('lấy ', '');
-    return lang === 'vi'
-      ? `Khối lệnh này đọc giá trị hiện tại của thuộc tính "${prop}" để bạn có thể sử dụng nó trong các phép tính hoặc điều kiện khác.`
-      : `This block reads the current value of the "${prop}" property so you can use it in other calculations or conditions.`;
-  }
-  
-  // Logic
-  if (type === 'lua_if') {
-    return lang === 'vi'
-      ? `Cấu trúc điều kiện cơ bản nhất. Nếu [điều kiện] là đúng (true), thì các lệnh bên trong sẽ được thực hiện. Nếu sai, chúng sẽ bị bỏ qua.`
-      : `The most basic conditional structure. If the [condition] is true, the blocks inside will be executed. If false, they will be skipped.`;
-  }
-  
-  // Instance creation
-  if (type.includes('instance_new')) {
-    return lang === 'vi'
-      ? `Tạo ra một đối tượng mới hoàn toàn (như Part, Script, Sound) trong trò chơi. Bạn cần đặt Parent cho nó để nó xuất hiện trong thế giới.`
-      : `Creates a brand new object (like a Part, Script, Sound) in the game. You need to set its Parent for it to appear in the world.`;
+
+  // World / Workspace
+  if (type.startsWith('world_')) {
+    if (type.includes('me')) return lang === 'vi' ? "Đại diện cho chính đối tượng đang chứa kịch bản này (script.Parent). Nếu bạn bỏ kịch bản vào một Part đỏ, 'Me' chính là Part đỏ đó. 'Me' giúp các khối lệnh bên trong linh hoạt và không bị lỗi khi bạn đổi tên vật thể hoặc di chuyển nó sang vị trí khác trong Explorer." : "Represents the specific object containing this script (script.Parent). If you put the script in a red Part, 'Me' is that red Part. Using 'Me' makes your logic flexible and prevents errors if you rename the object or move it elsewhere in the Explorer.";
+    if (type.includes('instance')) return lang === 'vi' ? "Một công cụ chọn vật thể mạnh mẽ. Bạn có thể nhấn vào để chọn trực tiếp bất kỳ Part, Model hay Folder nào từ cây Explorer của game. Khối này biến đường dẫn phức tạp thành một tham chiếu trực quan dễ dùng." : "A powerful object selector. You can click to select any Part, Model, or Folder directly from your game's Explorer tree. It turns complex paths into a simple, visual reference.";
   }
 
   // Default fallback
   return lang === 'vi' 
-    ? `Khối lệnh "${name}" thuộc nhóm ${block.category}. Nó cung cấp các chức năng chuyên sâu để điều khiển ${name.toLowerCase()} trong môi trường Roblox.`
-    : `The "${name}" block belongs to the ${block.category} category. It provides specialized functions to control ${name.toLowerCase()} within the Roblox environment.`;
+    ? `Khối lệnh "${name}" thuộc nhóm ${block.category}. Nó cung cấp các công cụ cần thiết để xây dựng logic trò chơi chuyên nghiệp. Các khối này đã được tối ưu hóa để tương thích hoàn toàn với nền tảng Roblox. Hãy kết hợp chúng theo logic để tạo ra trải nghiệm độc đáo cho người chơi.`
+    : `The "${name}" block belongs to the ${block.category} category. It provides essential tools for professional game logic construction. These blocks are optimized for full compatibility with the Roblox platform. Combine them logically to create unique player experiences.`;
+};
+
+const getBlockUsage = (block: any, lang: string) => {
+  const type = block.type.toLowerCase();
+  
+  if (type.startsWith('variables_')) {
+    if (type.includes('create')) {
+      return lang === 'vi'
+        ? [
+            "Bước 1: Quyết định xem bạn muốn lưu trữ loại dữ liệu nào (Số, Chữ, hay Vật thể).",
+            "Bước 2: Kéo khối 'variable create' và đặt vào vị trí khởi đầu. Nhấn vào ô 'x' để đặt tên (Vd: 'DiemSo').",
+            "Bước 3: Lắp giá trị mặc định ban đầu vào ô 'with value' (Vd: số 0).",
+            "Bước 4: Sử dụng các khối 'variable get DiemSo' ở các phần khác của Code để kiểm tra điểm của người chơi.",
+            "Lưu ý: Luôn gán giá trị hợp lý ngay từ đầu để tránh lỗi kịch bản khi chạy."
+          ]
+        : [
+            "Step 1: Decide what kind of data you want to store (Number, String, or Object).",
+            "Step 2: Drag 'variable create' and place it at a startup position. Click 'x' to name it (e.g., 'Score').",
+            "Step 3: Snap a default starting value into 'with value' (e.g., the number 0).",
+            "Step 4: Use 'variable get Score' blocks elsewhere to check the player's performance.",
+            "Note: Always assign a sensible initial value to prevent script errors during execution."
+          ];
+    }
+    if (type.includes('set') || type.includes('change')) {
+      return lang === 'vi'
+        ? [
+            "Bước 1: Chắc chắn rằng biến đó đã được khai báo ở đâu đó trong cùng một Script hoặc một Script liên quan.",
+            "Bước 2: Click vào ô tên biến. Một bảng tìm kiếm thông minh sẽ hiện ra liệt kê các biến đã có.",
+            "Bước 3: Gõ tên để lọc hoặc chọn trực tiếp từ danh sách. Nếu bạn nhấn chuột ra ngoài Workspace hoặc vùng trống, bảng chọn sẽ tự ẩn đi.",
+            "Bước 4: Gắn giá trị mới vào. Nếu dùng 'Change', giá trị bạn nhập sẽ được cộng dồn vào giá trị cũ.",
+            "Mẹo: Dùng 'change' cho tiền tệ, dùng 'set' cho các trạng thái như 'TênNgườiChơi' hoặc 'ĐangChạy'."
+          ]
+        : [
+            "Step 1: Ensure the variable has been declared somewhere within the same or a related script.",
+            "Step 2: Click the variable name field. A smart search dropdown listing available variables will appear.",
+            "Step 3: Type to filter or select directly. Clicking anywhere on the Workspace background will hide this dropdown.",
+            "Step 4: Attach the new value. If using 'Change', your input will be added to the existing value.",
+            "Tip: Use 'change' for currencies, and 'set' for states like 'PlayerName' or 'IsRunning'."
+          ];
+    }
+  }
+
+  if (type.startsWith('raycast_')) {
+    return lang === 'vi'
+      ? [
+          "Bước 1: Khởi tạo RaycastParams và cấu hình nó (ví dụ: thêm nhân vật chính vào danh sách bỏ qua).",
+          "Bước 2: Xác định điểm Gốc (Origin) - dùng khối 'get position of' một Part hoặc súng.",
+          "Bước 3: Xác định Hướng (Direction) - Vector3 xác định tia sẽ dài bao nhiêu và bắn về đâu.",
+          "Bước 4: Chạy khối 'Raycast' và lưu kết quả vào một biến tạm.",
+          "Bước 5: Dùng khối logic 'if' để kiểm tra 'nếu kết quả ~= nil', sau đó dùng khối 'Get Property from Result' để lấy Part bị bắn trúng."
+        ]
+      : [
+          "Step 1: Initialize RaycastParams and configure it (e.g., add the shooter to the ignore list).",
+          "Step 2: Define the Origin - use a 'get position' block of a Part or a gun muzzle.",
+          "Step 3: Define the Direction - a Vector3 determining how long and where the ray points.",
+          "Step 4: Execute the 'Raycast' block and store the returned value in a temporary variable.",
+          "Step 5: Use an 'if' block to check 'if result ~= nil', then use 'Get Property from Result' to fetch the hit Part."
+        ];
+  }
+
+  if (type.startsWith('world_')) {
+    return lang === 'vi'
+      ? [
+          "Bước 1: Dùng khối 'Instance' chọn vật phẩm từ Explorer hoặc dùng 'Me' cho vật phẩm đang chứa script.",
+          "Bước 2: Lắp khối này vào đầu vào 'Instance' của các khối hành động như 'set Color' hoặc 'clone'.",
+          "Bước 3: Để tìm vật phẩm nằm sâu bên trong, hãy dùng khối 'find Child' hoặc 'get instance by path'.",
+          "Ưu điểm: Việc chọn trực tiếp giúp bạn không bao giờ sai đường dẫn (Path) - một lỗi cực kỳ phổ biến trong lập trình."
+        ]
+      : [
+          "Step 1: Use the 'Instance' selector to pick an item from Explorer, or 'Me' for the item containing the script.",
+          "Step 2: Snap this block into the 'Instance' input of action blocks like 'set Color' or 'clone'.",
+          "Step 3: To find items deep inside folders, use 'find Child' or 'get instance by path' blocks.",
+          "Pro Tip: Selecting directly ensures you never mess up the 'Path' - a very common error in game dev."
+        ];
+  }
+
+  return lang === 'vi'
+    ? [
+        `Bước 1: Tìm khối "${name}" trong mục ${block.category}.`,
+        `Bước 2: Kéo khối ra và kết nối nó vào chuỗi logic của bạn.`,
+        `Bước 3: Chú ý các ô đầu vào (Input) và đầu ra (Output). Bạn chỉ có thể lắp các khối có hình dáng tương ứng.`,
+        `Bước 4: Sau khi lắp xong, mã máy sẽ tự động được tạo ở tab bên phải. Bạn có thể nhấn 'RUN' để kiểm tra kết quả ngay lập tức.`
+      ]
+    : [
+        `Step 1: Find the "${name}" block in the ${block.category} section.`,
+        `Step 2: Drag the block out and connect it to your logic chain.`,
+        `Step 3: Pay attention to Input and Output slots. Only blocks with matching shapes can be connected.`,
+        `Step 4: Once connected, the machine code is auto-generated in the right tab. You can hit 'RUN' to test the results immediately.`
+      ];
+};
+
+const getBlockSyntax = (block: any) => {
+  const type = block.type.toLowerCase();
+  
+  // -- Variables Custom --
+  if (type === 'variables_create') return "local [VariableName] = [Value]";
+  if (type === 'variables_set_custom') return "[VariableName] = [Value]";
+  if (type === 'variables_change_custom') return "[VariableName] = [VariableName] + [Amount]";
+  if (type === 'variables_get_custom') return "[VariableName]";
+  
+  // -- Logic --
+  if (type === 'lua_if') return "if [Condition] then\n    [Action]\nend";
+  if (type === 'logic_negate') return "not [Boolean]";
+  if (type === 'logic_compare_eq') return "[A] == [B]";
+  if (type === 'logic_compare_lt') return "[A] < [B]";
+  if (type === 'logic_compare_gt') return "[A] > [B]";
+  if (type === 'logic_compare_neq') return "[A] ~= [B]";
+  if (type === 'logic_boolean_true') return "true";
+  if (type === 'logic_boolean_false') return "false";
+  if (type === 'logic_operation_and') return "[A] and [B]";
+  if (type === 'logic_operation_or') return "[A] or [B]";
+  if (type === 'wait') return "task.wait([Seconds])";
+
+  // -- Loops --
+  if (type === 'loops_while_lua') return "while [Condition] do\n    [Action]\nend";
+  if (type === 'loops_repeat_lua') return "for [Var] = [From], [To] do\n    [Action]\nend";
+  if (type === 'loops_for_children') return "for _, [Child] in ipairs([Instance]:GetChildren()) do\n    [Action]\nend";
+  if (type === 'loops_for_descendants') return "for _, [Descendant] in ipairs([Instance]:GetDescendants()) do\n    [Action]\nend";
+  if (type === 'loops_break_lua') return "break";
+
+  // -- World / Workspace --
+  if (type === 'world_me') return "script.Parent";
+  if (type === 'world_game') return "game";
+  if (type === 'world_workspace' || type === 'workspace') return 'game:GetService("Workspace")';
+  if (type === 'world_this_script') return "script";
+  if (type === 'world_instance' || type === 'instance_selector') return "game.[Path].[To].[Object]";
+  if (type === 'world_set_property_direct') return "[Instance].[Property] = [Value]";
+  if (type === 'world_get_property_direct') return "[Instance].[Property]";
+  if (type === 'world_find_first_child_direct' || type === 'workspace_findfirstchild') return "local [Var] = [Instance]:FindFirstChild([Name])";
+  if (type === 'workspace_waitforchild') return "local [Var] = [Instance]:WaitForChild([Name])";
+  if (type === 'world_vector3') return "Vector3.new([X], [Y], [Z])";
+  if (type === 'world_set_property') return "[Instance][[PropertyName]] = [Value]";
+  if (type === 'world_get_property') return "[Instance][[PropertyName]]";
+  if (type === 'world_find_first_child') return "local [Var] = [Instance]:FindFirstChild([Name])";
+  if (type === 'world_color3') return "Color3.new([R], [G], [B])";
+  if (type === 'world_create_instance_direct') return "Instance.new([ClassName], [Parent])";
+  if (type === 'world_clone_instance') return "local _clone = [Instance]:Clone()\n_clone.Parent = [Parent]";
+
+  // -- Raycast (Matching generators.ts) --
+  if (type === 'raycast_params_create' || type === 'raycast_params_new') return "RaycastParams.new()";
+  if (type === 'raycast_params_set_filter') return "[Params].FilterDescendantsInstances = [List]";
+  if (type === 'raycast_params_set_type') return "[Params].FilterType = [Enum.RaycastFilterType]";
+  if (type === 'raycast_workspace_raycast' || type === 'workspace_raycast') return "local [Var] = [Instance]:Raycast([Origin], [Direction], [Params])";
+  if (type === 'raycast_workspace_spherecast') return "local [Var] = [Instance]:Spherecast([Origin], [Radius], [Direction], [Params])";
+  if (type === 'raycast_workspace_blockcast') return "local [Var] = [Instance]:Blockcast([CFrame], [Size], [Direction], [Params])";
+  if (type === 'raycast_get_result_property') return "[Result] and [Result].[Property]";
+
+  // -- Events --
+  if (type === 'event_game_start') return "task.spawn(function()\n    [Action]\nend)";
+  if (type === 'event_touched' || type === 'lua_event_touched') return "[Instance].Touched:Connect(function(otherPart)\n    [Action]\nend)";
+  if (type === 'event_clicked') return "[ClickDetector].MouseClick:Connect(function(player)\n    [Action]\nend)";
+  if (type === 'event_player_joined' || type === 'lua_event_player_added') return "game.Players.PlayerAdded:Connect(function(player)\n    [Action]\nend)";
+  if (type === 'event_heartbeat') return "game:GetService('RunService').Heartbeat:Connect(function(deltaTime)\n    [Action]\nend)";
+  if (type === 'event_value_changed') return "[Value].Changed:Connect(function(newValue)\n    [Action]\nend)";
+  if (type === 'event_game_loaded') return "game.Loaded:Connect(function()\n    [Action]\nend)";
+
+  // -- Instance Methods/Props (Dynamic matching for rbx_ blocks) --
+  if (type.startsWith('rbx_')) {
+    const parts = type.split('_');
+    const serviceNameRaw = parts[1];
+    const serviceName = serviceNameRaw.charAt(0).toUpperCase() + serviceNameRaw.slice(1);
+    const serviceVar = serviceName === 'Workspace' ? 'workspace' : `game:GetService("${serviceName}")`;
+
+    if (type.includes('_method_')) {
+      const methodNameRaw = parts[parts.length - 1];
+      const methodName = methodNameRaw.charAt(0).toUpperCase() + methodNameRaw.slice(1);
+      return `${serviceVar}:${methodName}(...)`;
+    }
+    if (type.includes('_property_set_')) {
+      const propNameRaw = parts[parts.length - 1];
+      const propName = propNameRaw.charAt(0).toUpperCase() + propNameRaw.slice(1);
+      return `${serviceVar}.${propName} = [Value]`;
+    }
+    if (type.includes('_property_get_')) {
+      const propNameRaw = parts[parts.length - 1];
+      const propName = propNameRaw.charAt(0).toUpperCase() + propNameRaw.slice(1);
+      return `${serviceVar}.${propName}`;
+    }
+    if (type.includes('_event_')) {
+      const eventNameRaw = parts[parts.length - 1];
+      const eventName = eventNameRaw.charAt(0).toUpperCase() + eventNameRaw.slice(1);
+      return `${serviceVar}.${eventName}:Connect(function()\n    [Action]\nend)`;
+    }
+    if (type.includes('_child_')) {
+      if (type.includes('create_instance')) return `Instance.new([ClassName], ${serviceVar})`;
+      if (type.includes('parent_object_to_service')) return `[Instance].Parent = ${serviceVar}`;
+    }
+  }
+
+  // -- Sound --
+  if (type === 'sound_play') return "[Sound]:Play()";
+  if (type === 'sound_stop') return "[Sound]:Stop()";
+  if (type === 'sound_volume') return "[Sound].Volume = [Value]";
+  if (type === 'sound_timeposition') return "[Sound].TimePosition = [Value]";
+  if (type === 'sound_soundid') return "[Sound].SoundId = [Url]";
+
+  // -- Camera --
+  if (type === 'camera_get_current') return "workspace.CurrentCamera";
+  if (type === 'camera_set_type') return "workspace.CurrentCamera.CameraType = [Enum.CameraType]";
+  if (type === 'camera_look_at') return "workspace.CurrentCamera.CFrame = CFrame.lookAt(workspace.CurrentCamera.CFrame.Position, [Target])";
+  if (type === 'camera_set_fov') return "workspace.CurrentCamera.FieldOfView = [Number]";
+  if (type === 'camera_set_cframe') return "workspace.CurrentCamera.CFrame = [CFrame]";
+
+  // -- Effects --
+  if (type === 'effects_emit_particles') return "[Emitter]:Emit([Count])";
+  if (type === 'effects_create_explosion') return "(function()\n    local ex = Instance.new('Explosion')\n    ex.Position = [Pos]\n    ex.Parent = workspace\n    return ex\nend)()";
+
+  // -- Debug / Comment --
+  if (type === 'comment') return "-- [Text]";
+  if (type === 'print') return "print([Text])";
+  if (type === 'warn') return "warn([Text])";
+  if (type === 'run_lua') return "[YourCode]";
+
+  // -- Math --
+  if (type === 'math_number' || type === 'math_number_custom') return "[Number]";
+  if (type === 'math_arithmetic') return "([A] + [B])";
+  if (type === 'math_single') return "math.sqrt([Value])";
+  if (type === 'math_random_int') return "math.random([Min], [Max])";
+
+  // -- Text --
+  if (type === 'text') return "\"[String]\"";
+  if (type === 'text_join') return "([A] .. [B])";
+  if (type === 'text_length') return "#[String]";
+
+  // -- Datastore --
+  if (type === 'datastore_save' || type === 'datastore_setasync') return "[DataStore]:SetAsync([Key], [Value])";
+  if (type === 'datastore_get' || type === 'datastore_getasync') return "[DataStore]:GetAsync([Key])";
+
+  // Default fallback logic to approximate generator style
+  if (type.includes('set')) return "[Target].[Property] = [Value]";
+  if (type.includes('get')) return "[Target].[Property]";
+  if (type.includes('event')) return "[Target].[Event]:Connect(function(...) [Actions] end)";
+
+  return null;
 };
 
 const robloxTheme = {
@@ -389,8 +645,21 @@ export default function App() {
   const [showInfo, setShowInfo] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authEmailLogin, setAuthEmailLogin] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authUsername, setAuthUsername] = useState('');
+  const [birthDay, setBirthDay] = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthYear, setBirthYear] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authEmailFocus, setAuthEmailFocus] = useState<string | null>(null);
   const [showBlockInfoModal, setShowBlockInfoModal] = useState<boolean>(false);
   const [selectedBlockInfo, setSelectedBlockInfo] = useState<any>(null);
+  const [infoActiveCategory, setInfoActiveCategory] = useState<string | null>(null);
+  const [categorySearchQuery, setCategorySearchQuery] = useState<string>('');
   const toolboxRef = useRef<any>(null);
 
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'warning' } | null>(null);
@@ -403,8 +672,32 @@ export default function App() {
     }))
   );
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  const [deviceStep, setDeviceStep] = useState<'selection' | 'confirmation' | 'loading' | 'orientation' | 'completed'>('selection');
+  const [selectedDevice, setSelectedDevice] = useState<'pc' | 'phone' | 'tablet' | null>(null);
+  const [detectedDevice, setDetectedDevice] = useState<'pc' | 'phone' | 'tablet' | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [showTutorialModal, setShowTutorialModal] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+
+  // Adjust sidebar for mobile devices
+  useEffect(() => {
+    if (selectedDevice === 'phone' || selectedDevice === 'tablet') {
+      setSidebarOpen(false);
+    }
+  }, [selectedDevice]);
+
+  // Auto-detection
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    if (/tablet|ipad|playbook|silk/i.test(ua)) {
+      setDetectedDevice('tablet');
+    } else if (/mobile|iphone|ipod|android|blackberry|phone/i.test(ua)) {
+      setDetectedDevice('phone');
+    } else {
+      setDetectedDevice('pc');
+    }
+  }, []);
 
   const tutorials = [
     { title: currentLang === 'vi' ? 'Chào mừng!' : 'Welcome!', content: currentLang === 'vi' ? 'Chào mừng bạn đến với BlockLua! Đây là nơi bạn có thể tạo game Roblox bằng các khối lệnh trực quan.' : 'Welcome to BlockLua! This is where you can create Roblox games using visual blocks.' },
@@ -413,7 +706,7 @@ export default function App() {
   ];
 
   const [showControlCenter, setShowControlCenter] = useState(false);
-  const [controlCenterTab, setControlCenterTab] = useState<'storage' | 'achievements'>('storage');
+  const [controlCenterTab, setControlCenterTab] = useState<'storage' | 'achievements' | 'ai' | 'test'>('storage');
   const [achievements, setAchievements] = useState<string[]>([]);
   const [achievementsLoaded, setAchievementsLoaded] = useState(false);
   const isInitialLoading = useRef(true);
@@ -517,15 +810,44 @@ export default function App() {
         let currentAchievements: string[] = [];
 
         if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName,
-            photoURL: firebaseUser.photoURL,
-            hasSeenTutorial: false,
-            achievements: [],
-            createdAt: Timestamp.now()
-          });
+          // If new user from Google, try to set up a default username mapping if possible
+          let assignedUsername = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.slice(0, 5)}`;
+          assignedUsername = assignedUsername.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+          
+          // Check if this default username is available
+          const usernameDoc = await getDoc(doc(db, 'usernames', assignedUsername));
+          if (!usernameDoc.exists()) {
+             // It's available! Map it.
+             const batch = writeBatch(db);
+             batch.set(doc(db, 'usernames', assignedUsername), {
+               email: firebaseUser.email,
+               uid: firebaseUser.uid,
+               username: firebaseUser.displayName || assignedUsername
+             });
+             batch.set(userRef, {
+               uid: firebaseUser.uid,
+               email: firebaseUser.email,
+               displayName: firebaseUser.displayName || assignedUsername,
+               username: assignedUsername, // Store the lowercase unique username
+               photoURL: firebaseUser.photoURL,
+               hasSeenTutorial: false,
+               achievements: [],
+               createdAt: Timestamp.now()
+             });
+             await batch.commit();
+          } else {
+             // Username taken, just create the user doc without a mapping for now
+             // They'll have to pick one later or we just use UID-based one
+             await setDoc(userRef, {
+               uid: firebaseUser.uid,
+               email: firebaseUser.email,
+               displayName: firebaseUser.displayName,
+               photoURL: firebaseUser.photoURL,
+               hasSeenTutorial: false,
+               achievements: [],
+               createdAt: Timestamp.now()
+             });
+          }
           setShowTutorialModal(false);
         } else {
           // Sync tutorial state from cloud
@@ -610,10 +932,23 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
+  useEffect(() => {
+    if (!showAuthModal) {
+      setAuthEmail('');
+      setAuthEmailLogin('');
+      setAuthPassword('');
+      setAuthUsername('');
+      setBirthDay('');
+      setBirthMonth('');
+      setBirthYear('');
+    }
+  }, [showAuthModal]);
+
   const login = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
       showToast(currentLang === 'vi' ? 'Đăng nhập thành công!' : 'Logged in successfully!', 'success');
+      setShowAuthModal(false);
     } catch (error: any) {
       if (error.code === 'auth/popup-closed-by-user') {
         showToast(currentLang === 'vi' ? 'Cửa sổ đăng nhập đã bị đóng.' : 'Login popup was closed.', 'warning');
@@ -624,6 +959,151 @@ export default function App() {
       }
       console.error(error);
       showToast(currentLang === 'vi' ? 'Lỗi đăng nhập!' : 'Login failed!', 'error');
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmailLogin || !authPassword) {
+      showToast(currentLang === 'vi' ? 'Vui lòng điền đầy đủ thông tin.' : 'Please fill in all fields.', 'warning');
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      let emailToUse = authEmailLogin;
+      
+      // If it doesn't look like an email, try to look up as a username
+      const identifier = authEmailLogin.trim();
+      if (!identifier.includes('@')) {
+        const usernameDoc = await getDoc(doc(db, 'usernames', identifier.toLowerCase()));
+        if (usernameDoc.exists()) {
+          emailToUse = usernameDoc.data().email;
+        } else {
+          showToast(currentLang === 'vi' ? 'Tên người dùng không tồn tại.' : 'Username does not exist.', 'error');
+          setAuthLoading(false);
+          return;
+        }
+      } else {
+        emailToUse = identifier;
+      }
+
+      await signInWithEmailAndPassword(auth, emailToUse, authPassword);
+      showToast(currentLang === 'vi' ? 'Đăng nhập thành công!' : 'Logged in successfully!', 'success');
+      setShowAuthModal(false);
+      setAuthPassword('');
+      setAuthEmailLogin('');
+    } catch (error: any) {
+      console.error(error);
+      let message = currentLang === 'vi' ? 'Lỗi đăng nhập!' : 'Login failed!';
+      if (error.code === 'auth/operation-not-allowed') {
+        message = currentLang === 'vi' 
+          ? 'Tính năng đăng nhập bằng tên người dùng chưa được bật. Vui lòng liên hệ quản trị viên hoặc bật "Email/Password" trong Firebase Console.' 
+          : 'Username login is not enabled. Please enable "Email/Password" in Firebase Console.';
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        message = currentLang === 'vi' ? 'Thông tin đăng nhập không chính xác.' : 'Incorrect login credentials.';
+      }
+      showToast(message, 'error');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanUsername = authUsername.trim();
+    const lowercaseUsername = cleanUsername.toLowerCase();
+
+    if (!cleanUsername || !authPassword || !birthDay || !birthMonth || !birthYear) {
+      showToast(currentLang === 'vi' ? 'Vui lòng điền đầy đủ thông tin.' : 'Please fill in all fields.', 'warning');
+      return;
+    }
+    
+    // Validate birth date
+    const d = parseInt(birthDay);
+    const m = parseInt(birthMonth);
+    const y = parseInt(birthYear);
+    if (isNaN(d) || isNaN(m) || isNaN(y) || d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > new Date().getFullYear()) {
+      showToast(currentLang === 'vi' ? 'Ngày sinh không hợp lệ.' : 'Invalid birth date.', 'warning');
+      return;
+    }
+
+    if (authPassword.length < 6) {
+      showToast(currentLang === 'vi' ? 'Mật khẩu phải từ 6 ký tự trở lên.' : 'Password must be at least 6 characters.', 'warning');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(cleanUsername)) {
+      showToast(currentLang === 'vi' ? 'Tên người dùng chỉ gồm chữ, số, gạch dưới (3-20 ký tự).' : 'Username must be 3-20 chars (letters, numbers, underscore).', 'warning');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      // 1. Check if username exists globally
+      const usernameDoc = await getDoc(doc(db, 'usernames', lowercaseUsername));
+      if (usernameDoc.exists()) {
+        showToast(currentLang === 'vi' ? 'Tên người dùng này đã được sử dụng!' : 'Username is already taken!', 'error');
+        setAuthLoading(false);
+        return;
+      }
+
+      // 2. Generate a virtual email for Firebase Auth
+      const virtualEmail = `${lowercaseUsername}_${Math.floor(Date.now() / 1000)}@mcb.app`;
+
+      // 3. Create user
+      const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, authPassword);
+      await updateProfile(userCredential.user, { displayName: cleanUsername });
+      
+      // 4. Save mapping and profile
+      const batch = writeBatch(db);
+      
+      // Username mapping (global)
+      batch.set(doc(db, 'usernames', lowercaseUsername), {
+        email: virtualEmail,
+        uid: userCredential.user.uid,
+        username: cleanUsername
+      });
+
+      // User profile
+      batch.set(doc(db, 'users', userCredential.user.uid), {
+        uid: userCredential.user.uid,
+        email: virtualEmail,
+        displayName: cleanUsername,
+        username: cleanUsername,
+        birthDate: { day: d, month: m, year: y },
+        createdAt: Timestamp.now(),
+        hasSeenTutorial: false,
+        achievements: []
+      });
+
+      await batch.commit();
+
+      showToast(currentLang === 'vi' ? 'Đăng ký thành công!' : 'Registered successfully!', 'success');
+      setShowAuthModal(false);
+      setAuthPassword('');
+      setAuthUsername('');
+      setBirthDay('');
+      setBirthMonth('');
+      setBirthYear('');
+    } catch (error: any) {
+      console.error(error);
+      let message = currentLang === 'vi' ? 'Lỗi đăng ký!' : 'Registration failed!';
+      if (error.code === 'auth/operation-not-allowed') {
+        message = currentLang === 'vi' 
+          ? 'Tính năng đăng ký chưa được bật. Vui lòng bật "Email/Password" trong Firebase Console.' 
+          : 'Registration is not enabled. Please enable "Email/Password" in Firebase Console.';
+      } else if (error.code === 'auth/email-already-in-use' || error.message?.includes('auth/email-already-in-use')) {
+        message = currentLang === 'vi' 
+          ? 'Tài khoản này đã tồn tại.' 
+          : 'This account already exists.';
+        setAuthMode('login');
+      } else if (error.code === 'auth/invalid-email') {
+        message = currentLang === 'vi' ? 'Định dạng đăng ký không hợp lệ.' : 'Invalid registration format.';
+      } else if (error.code === 'auth/weak-password') {
+        message = currentLang === 'vi' ? 'Mật khẩu phải có ít nhất 6 ký tự.' : 'Password must be at least 6 characters.';
+      }
+      showToast(message, 'error');
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -660,6 +1140,36 @@ export default function App() {
       saveToStorage(activeSlotIndexRef.current, true);
     }, 5000);
   }, []);
+
+  // Optimized code generation logic with persistent timer
+  const updateTimeoutRef = useRef<any>(null);
+  const debouncedUpdateCode = useCallback(() => {
+    if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
+    updateTimeoutRef.current = setTimeout(() => {
+      if (workspace.current) {
+        // Update code
+        const code = luaGenerator.workspaceToCode(workspace.current);
+        const header = `-- Generated by BlockLua\n`;
+        setGeneratedCode(code.trim() ? header + code : '');
+
+        // Update variables - Throttle discovery
+        const currentBlocks = workspace.current.getAllBlocks(false);
+        const vars = currentBlocks
+          .filter(b => b.type === 'variables_create')
+          .map(b => b.getFieldValue('VAR'))
+          .filter((v, i, a) => v && a.indexOf(v) === i);
+        setDefinedVariables(vars);
+
+        // Save to localStorage (Throttled)
+        const xml = Blockly.Xml.workspaceToDom(workspace.current);
+        const xmlText = Blockly.Xml.domToText(xml);
+        localStorage.setItem('blocklua_workspace', xmlText);
+        localStorage.setItem('blocklua_explorer', JSON.stringify(explorerRef.current));
+        
+        triggerAutoSave();
+      }
+    }, 500); // Increased debounce for smoother dragging
+  }, [triggerAutoSave]);
 
   // Trigger auto-save when explorer state changes
   useEffect(() => {
@@ -861,6 +1371,135 @@ export default function App() {
   };
 
 
+  const downloadCurrentScript = () => {
+    if (!generatedCode.trim()) return;
+    const blob = new Blob([generatedCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = "script.lua";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(currentLang === 'vi' ? 'Đã bắt đầu tải về!' : 'Download started!');
+  };
+
+  const [activeSyncTab, setActiveSyncTab] = useState<'copy' | 'plugin'>('copy');
+  const [baseUrl, setBaseUrl] = useState(
+    (window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-')
+  );
+
+  const robloxSyncPluginCode = `-- BlockLua ROBLOX SYNC PLUGIN (v2.5)
+-- Paste this into a LOCAL PLUGIN (Right click ServerScriptService -> Save as Local Plugin)
+-- This plugin synchronizes your web editor with Roblox Studio automatically.
+
+local HttpService = game:GetService("HttpService")
+local BASE_URL = "${baseUrl}"
+local SYNC_URL = BASE_URL .. "/api/sync"
+local EXPORT_URL = BASE_URL .. "/api/export"
+
+print("📡 [BlockLua] Sync Service Initialized: " .. BASE_URL)
+
+-- Helper to find object by dot-path
+local function findObjectFromPath(path)
+    if path == "game" then return game end
+    local parts = string.split(path, ".")
+    local current = game
+    for i = 2, #parts do
+        local found = current:FindFirstChild(parts[i])
+        if not found then return nil end
+        current = found
+    end
+    return current
+end
+
+-- Helper to serialize Studio tree to JSON
+local function serializeInstance(instance)
+    local className = instance.ClassName
+    -- Only sync relevant services and objects to avoid massive trees
+    local allowedClasses = {
+        "DataModel", "Workspace", "ServerScriptService", "ReplicatedStorage", 
+        "StarterPlayer", "StarterPlayerScripts", "StarterCharacterScripts",
+        "StarterGui", "Folder", "Part", "Script", "LocalScript", "ModuleScript", "Sound"
+    }
+    
+    local isAllowed = false
+    for _, c in ipairs(allowedClasses) do
+        if className == c then isAllowed = true break end
+    end
+    if not isAllowed and not (instance.Parent == game) then return nil end
+
+    local node = {
+        id = instance:GetAttribute("BlockLuaId") or instance.Name .. "_" .. tostring(math.random(1000, 9999)),
+        Name = instance.Name,
+        ClassName = className,
+        Children = {}
+    }
+    
+    -- Limit depth and child count for performance
+    local children = instance:GetChildren()
+    if #children > 50 then -- Sample first 50
+        for i = 1, 50 do
+            local childNode = serializeInstance(children[i])
+            if childNode then table.insert(node.Children, childNode) end
+        end
+    else
+        for _, child in ipairs(children) do
+            local childNode = serializeInstance(child)
+            if childNode then table.insert(node.Children, childNode) end
+        end
+    end
+    
+    return node
+end
+
+-- 1. Sync FROM Web TO Studio (Poll Exports)
+task.spawn(function()
+    while true do
+        local success, result = pcall(function()
+            return HttpService:GetAsync(EXPORT_URL)
+        end)
+        
+        if success and result and #result > 2 then
+            local data = HttpService:JSONDecode(result)
+            if data and data.script then
+                local target = findObjectFromPath(data.path)
+                if target then
+                    local scriptObj = target:FindFirstChild(data.type)
+                    if not scriptObj or scriptObj.ClassName ~= data.type then
+                        scriptObj = Instance.new(data.type)
+                        scriptObj.Name = data.type
+                        scriptObj.Parent = target
+                    end
+                    
+                    if scriptObj.Source ~= data.code then
+                        scriptObj.Source = data.code
+                        warn("✅ [BlockLua] Updated " .. data.type .. " at " .. data.path)
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- 2. Sync FROM Studio TO Web (Push Tree)
+task.spawn(function()
+    while true do
+        local tree = serializeInstance(game)
+        if tree then
+            local success, result = pcall(function()
+                return HttpService:PostAsync(SYNC_URL, HttpService:JSONEncode({ tree = tree }))
+            end)
+            if not success then
+                -- warn("⚠️ [BlockLua] Tree sync failed: " .. tostring(result))
+            end
+        end
+        task.wait(5) -- Slower sync for tree to save performance
+    end
+end)`;
+
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -884,6 +1523,32 @@ export default function App() {
   }, [explorer]);
 
   const [allBlocks, setAllBlocks] = useState<{ type: string, name: string, category: string, blockDef: any }[]>([]);
+  
+  // High-performance block counts for the UI categories
+  const blockCountsByCategory = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    allBlocks.forEach(b => {
+      counts[b.category] = (counts[b.category] || 0) + 1;
+    });
+    return counts;
+  }, [allBlocks]);
+
+  // Memoized search results for high-speed filtering
+  const searchResults = React.useMemo(() => {
+    if (!categorySearchQuery || !categorySearchQuery.trim()) return [];
+    const lowerQuery = categorySearchQuery.toLowerCase();
+    return allBlocks.filter(b => 
+      b.name.toLowerCase().includes(lowerQuery) || 
+      b.type.toLowerCase().includes(lowerQuery)
+    ).slice(0, 30);
+  }, [allBlocks, categorySearchQuery]);
+
+  // Memoized list for the actively viewed info category
+  const infoModalBlocks = React.useMemo(() => {
+    if (!infoActiveCategory) return [];
+    return allBlocks.filter(b => b.category === infoActiveCategory);
+  }, [allBlocks, infoActiveCategory]);
+
   const [selectorTarget, setSelectorTarget] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(288);
   const [isResizing, setIsResizing] = useState(false);
@@ -968,9 +1633,6 @@ export default function App() {
   }, [setExplorer]);
 
   const [exportScriptType, setExportScriptType] = useState<'Script' | 'LocalScript' | null>(null);
-  const [baseUrl, setBaseUrl] = useState(
-    (window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('/').slice(0, 3).join('/')).replace('ais-dev-', 'ais-pre-')
-  );
 
   const handleInstanceSelect = (path: string, instanceId: string) => {
     // Keep full path as requested by user (e.g., game.Workspace.Part)
@@ -2364,27 +3026,49 @@ export default function App() {
 
               // Click outside logic
               const clickOutsideHandler = (e: Event) => {
-                if (!container.contains(e.target as Node) && e.target !== htmlInput) {
+                const target = e.target as HTMLElement;
+                const dropdown = document.getElementById('variable-autocomplete-dropdown');
+                
+                // Cực kỳ quan trọng: Nếu nhấp vào bất kỳ đâu thuộc về Workspace SVG
+                // thì chúng ta nên ẩn bảng đi vì Workspace thường chặn sự kiện
+                const isWorkspaceClick = target.classList.contains('blocklyWorkspace') || 
+                                          target.classList.contains('blocklyMainBackground') || 
+                                          target.closest('.blocklySvg');
+
+                // Nếu người dùng nhấp ra ngoài dropdown VÀ ngoài input field
+                if (dropdown && !dropdown.contains(target) && target !== htmlInput) {
+                  // Thêm điều kiện: nếu nhấp vào Workspace hoặc một vùng không liên quan
                   (Blockly as any).WidgetDiv.hide();
                 }
               };
-              window.addEventListener('mousedown', clickOutsideHandler, true);
-              window.addEventListener('touchstart', clickOutsideHandler, true);
-              window.addEventListener('wheel', clickOutsideHandler, true);
+              
+              // Sử dụng capture: true để bắt sự kiện trước khi Blockly kịp ngăn chặn sự kiện nổi lên
+              document.addEventListener('pointerdown', clickOutsideHandler, true);
+              document.addEventListener('mousedown', clickOutsideHandler, true);
+              document.addEventListener('touchstart', clickOutsideHandler, true);
 
               const windowBlurHandler = () => {
                 (Blockly as any).WidgetDiv.hide();
               };
               window.addEventListener('blur', windowBlurHandler);
 
+              // Thêm sự kiện lắng nghe trực tiếp từ workspace để đảm bảo ẩn khi click vào vùng làm việc
+              const workspaceListener = (event: any) => {
+                if (event.type === (Blockly as any).Events.CLICK) {
+                  (Blockly as any).WidgetDiv.hide();
+                }
+              };
+              workspace.addChangeListener(workspaceListener);
+
               // Cleanup on hide
               const oldHide = (Blockly as any).WidgetDiv.hide;
               (Blockly as any).WidgetDiv.hide = function() {
                 htmlInput.removeEventListener('input', inputHandler);
-                window.removeEventListener('mousedown', clickOutsideHandler, true);
-                window.removeEventListener('touchstart', clickOutsideHandler, true);
-                window.removeEventListener('wheel', clickOutsideHandler, true);
+                document.removeEventListener('pointerdown', clickOutsideHandler, true);
+                document.removeEventListener('mousedown', clickOutsideHandler, true);
+                document.removeEventListener('touchstart', clickOutsideHandler, true);
                 window.removeEventListener('blur', windowBlurHandler);
+                workspace.removeChangeListener(workspaceListener);
                 
                 if (container.parentNode) {
                   container.style.opacity = '0';
@@ -6504,7 +7188,62 @@ export default function App() {
               }
             }
           ];
-        } else if (cat.name === 'Gui') {
+        } else if (cat.name === 'Raycast') {
+          blocks = [
+            { kind: 'block', type: 'raycast_params_create' },
+            { 
+              kind: 'block', 
+              type: 'raycast_params_set_filter',
+              inputs: {
+                PARAMS: { shadow: { type: 'placeholder_any' } },
+                LIST: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'raycast_params_set_type',
+              inputs: {
+                PARAMS: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'raycast_workspace_raycast',
+              inputs: {
+                ORIGIN: { shadow: { type: 'world_vector3_values' } },
+                DIRECTION: { shadow: { type: 'world_vector3_values' } },
+                PARAMS: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'raycast_workspace_spherecast',
+              inputs: {
+                ORIGIN: { shadow: { type: 'world_vector3_values' } },
+                RADIUS: { shadow: { type: 'math_number', fields: { NUM: 5 } } },
+                DIRECTION: { shadow: { type: 'world_vector3_values' } },
+                PARAMS: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            { 
+              kind: 'block', 
+              type: 'raycast_workspace_blockcast',
+              inputs: {
+                CFRAME: { shadow: { type: 'placeholder_any' } },
+                SIZE: { shadow: { type: 'world_vector3_values' } },
+                DIRECTION: { shadow: { type: 'world_vector3_values' } },
+                PARAMS: { shadow: { type: 'placeholder_any' } }
+              }
+            },
+            {
+              kind: 'block',
+              type: 'raycast_get_result_property',
+              inputs: {
+                RESULT: { shadow: { type: 'placeholder_any' } }
+              }
+            }
+          ];
+        } else if (cat.name === 'GUI') {
           blocks = [
             { kind: 'block', type: 'gui_get_mouse' },
             { 
@@ -7138,7 +7877,19 @@ export default function App() {
           ];
         } else if (cat.name === 'Optimization') {
           blocks = [
-            { kind: 'label', text: 'Coming Soon...' }
+            { 
+              kind: 'block', 
+              type: 'opt_task_wait',
+              inputs: { SECONDS: { shadow: { type: 'placeholder_number' } } }
+            },
+            { kind: 'block', type: 'opt_task_spawn' },
+            { kind: 'block', type: 'opt_task_defer' },
+            { 
+              kind: 'block', 
+              type: 'opt_task_delay',
+              inputs: { SECONDS: { shadow: { type: 'placeholder_number' } } }
+            },
+            { kind: 'block', type: 'opt_debug_profile' }
           ];
         } else {
           blocks = [
@@ -7354,84 +8105,41 @@ export default function App() {
       theme: customTheme,
     });
 
-    // Code generation logic
-    const updateCode = () => {
-      if (workspace.current) {
-        const code = luaGenerator.workspaceToCode(workspace.current);
-        
-        if (code.trim()) {
-          const header = `-- Generated by BlockLua\n`;
-          setGeneratedCode(header + code);
-        } else {
-          setGeneratedCode('');
-        }
-      }
-    };
-
-    // Debounced updateCode
-    let updateTimeout: any;
-    const debouncedUpdateCode = () => {
-      clearTimeout(updateTimeout);
-      updateTimeout = setTimeout(updateCode, 200);
-    };
-
-    // Extract all blocks for search - Optimized
+    // Pre-calculate block names for search to avoid creating blocks repeatedly
+    // This is a one-time heavy task, we store it in a ref or state
     const extractedBlocks: { type: string, name: string, category: string, blockDef: any }[] = [];
     
-    // Only extract if we haven't already
     isInitialLoading.current = true;
     try {
-      toolbox.contents.forEach((cat: any) => {
+      // Use a hidden temporary workspace for extraction to not interfere with main rendering
+      const tempWorkspace = new Blockly.Workspace();
+      toolbox.contents.forEach((cat: any, index: number) => {
         if (cat.kind === 'category' && cat.contents) {
+          const originalCategoryName = CATEGORIES[index]?.name || cat.name;
           cat.contents.forEach((item: any) => {
             if (item.kind === 'block') {
               let blockName = item.type.replace(/_/g, ' ');
               try {
-                if (workspace.current) {
-                  const tempBlock = workspace.current.newBlock(item.type);
-                  if (tempBlock) {
-                    let text = '';
-                    tempBlock.inputList.forEach((input: any) => {
-                      input.fieldRow.forEach((field: any) => {
-                        const fieldText = field.getText();
-                        if (fieldText) text += fieldText + ' ';
-                      });
-                      if (input.type === 1 /* Blockly.INPUT_VALUE */) {
-                        text += '[' + (input.name || ' ') + '] ';
-                      }
-                    });
-                    text = text.trim();
-                    
-                    if (text.length > 0) {
-                      blockName = text;
-                    } else {
-                      const fallbackText = tempBlock.toString();
-                      if (fallbackText && fallbackText.trim().length > 0) {
-                        blockName = fallbackText.replace(/\?/g, '[ ]').trim();
-                      }
-                    }
-                    try {
-                      tempBlock.dispose(false);
-                    } catch (e) {
-                      console.warn("Error disposing temp block:", e);
-                    }
-                  }
+                const tempBlock = tempWorkspace.newBlock(item.type);
+                if (tempBlock) {
+                  const textContent = tempBlock.toString().replace(/\?/g, '[ ]').trim();
+                  blockName = textContent || blockName;
+                  tempBlock.dispose(false);
                 }
               } catch (e) {
-                // Fallback to capitalized type name
                 blockName = blockName.charAt(0).toUpperCase() + blockName.slice(1);
               }
-
               extractedBlocks.push({
                 type: item.type,
                 name: blockName,
-                category: cat.name,
+                category: originalCategoryName,
                 blockDef: item
               });
             }
           });
         }
       });
+      tempWorkspace.dispose();
     } finally {
       setTimeout(() => { isInitialLoading.current = false; }, 100);
     }
@@ -7439,44 +8147,19 @@ export default function App() {
     setAllBlocks(extractedBlocks);
 
     workspace.current.addChangeListener((e: any) => {
+      // Achievement tracking
       if (e.type === Blockly.Events.BLOCK_CREATE && !isInitialLoading.current) {
         unlockAchievement('hello_world');
-        const blocks = workspace.current!.getAllBlocks(false);
-        if (blocks.length >= 50) {
+        const blocksCount = workspace.current!.getAllBlocks(false).length;
+        if (blocksCount >= 50) {
           unlockAchievement('block_hoarder');
         }
       }
 
-      // Auto-save trigger
-      if (e.type === Blockly.Events.BLOCK_MOVE || 
-          e.type === Blockly.Events.BLOCK_CHANGE || 
-          e.type === Blockly.Events.BLOCK_CREATE || 
-          e.type === Blockly.Events.BLOCK_DELETE) {
-        
-        // Immediate save to localStorage for reliability
-        if (workspace.current) {
-          const xml = Blockly.Xml.workspaceToDom(workspace.current);
-          const xmlText = Blockly.Xml.domToText(xml);
-          localStorage.setItem('blocklua_workspace', xmlText);
-          localStorage.setItem('blocklua_explorer', JSON.stringify(explorerRef.current));
-        }
-        
-        triggerAutoSave();
-      }
-
-      // Update defined variables
-      if (e.type === Blockly.Events.BLOCK_CREATE || 
-          e.type === Blockly.Events.BLOCK_DELETE || 
-          e.type === Blockly.Events.BLOCK_CHANGE) {
-        const blocks = workspace.current!.getAllBlocks(false);
-        const vars = blocks
-          .filter(b => b.type === 'variables_create')
-          .map(b => b.getFieldValue('VAR'))
-          .filter((v, i, a) => v && a.indexOf(v) === i);
-        setDefinedVariables(vars);
-      }
-
+      // UI events are lightweight
       if (e.isUiEvent) return;
+      
+      // All heavy logic (Code gen, Variable sync, Storage) moved to debounce
       debouncedUpdateCode();
     });
 
@@ -7598,40 +8281,277 @@ export default function App() {
 
   return (
     <div 
-      className={`flex flex-col h-screen w-screen bg-[#1e1e1e] overflow-hidden font-sans text-gray-200 no-select ${enableEffects ? 'effects-enabled' : ''}`}
+      className={`flex flex-col h-screen w-screen bg-[#1e1e1e] overflow-hidden font-sans text-gray-200 no-select ${enableEffects ? 'effects-enabled' : ''} device-${selectedDevice || 'unknown'}`}
     >
       <AnimatePresence>
-        {(showMenu || showSettings) && (
-          <div 
-            className="fixed inset-0 z-[90]" 
-            onClick={() => {
-              setShowMenu(false);
-              setShowSettings(false);
-            }}
-          />
-        )}
-        {selectorTarget && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+        {deviceStep !== 'completed' && (
+          <motion.div
+            key="device-splash"
+            initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-md flex items-center justify-center pointer-events-auto"
-            onClick={() => {
-              setSelectorTarget(null);
-              setExportScriptType(null);
-            }}
+            className="fixed inset-0 z-[10000] bg-[#050505] flex items-center justify-center p-4 overflow-y-auto"
           >
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className="bg-[#4c97ff] text-white px-6 py-3 rounded-2xl font-black tracking-widest shadow-2xl flex items-center gap-3 animate-bounce"
-            >
-              <MousePointer2 size={24} />
-              {currentLang === 'vi' ? 'CHỌN ĐỐI TƯỢNG TRONG EXPLORER' : 'SELECT AN OBJECT IN EXPLORER'}
-            </motion.div>
+            {/* Background elements */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(76,151,255,0.05)_0%,transparent_70%)]" />
+            <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4c97ff 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }} />
+
+            <AnimatePresence mode="wait">
+              {deviceStep === 'selection' && (
+                <motion.div
+                  key="selection"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="relative z-10 w-full max-w-2xl bg-[#0f0f0f] border border-white/10 rounded-[30px] md:rounded-[40px] p-6 md:p-12 shadow-2xl text-center my-auto max-h-[95vh] overflow-y-auto hide-scrollbar"
+                >
+                  <motion.div 
+                    initial={{ scale: 0 }} 
+                    animate={{ scale: 1 }} 
+                    className="w-12 h-12 md:w-16 md:h-16 bg-[#4c97ff]/20 rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6"
+                  >
+                    <LayoutDashboard className="text-[#4c97ff]" size={28} />
+                  </motion.div>
+                  <h1 className="text-2xl md:text-4xl font-black text-white mb-2 tracking-tight">
+                    {currentLang === 'vi' ? 'Bạn đang sử dụng thiết bị nào?' : 'Which device are you using?'}
+                  </h1>
+                  <p className="text-gray-500 font-bold uppercase tracking-[0.2em] text-[8px] md:text-[10px] mb-6 md:mb-10">
+                    {currentLang === 'vi' ? 'Tối ưu hóa giao diện cho trải nghiệm tốt nhất' : 'Optimize interface for the best experience'}
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6 mb-8 md:mb-10">
+                    {[
+                      { id: 'pc' as const, label: currentLang === 'vi' ? 'MÁY TÍNH' : 'DESKTOP', icon: <Monitor size={24} /> },
+                      { id: 'tablet' as const, label: 'IPAD / TABLET', icon: <Tablet size={24} /> },
+                      { id: 'phone' as const, label: currentLang === 'vi' ? 'ĐIỆN THOẠI' : 'PHONE', icon: <Smartphone size={24} /> }
+                    ].map((device) => {
+                      const isSuggested = detectedDevice === device.id;
+                      const isSelected = selectedDevice === device.id;
+                      
+                      return (
+                        <motion.button
+                          key={device.id}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setSelectedDevice(device.id)}
+                          className={`relative p-5 md:p-8 rounded-2xl md:rounded-3xl border-2 transition-all flex flex-row sm:flex-col items-center justify-center sm:justify-start gap-4 ${
+                            isSelected 
+                              ? 'bg-[#4c97ff]/10 border-[#4c97ff] text-white shadow-[0_0_20px_rgba(76,151,255,0.1)]' 
+                              : 'bg-white/5 border-white/5 text-gray-500 hover:border-white/20'
+                          }`}
+                        >
+                          {isSuggested && (
+                            <motion.div 
+                              animate={{ scale: [1, 1.2, 1] }}
+                              transition={{ repeat: Infinity, duration: 2 }}
+                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white font-black shadow-lg z-20 text-xs"
+                            >
+                              !
+                            </motion.div>
+                          )}
+                          <div className={isSelected ? 'text-[#4c97ff]' : 'text-current'}>
+                            {device.icon}
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{device.label}</span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+
+                  <motion.button
+                    disabled={!selectedDevice}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setDeviceStep('confirmation')}
+                    className="w-full py-4 md:py-5 bg-[#4c97ff] disabled:bg-gray-800 disabled:opacity-50 text-white font-black rounded-xl md:rounded-2xl shadow-xl shadow-blue-500/10 transition-all uppercase tracking-[0.2em] md:tracking-[0.3em] text-[10px] md:text-xs"
+                  >
+                    {currentLang === 'vi' ? 'XÁC NHẬN LỰA CHỌN' : 'CONFIRM SELECTION'}
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {deviceStep === 'confirmation' && (
+                <motion.div
+                  key="confirmation"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="relative z-10 w-full max-w-md bg-[#0f0f0f] border border-white/10 rounded-[30px] md:rounded-[40px] p-6 md:p-10 shadow-2xl text-center my-auto"
+                >
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-yellow-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6">
+                    <AlertTriangle className="text-yellow-500" size={28} />
+                  </div>
+                  <h2 className="text-xl md:text-2xl font-black text-white mb-6">
+                    {currentLang === 'vi' ? 'Bạn chắc chắn chứ?' : 'Are you sure?'}
+                  </h2>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setDeviceStep('selection')}
+                      className="flex-1 py-3 md:py-4 bg-white/5 hover:bg-white/10 text-gray-400 font-black rounded-xl md:rounded-2xl uppercase tracking-widest text-[10px]"
+                    >
+                      {currentLang === 'vi' ? 'KHÔNG' : 'NO'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDeviceStep('loading');
+                        let progress = 0;
+                        const interval = setInterval(() => {
+                          progress += Math.random() * 15;
+                          if (progress >= 100) {
+                            progress = 100;
+                            setLoadingProgress(100);
+                            clearInterval(interval);
+                            setTimeout(() => {
+                              if (selectedDevice === 'pc') {
+                                setDeviceStep('completed');
+                              } else {
+                                setDeviceStep('orientation');
+                              }
+                            }, 1000);
+                          } else {
+                            setLoadingProgress(Math.floor(progress));
+                          }
+                        }, 250);
+                      }}
+                      className="flex-1 py-3 md:py-4 bg-[#4c97ff] text-white font-black rounded-xl md:rounded-2xl shadow-lg shadow-blue-500/20 uppercase tracking-widest text-[10px]"
+                    >
+                      {currentLang === 'vi' ? 'CÓ, TIẾP TỤC' : 'YES, CONTINUE'}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {deviceStep === 'loading' && (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="relative z-10 w-full max-w-sm text-center my-auto"
+                >
+                  <div className="relative w-24 h-24 md:w-32 md:h-32 mx-auto mb-8">
+                    <svg className="w-full h-full transform -rotate-90">
+                      <circle
+                        cx="50%"
+                        cy="50%"
+                        r="45%"
+                        stroke="rgba(255,255,255,0.05)"
+                        strokeWidth="8"
+                        fill="transparent"
+                      />
+                      <motion.circle
+                        cx="50%"
+                        cy="50%"
+                        r="45%"
+                        stroke="#4c97ff"
+                        strokeWidth="8"
+                        fill="transparent"
+                        strokeDasharray="283"
+                        animate={{ strokeDashoffset: 283 - (283 * loadingProgress) / 100 }}
+                        transition={{ type: 'spring', stiffness: 50, damping: 20 }}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-2xl md:text-3xl font-black text-white">{loadingProgress}%</span>
+                    </div>
+                  </div>
+                  <h3 className="text-base md:text-lg font-black text-white uppercase tracking-[0.3em] mb-2">
+                    {currentLang === 'vi' ? 'ĐANG TẢI GIAO DIỆN' : 'LOADING INTERFACE'}
+                  </h3>
+                  <div className="flex justify-center gap-1">
+                    {[0, 1, 2].map(i => (
+                      <motion.div
+                        key={i}
+                        animate={{ 
+                          scale: [1, 1.5, 1],
+                          opacity: [0.3, 1, 0.3]
+                        }}
+                        transition={{ 
+                          duration: 1, 
+                          repeat: Infinity, 
+                          delay: i * 0.2 
+                        }}
+                        className="w-1.5 h-1.5 bg-[#4c97ff] rounded-full"
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {deviceStep === 'orientation' && (
+                <motion.div
+                  key="orientation"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative z-10 w-full max-w-md bg-[#0f0f0f] border border-white/10 rounded-[30px] md:rounded-[40px] p-6 md:p-10 shadow-2xl text-center my-auto"
+                >
+                  <motion.div
+                    animate={{ rotate: [0, 90, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-16 h-32 md:w-24 md:h-48 bg-white/5 border-2 border-[#4c97ff] rounded-2xl md:rounded-3xl mx-auto mb-6 md:mb-10 flex items-center justify-center"
+                  >
+                    <Smartphone size={32} className="text-[#4c97ff]/50" />
+                  </motion.div>
+                  <h2 className="text-xl md:text-2xl font-black text-white mb-2 md:mb-4">
+                    {currentLang === 'vi' ? 'Vui lòng quay ngang thiết bị' : 'Please rotate your device'}
+                  </h2>
+                  <p className="text-xs md:text-base text-gray-500 font-bold mb-6 md:mb-8 leading-relaxed">
+                    {currentLang === 'vi' 
+                      ? 'Để có trải nghiệm lập trình tốt nhất trên di động, vui lòng để thiết bị nằm ngang.' 
+                      : 'For the best mobile programming experience, please use landscape orientation.'}
+                  </p>
+                  <button
+                    onClick={() => setDeviceStep('completed')}
+                    className="w-full py-4 md:py-5 bg-[#4c97ff] text-white font-black rounded-xl md:rounded-2xl shadow-xl shadow-blue-500/20 transition-all uppercase tracking-[0.2em] md:tracking-[0.3em] text-[10px] md:text-xs"
+                  >
+                    {currentLang === 'vi' ? 'TÔI ĐÃ SẴN SÀNG' : 'I AM READY'}
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {deviceStep === 'completed' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1 }}
+            className="flex flex-col h-full w-full"
+          >
+            <AnimatePresence>
+              {(showMenu || showSettings) && (
+                <div 
+                  className="fixed inset-0 z-[90]" 
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowSettings(false);
+                  }}
+                />
+              )}
+              {selectorTarget && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-md flex items-center justify-center pointer-events-auto"
+                  onClick={() => {
+                    setSelectorTarget(null);
+                    setExportScriptType(null);
+                  }}
+                >
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="bg-[#4c97ff] text-white px-6 py-3 rounded-2xl font-black tracking-widest shadow-2xl flex items-center gap-3 animate-bounce"
+                  >
+                    <MousePointer2 size={24} />
+                    {currentLang === 'vi' ? 'CHỌN ĐỐI TƯỢNG TRONG EXPLORER' : 'SELECT AN OBJECT IN EXPLORER'}
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
       {/* Header */}
       <motion.div 
@@ -7717,14 +8637,53 @@ export default function App() {
               <RefreshCw size={14} />
               {currentLang === 'vi' ? 'ĐỒNG BỘ HÓA' : 'SYNC'}
             </button>
+            <button 
+              onClick={() => { setShowBlockInfoModal(true); }}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 text-gray-500 hover:text-gray-300 ml-1`}
+            >
+              <BookOpen size={14} />
+              {currentLang === 'vi' ? 'THÔNG TIN KHỐI' : 'BLOCK INFO'}
+            </button>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 mr-4 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
-            <div className={`w-2 h-2 bg-[#4c97ff] rounded-full ${enableEffects ? 'animate-pulse' : ''}`} />
-            <span className="text-[10px] font-bold text-[#4c97ff] uppercase tracking-widest">System Active</span>
-          </div>
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] font-black text-white uppercase tracking-tighter">{user.displayName || (currentLang === 'vi' ? 'Người dùng' : 'User')}</span>
+                <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">{currentLang === 'vi' ? 'Thành viên' : 'Member'}</span>
+              </div>
+              <button 
+                onClick={logout}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center border border-white/10 group overflow-hidden"
+                title={currentLang === 'vi' ? 'Đăng xuất' : 'Logout'}
+              >
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <User size={16} className="text-gray-400 group-hover:text-white" />
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => { setAuthMode('register'); setShowAuthModal(true); }}
+                className="px-5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-500/50 text-blue-400 text-[10px] font-black rounded-lg transition-all flex items-center gap-2 uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/5"
+              >
+                <UserPlus size={14} />
+                {currentLang === 'vi' ? 'Đăng ký' : 'Register'}
+              </button>
+              <button 
+                onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                className="px-5 py-1.5 bg-[#4c97ff] hover:bg-[#3a86ff] text-white text-[10px] font-black rounded-lg shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 uppercase tracking-widest active:scale-95"
+              >
+                <LogIn size={14} />
+                {currentLang === 'vi' ? 'Đăng nhập' : 'Login'}
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -7797,233 +8756,314 @@ export default function App() {
               className="fixed top-0 left-0 bg-black/80 backdrop-blur-md z-[2000] flex items-center justify-center w-full h-full"
             >
               <motion.div 
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 50, opacity: 0 }}
-                className="bg-[#111111] w-full h-full flex flex-col overflow-hidden"
+                initial={{ opacity: 0, scale: 1.05 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+                className="bg-[#111111] w-full h-full flex flex-col overflow-hidden relative"
               >
-                {/* Header */}
-                <div className="flex items-center justify-between px-8 py-6 border-b border-white/5 bg-black/40">
-                  <div className="flex items-center gap-6">
-                    <div className="w-14 h-14 bg-[#4c97ff]/20 rounded-2xl flex items-center justify-center shadow-lg shadow-[#4c97ff]/5 border border-[#4c97ff]/20">
-                      <Info className="text-[#4c97ff]" size={28} />
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-black/40 backdrop-blur-md relative z-20">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 bg-[#4c97ff]/20 rounded-lg flex items-center justify-center shadow-lg shadow-[#4c97ff]/10 border border-[#4c97ff]/30">
+                      <BookOpen className="text-[#4c97ff]" size={16} />
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
-                        {currentLang === 'vi' ? 'THƯ VIỆN KHỐI LỆNH' : 'BLOCK LIBRARY'}
-                        <span className="px-2 py-0.5 bg-white/5 rounded text-[10px] text-gray-500 font-mono border border-white/5 uppercase tracking-widest">v2.0</span>
+                      <h3 className="text-lg font-black text-white tracking-tighter flex items-center gap-2">
+                        {currentLang === 'vi' ? 'THÔNG TIN KHỐI GIAO DIỆN' : 'BLOCK INTERFACE INFO'}
+                        <span className="px-1.5 py-0.5 bg-[#4c97ff]/10 text-[#4c97ff] rounded-md text-[7px] font-black border border-[#4c97ff]/20 uppercase tracking-widest">v2.5</span>
                       </h3>
-                      <div className="text-sm text-gray-400 font-bold tracking-widest uppercase mt-1 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                        {currentLang === 'vi' ? 'Tài liệu hướng dẫn chi tiết cho mọi khối lệnh' : 'Detailed documentation for every block'}
+                      <div className="text-[9px] text-gray-400 font-bold tracking-widest uppercase mt-0.5 flex items-center gap-1.5">
+                        <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
+                        {currentLang === 'vi' ? 'Tìm hiểu cách hoạt động của mọi nhóm lệnh' : 'Learn how every command group works'}
                       </div>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setShowBlockInfoModal(false);
-                      setSelectedBlockInfo(null);
-                    }}
-                    className="w-12 h-12 bg-white/5 hover:bg-red-500/20 hover:text-red-500 rounded-2xl flex items-center justify-center text-gray-400 transition-all group"
-                  >
-                    <X size={24} className="group-hover:rotate-90 transition-transform duration-300" />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {infoActiveCategory && (
+                      <button 
+                        onClick={() => {
+                          setInfoActiveCategory(null);
+                          setSelectedBlockInfo(null);
+                        }}
+                        className="flex items-center gap-2 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border border-white/5"
+                      >
+                        <ChevronRight size={14} className="rotate-180" />
+                        {currentLang === 'vi' ? 'QUAY LẠI' : 'BACK'}
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setShowBlockInfoModal(false);
+                        setSelectedBlockInfo(null);
+                        setInfoActiveCategory(null);
+                      }}
+                      className="w-10 h-10 bg-white/5 hover:bg-red-500/20 hover:text-red-500 rounded-xl flex items-center justify-center text-gray-400 transition-all group border border-white/5"
+                    >
+                      <X size={20} className="group-hover:rotate-90 transition-transform duration-500" />
+                    </button>
+                  </div>
                 </div>
                 
-                <div className="flex-1 flex overflow-hidden">
-                  {/* Sidebar */}
-                  <div className="w-80 border-r border-white/5 flex flex-col bg-[#0a0a0a]">
-                    <div className="p-6">
-                      <div className="relative group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#4c97ff] transition-colors" size={18} />
-                        <input 
-                          type="text" 
-                          placeholder={currentLang === 'vi' ? "Tìm kiếm khối..." : "Search blocks..."}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-[#4c97ff]/50 focus:bg-white/10 transition-all placeholder:text-gray-600"
-                          onChange={(e) => {
-                            const val = e.target.value.toLowerCase();
-                            const buttons = document.querySelectorAll('.block-info-btn');
-                            buttons.forEach(btn => {
-                              const text = btn.textContent?.toLowerCase() || '';
-                              if (text.includes(val)) {
-                                (btn as HTMLElement).style.display = 'flex';
-                              } else {
-                                (btn as HTMLElement).style.display = 'none';
-                              }
-                            });
+                <div className="flex-1 flex overflow-hidden relative z-10">
+                  {/* Category Selection View */}
+                  {!infoActiveCategory ? (
+                    <div className="flex-1 flex flex-col p-5 md:p-6 overflow-hidden">
+                      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div>
+                          <h4 className="text-base font-black text-white tracking-tight mb-0.5">
+                            {currentLang === 'vi' ? 'Danh sách nhóm lệnh' : 'Command Group List'}
+                          </h4>
+                          <p className="text-gray-500 text-[10px] font-medium font-bold uppercase tracking-wider">
+                            {currentLang === 'vi' ? 'Nhấn vào một nhóm để xem chi tiết các khối lệnh bên trong.' : 'Click on a group to see code block details within.'}
+                          </p>
+                        </div>
+                        <div className="relative w-full md:w-56 group">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#4c97ff] transition-colors" size={14} />
+                          <input 
+                            type="text" 
+                            value={categorySearchQuery}
+                            onChange={(e) => setCategorySearchQuery(e.target.value)}
+                            placeholder={currentLang === 'vi' ? "Tìm nhóm lệnh..." : "Search groups..."}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-5 text-[11px] text-white focus:outline-none focus:border-[#4c97ff]/50 focus:bg-white/10 transition-all placeholder:text-gray-600 shadow-inner"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-6 overflow-x-hidden">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                          {CATEGORIES.filter(c => c.name.toLowerCase().includes(categorySearchQuery.toLowerCase())).map((cat) => {
+                            const catColor = getCategoryColor(cat.name);
+                            const blockCount = blockCountsByCategory[cat.name] || 0;
                             
-                            const categories = document.querySelectorAll('.block-info-category');
-                            categories.forEach(cat => {
-                              const visibleButtons = cat.querySelectorAll('.block-info-btn[style="display: flex;"], .block-info-btn:not([style*="display: none"])');
-                              if (visibleButtons.length === 0) {
-                                (cat as HTMLElement).style.display = 'none';
-                              } else {
-                                (cat as HTMLElement).style.display = 'block';
-                              }
-                            });
-                          }}
-                        />
+                            return (
+                              <motion.button
+                                key={cat.name}
+                                onClick={() => setInfoActiveCategory(cat.name)}
+                                className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-4 text-left hover:border-[#4c97ff]/40 transition-[border-color,transform] duration-75 group flex flex-col h-full shadow-lg relative overflow-hidden will-change-transform hover:scale-[1.05] active:scale-[0.95]"
+                              >
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-[#4c97ff]/5 rounded-bl-full -mr-8 -mt-8 blur-xl pointer-events-none"></div>
+                                
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-black/20 relative z-10" style={{ backgroundColor: catColor + '20' }}>
+                                  <div className="w-1.5 h-1.5 rounded-full absolute -top-0.5 -right-0.5" style={{ backgroundColor: catColor }}></div>
+                                  <span className="text-base font-black" style={{ color: catColor }}>{cat.name.charAt(0)}</span>
+                                </div>
+                                
+                                <h5 className="text-sm font-black text-white mb-1 tracking-tight group-hover:text-[#4c97ff] transition-colors">{cat.name}</h5>
+                                <p className="text-gray-500 text-[9px] font-bold uppercase tracking-widest mb-4">
+                                  {blockCount} {currentLang === 'vi' ? 'Khối lệnh' : 'Blocks'}
+                                </p>
+                                
+                                <div className="mt-auto flex items-center justify-between">
+                                  <span className="text-[8px] font-black text-[#4c97ff] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {currentLang === 'vi' ? 'Khám phá' : 'Explore'}
+                                  </span>
+                                  <div className="w-7 h-7 bg-white/5 rounded-lg flex items-center justify-center text-gray-600 group-hover:bg-[#4c97ff] group-hover:text-white transition-all">
+                                    <ChevronRight size={14} />
+                                  </div>
+                                </div>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-8">
-                      {CATEGORIES.map(cat => {
-                        const catBlocks = allBlocks.filter(b => b.category === cat.name);
-                        if (catBlocks.length === 0) return null;
-                        const catColor = getCategoryColor(cat.name);
-                        
-                        return (
-                          <div key={cat.name} className="mb-8 block-info-category">
-                            <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] px-4 mb-4 flex items-center gap-3">
-                              <div className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ backgroundColor: catColor }}></div>
-                              {cat.name}
-                            </h4>
-                            <div className="space-y-1.5">
-                              {catBlocks.map(block => (
-                                <button
-                                  key={block.type}
-                                  onClick={() => setSelectedBlockInfo(block)}
-                                  className={`block-info-btn w-full text-left px-4 py-3 rounded-2xl text-sm transition-all flex items-center gap-4 group ${selectedBlockInfo?.type === block.type ? 'bg-[#4c97ff] text-white shadow-lg shadow-[#4c97ff]/20' : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'}`}
-                                >
-                                  <div 
-                                    className={`w-2.5 h-2.5 rounded-full flex-shrink-0 transition-transform group-hover:scale-125 ${selectedBlockInfo?.type === block.type ? 'bg-white' : ''}`} 
-                                    style={{ backgroundColor: selectedBlockInfo?.type === block.type ? undefined : catColor }}
-                                  ></div>
-                                  <span className="truncate font-bold tracking-tight">{block.name}</span>
-                                </button>
-                              ))}
+                  ) : (
+                    /* Block Selection & Details View */
+                    <div className="flex-1 flex overflow-hidden">
+                      {/* Sub-Panel: Blocks List */}
+                      <div className="w-56 border-r border-white/5 flex flex-col bg-[#0a0a0a] relative z-20">
+                        <div className="p-4 border-b border-white/5">
+                          <div className="flex items-center gap-2.5 mb-3">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center shadow-lg" style={{ backgroundColor: getCategoryColor(infoActiveCategory) + '20' }}>
+                              <span className="font-black text-[12px]" style={{ color: getCategoryColor(infoActiveCategory) }}>{infoActiveCategory.charAt(0)}</span>
                             </div>
+                            <h4 className="text-[11px] font-black text-white tracking-tight uppercase">{infoActiveCategory}</h4>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="flex-1 bg-[#0f0f0f] overflow-y-auto custom-scrollbar relative">
-                    {/* Background decoration */}
-                    <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ 
-                      backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
-                      backgroundSize: '48px 48px'
-                    }}></div>
-
-                    {selectedBlockInfo ? (
-                      <div className="max-w-4xl mx-auto py-16 px-8 relative z-10">
-                        <motion.div
-                          key={selectedBlockInfo.type}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4 }}
-                        >
-                          <div className="flex items-center gap-4 mb-8">
-                            <div 
-                              className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-xl"
-                              style={{ backgroundColor: getCategoryColor(selectedBlockInfo.category) }}
+                          <div className="relative group">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" size={12} />
+                            <input 
+                              type="text" 
+                              placeholder={currentLang === 'vi' ? "Tìm khối..." : "Search block..."}
+                              className="w-full bg-white/5 border border-white/5 rounded-lg py-1.5 pl-8 pr-3 text-[9px] text-white focus:outline-none focus:border-[#4c97ff]/50 transition-all font-bold"
+                              onChange={(e) => {
+                                const val = e.target.value.toLowerCase();
+                                const items = document.querySelectorAll('.sub-block-item');
+                                items.forEach(item => {
+                                  if (item.textContent?.toLowerCase().includes(val)) {
+                                    (item as HTMLElement).style.display = 'flex';
+                                  } else {
+                                    (item as HTMLElement).style.display = 'none';
+                                  }
+                                });
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1 will-change-transform contain-content overscroll-contain">
+                          {infoModalBlocks.map(block => (
+                            <button
+                              key={block.type}
+                              onClick={() => setSelectedBlockInfo(block)}
+                              className={`sub-block-item w-full text-left px-4 py-2.5 rounded-xl text-[10px] transition-all flex items-center gap-3 group border ${selectedBlockInfo?.type === block.type ? 'bg-[#4c97ff] border-[#4c97ff]/30 text-white shadow-xl shadow-[#4c97ff]/10' : 'bg-transparent border-transparent text-gray-500 hover:bg-white/5 hover:text-white'}`}
                             >
-                              {selectedBlockInfo.category}
-                            </div>
-                            <div className="text-gray-600 text-xs font-mono bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">{selectedBlockInfo.type}</div>
-                          </div>
-                          
-                          <h2 className="text-5xl font-black text-white mb-12 tracking-tight leading-tight">{selectedBlockInfo.name}</h2>
-                          
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                            <div className="space-y-12">
-                              <section>
-                                <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-widest">
-                                  <div className="w-8 h-8 bg-[#4c97ff]/10 rounded-lg flex items-center justify-center">
-                                    <Info className="text-[#4c97ff]" size={18} />
-                                  </div>
-                                  {currentLang === 'vi' ? 'Chức năng' : 'Function'}
-                                </h3>
-                                <div className="text-lg text-gray-300 leading-relaxed bg-white/5 p-8 rounded-[2rem] border border-white/5 shadow-2xl backdrop-blur-sm">
-                                  {getBlockDescription(selectedBlockInfo, currentLang)}
+                              <div 
+                                className={`w-2 h-2 rounded-full flex-shrink-0 transition-all ${selectedBlockInfo?.type === block.type ? 'bg-white scale-125 shadow-[0_0_8px_white]' : 'bg-white/10 group-hover:bg-white/30'}`} 
+                                style={{ backgroundColor: selectedBlockInfo?.type === block.type ? undefined : getCategoryColor(infoActiveCategory) }}
+                              ></div>
+                              <span className="truncate font-black tracking-tight uppercase">{block.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                  
+                      {/* Detail View */}
+                      <div className="flex-1 bg-[#0f0f0f] overflow-y-auto custom-scrollbar relative p-6 lg:p-8 will-change-transform contain-content overscroll-contain transform translate-z-0">
+                        {selectedBlockInfo ? (
+                          <motion.div
+                            key={selectedBlockInfo.type}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.2 }}
+                            className="max-w-4xl"
+                          >
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-gray-500 text-[7px] font-black uppercase tracking-widest">
+                                  ID: {selectedBlockInfo.type}
                                 </div>
-                              </section>
-                              
-                              <section>
-                                <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-widest">
-                                  <div className="w-8 h-8 bg-[#4c97ff]/10 rounded-lg flex items-center justify-center">
-                                    <Code2 className="text-[#4c97ff]" size={18} />
+                            </div>
+
+                            <h2 className="text-xl font-black text-white mb-8 tracking-tighter leading-tight drop-shadow-2xl">
+                              {selectedBlockInfo.name}
+                            </h2>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                              <div className="space-y-8">
+                                <section className="relative contain-paint">
+                                  <div className="absolute -left-5 top-0 bottom-0 w-0.5 bg-[#4c97ff] rounded-full opacity-50"></div>
+                                  <h3 className="text-[9px] font-black text-[#4c97ff] uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
+                                    <Info size={11} />
+                                    {currentLang === 'vi' ? 'MÔ TẢ HOẠT ĐỘNG' : 'OPERATION DESCRIPTION'}
+                                  </h3>
+                                  <div className="text-sm text-gray-300 leading-relaxed font-medium">
+                                    {getBlockDescription(selectedBlockInfo, currentLang)}
                                   </div>
-                                  {currentLang === 'vi' ? 'Cách sử dụng' : 'How to use'}
-                                </h3>
-                                <div className="bg-black/40 p-8 rounded-[2rem] border border-white/5 shadow-inner">
-                                  <ul className="space-y-6">
-                                    {[
-                                      currentLang === 'vi' 
-                                        ? `Tìm khối này trong nhóm ${selectedBlockInfo.category} ở thanh công cụ.`
-                                        : `Find this block in the ${selectedBlockInfo.category} category in the toolbox.`,
-                                      currentLang === 'vi'
-                                        ? `Kéo và thả nó vào vùng làm việc chính.`
-                                        : `Drag and drop it into the main workspace.`,
-                                      currentLang === 'vi'
-                                        ? `Kết nối các đầu vào/đầu ra với các khối lệnh tương ứng.`
-                                        : `Connect inputs/outputs with corresponding blocks.`,
-                                      currentLang === 'vi'
-                                        ? `Kiểm tra mã Lua được tạo ra ở tab CODE để hiểu rõ hơn.`
-                                        : `Check the generated Lua code in the CODE tab for better understanding.`
-                                    ].map((step, i) => (
-                                      <li key={i} className="flex gap-4 text-gray-400 items-start">
-                                        <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold text-[#4c97ff] flex-shrink-0 mt-1 border border-white/10">
+                                </section>
+
+                                <section className="bg-white/[0.01] border border-white/5 p-5 md:p-6 rounded-2xl contain-paint">
+                                  <h3 className="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] mb-5 flex items-center gap-2">
+                                    <Zap size={11} />
+                                    {currentLang === 'vi' ? 'CÁCH SỬ DỤNG' : 'HOW TO USE'}
+                                  </h3>
+                                  <div className="space-y-5">
+                                    {getBlockUsage(selectedBlockInfo, currentLang).map((step, i) => (
+                                      <div key={i} className="flex gap-4 items-start">
+                                        <div className="w-6 h-6 rounded-lg bg-[#4c97ff]/10 border border-[#4c97ff]/20 flex items-center justify-center text-[#4c97ff] text-[10px] font-black shrink-0">
                                           {i + 1}
                                         </div>
-                                        <span className="text-base leading-relaxed">{step}</span>
-                                      </li>
+                                        <p className="text-gray-400 text-sm leading-snug">{step}</p>
+                                      </div>
                                     ))}
-                                  </ul>
-                                </div>
-                              </section>
-                            </div>
+                                  </div>
+                                </section>
 
-                            <div className="space-y-8">
-                              <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-widest">
-                                <div className="w-8 h-8 bg-[#4c97ff]/10 rounded-lg flex items-center justify-center">
-                                  <Layers className="text-[#4c97ff]" size={18} />
-                                </div>
-                                {currentLang === 'vi' ? 'Xem trước' : 'Preview'}
-                              </h3>
-                              <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] p-12 flex items-center justify-center min-h-[300px] shadow-2xl relative overflow-hidden group">
-                                <div className="absolute inset-0 bg-[#4c97ff]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                                <div className="relative z-10 w-full transform group-hover:scale-105 transition-transform duration-500">
-                                  <BlocklyPreview blockType={selectedBlockInfo.type} />
-                                </div>
+                                {getBlockSyntax(selectedBlockInfo) && (
+                                  <section className="bg-black/40 border border-white/5 p-0 rounded-2xl relative overflow-hidden group contain-paint">
+                                    <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-white/[0.02]">
+                                      <h3 className="text-[9px] font-black text-[#f86d7c] uppercase tracking-[0.3em] flex items-center gap-2">
+                                        <Terminal size={11} />
+                                        {currentLang === 'vi' ? 'BẢNG CÚ PHÁP CHUẨN' : 'STANDARD SYNTAX TABLE'}
+                                      </h3>
+                                      <Code2 size={12} className="text-gray-600" />
+                                    </div>
+                                    <div className="relative">
+                                      <SyntaxHighlighter
+                                        language="lua"
+                                        style={robloxTheme}
+                                        PreTag="div"
+                                        customStyle={{
+                                          margin: 0,
+                                          padding: '24px',
+                                          borderRadius: '0',
+                                          fontSize: '11px',
+                                          background: 'transparent',
+                                          lineHeight: '1.6'
+                                        }}
+                                      >
+                                        {getBlockSyntax(selectedBlockInfo) || ''}
+                                      </SyntaxHighlighter>
+                                      
+                                      <div className="absolute bottom-0 right-0 p-4">
+                                        <div className="px-2 py-1 bg-[#f86d7c]/10 text-[#f86d7c] text-[7px] font-black rounded-md border border-[#f86d7c]/20 uppercase tracking-widest">Luau Language</div>
+                                      </div>
+                                    </div>
+                                  </section>
+                                )}
                               </div>
-                              
-                              <div className="bg-gradient-to-br from-[#4c97ff]/10 to-transparent p-8 rounded-[2rem] border border-[#4c97ff]/10">
-                                <h4 className="text-sm font-black text-[#4c97ff] uppercase tracking-widest mb-4">Mẹo nhỏ</h4>
-                                <p className="text-sm text-gray-400 leading-relaxed italic">
-                                  {currentLang === 'vi' 
-                                    ? "Bạn có thể chuột phải vào khối lệnh trong Workspace và chọn 'Help' để mở nhanh trang thông tin này."
-                                    : "You can right-click the block in the Workspace and select 'Help' to quickly open this information page."}
-                                </p>
+
+                              <div className="space-y-8">
+                                <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4">Preview</h3>
+                                <div className="aspect-video bg-black/60 rounded-3xl border border-white/5 flex items-center justify-center relative overflow-hidden group shadow-inner">
+                                  <div className="absolute inset-0 bg-gradient-to-br from-[#4c97ff]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                  <BlocklyPreview blockType={selectedBlockInfo.type} />
+                                  
+                                  <div className="absolute bottom-4 right-4">
+                                    <div className="px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-[8px] font-black text-gray-600 tracking-widest uppercase">
+                                      Interactive Preview
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="p-8 bg-gradient-to-br from-[#4c97ff]/10 to-transparent border border-[#4c97ff]/20 rounded-3xl">
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <Sparkles className="text-[#4c97ff]" size={16} />
+                                    <h4 className="text-white font-black uppercase text-[10px] tracking-widest">{currentLang === 'vi' ? 'Ghi chú thêm' : 'Additional Notes'}</h4>
+                                  </div>
+                                  <p className="text-gray-400 text-xs leading-relaxed italic">
+                                    {currentLang === 'vi' 
+                                      ? `Bạn có thể xem mã Luau tương ứng trong khung Scripting để hiểu rõ bản chất hoạt động của khối này.` 
+                                      : `You can view the corresponding Luau code in the Scripting panel to understand the underlying operation of this block.`}
+                                  </p>
+                                </div>
                               </div>
                             </div>
+                          </motion.div>
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-center">
+                            <div className="w-24 h-24 bg-white/5 rounded-3xl flex items-center justify-center mb-8 border border-white/5 shadow-2xl relative">
+                              <Layers className="text-gray-800" size={48} />
+                              <div className="absolute -inset-2 bg-[#4c97ff]/10 rounded-full blur-xl animate-pulse"></div>
+                            </div>
+                            <h3 className="text-2xl font-black text-white mb-2 tracking-tighter uppercase italic">
+                              {currentLang === 'vi' ? 'Hãy chọn một khối' : 'Select a Block'}
+                            </h3>
+                            <p className="text-gray-600 max-w-sm font-bold uppercase tracking-widest text-[10px]">
+                              {currentLang === 'vi' ? 'Thông tin chi tiết sẽ hiển thị tại đây' : 'Details will be shown here'}
+                            </p>
                           </div>
-                        </motion.div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-12">
-                        <motion.div
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          className="relative"
-                        >
-                          <div className="w-40 h-40 bg-white/5 rounded-[3rem] flex items-center justify-center mb-10 shadow-2xl border border-white/5 relative z-10">
-                            <Layers className="text-gray-700" size={80} />
-                          </div>
-                          <div className="absolute -top-4 -right-4 w-12 h-12 bg-[#4c97ff]/20 rounded-2xl blur-xl animate-pulse"></div>
-                          <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-[#ff4c4c]/10 rounded-full blur-2xl animate-bounce"></div>
-                        </motion.div>
-                        <h3 className="text-3xl font-black text-white mb-4 tracking-tight">
-                          {currentLang === 'vi' ? 'KHÁM PHÁ THƯ VIỆN' : 'EXPLORE THE LIBRARY'}
-                        </h3>
-                        <p className="text-gray-500 max-w-md text-lg leading-relaxed">
-                          {currentLang === 'vi' 
-                            ? 'Chọn một khối lệnh từ danh sách bên trái để khám phá sức mạnh và cách sử dụng nó trong dự án của bạn.'
-                            : 'Select a block from the list on the left to discover its power and how to use it in your project.'}
-                        </p>
-                      </div>
-                    )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer bar */}
+                <div className="h-8 bg-black/40 border-t border-white/5 px-6 flex items-center justify-between relative z-20">
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                       <div className="w-1.5 h-1.5 rounded-full bg-[#4c97ff] shadow-[0_0_6px_#4c97ff]"></div>
+                       <span className="text-[8px] font-black text-gray-500 tracking-[0.2em] uppercase">
+                          {allBlocks.length} {currentLang === 'vi' ? 'Khối lệnh' : 'Blocks'}
+                       </span>
+                    </div>
+                     <div className="flex items-center gap-2 border-l border-white/10 pl-6">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_6px_#a855f7]"></div>
+                        <span className="text-[8px] font-black text-gray-500 tracking-[0.2em] uppercase">
+                          {CATEGORIES.length} {currentLang === 'vi' ? 'Phân nhóm' : 'Categories'}
+                        </span>
+                     </div>
+                  </div>
+                  <div className="text-[8px] font-black text-gray-700 tracking-[0.3em] uppercase">
+                    BLOCKLUA PRO DOCUMENTATION
                   </div>
                 </div>
               </motion.div>
@@ -8079,436 +9119,181 @@ export default function App() {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-[#2b2b2b] border border-white/10 rounded-3xl p-8 max-w-3xl w-full shadow-2xl relative"
+                className="bg-[#1e1e1e] border border-white/10 rounded-3xl p-0 max-w-3xl w-full shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]"
               >
-                <button 
-                  onClick={() => setShowSyncModal(false)} 
-                  className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors"
-                >
-                  <X size={24} />
-                </button>
-                <div className="w-16 h-16 bg-[#4c97ff]/10 rounded-2xl flex items-center justify-center mb-6">
-                  <RefreshCw className="text-[#4c97ff]" size={32} />
-                </div>
-                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">
-                  {currentLang === 'vi' ? 'ĐỒNG BỘ VỚI ROBLOX STUDIO' : 'SYNC WITH ROBLOX STUDIO'}
-                </h3>
-                <div className="text-gray-400 mb-6 leading-relaxed space-y-2 text-sm">
-                  {currentLang === 'vi' ? (
-                    <>
-                      <p>Để đồng bộ liên tục mà không cần dùng Command Bar, hãy tạo một <strong>Plugin</strong>:</p>
-                      <ol className="list-decimal pl-5 space-y-1 text-gray-300">
-                        <li>Tạo một <strong>Script</strong> (ở đâu cũng được, ví dụ ServerStorage).</li>
-                        <li>Dán đoạn code bên dưới vào Script đó.</li>
-                        <li>Chuột phải vào Script, chọn <strong>Save as Local Plugin...</strong></li>
-                        <li>Vào tab <strong>Plugins</strong> trên Roblox Studio, bạn sẽ thấy nút <strong>Sync Explorer</strong> để nhấn đồng bộ bất cứ lúc nào!</li>
-                      </ol>
-                    </>
-                  ) : (
-                    <>
-                      <p>To sync easily without the Command Bar, create a <strong>Local Plugin</strong>:</p>
-                      <ol className="list-decimal pl-5 space-y-1 text-gray-300">
-                        <li>Create a <strong>Script</strong> (e.g., in ServerStorage).</li>
-                        <li>Paste the code below into it.</li>
-                        <li>Right-click the Script, choose <strong>Save as Local Plugin...</strong></li>
-                        <li>Go to the <strong>Plugins</strong> tab in Roblox Studio, you'll see a <strong>Sync Explorer</strong> button!</li>
-                      </ol>
-                    </>
-                  )}
-                </div>
-                <div className="mb-4">
-                  <label className="text-gray-400 text-sm block mb-1">Base URL:</label>
-                  <input 
-                    type="text" 
-                    value={baseUrl} 
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-white text-sm font-mono"
-                  />
-                </div>
-                <div className="relative group">
-                  <pre className="bg-[#1e1e1e] p-6 rounded-xl overflow-x-auto text-sm font-mono text-gray-300 border border-white/5 shadow-inner max-h-64 custom-scrollbar">
-{`local HttpService = game:GetService("HttpService")
-local BASE_URL = "${baseUrl}"
-local URL = BASE_URL .. "/api/sync"
-local EXPORT_URL = BASE_URL .. "/api/export"
-local EXPORT_TREE_URL = BASE_URL .. "/api/export_tree"
-
-local toolbar = plugin:CreateToolbar("BlockLua")
-local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
-
-local function serializeInstance(instance, path)
-    local currentPath = path == "" and instance.Name or (path .. "." .. instance.Name)
-    local data = {
-        id = path == "game" and instance.Name:lower() or currentPath,
-        Name = instance.Name,
-        ClassName = instance.ClassName,
-        expanded = false,
-        Properties = {},
-        Children = {}
-    }
-    if instance:IsA("Script") or instance:IsA("LocalScript") or instance:IsA("ModuleScript") then
-        data.Properties.Source = instance.Source
-    end
-    for _, child in ipairs(instance:GetChildren()) do
-        table.insert(data.Children, serializeInstance(child, data.id))
-    end
-    return data
-end
-
-local function sync()
-    local root = {
-        id = "game",
-        Name = "game",
-        ClassName = "DataModel",
-        expanded = true,
-        Properties = {},
-        Children = {}
-    }
-
-    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterGui", "StarterPlayer", "Lighting", "SoundService", "Players", "Teams", "Chat", "LocalizationService", "TextChatService", "TestService"}
-    for _, serviceName in ipairs(services) do
-        local success, service = pcall(function() return game:GetService(serviceName) end)
-        if success and service then
-            table.insert(root.Children, serializeInstance(service, "game"))
-        end
-    end
-
-    pcall(function()
-        HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)
-    end)
-end
-
-local function pollScripts()
-    local success, response = pcall(function()
-        return HttpService:GetAsync(EXPORT_URL)
-    end)
-
-    if success then
-        local data = HttpService:JSONDecode(response)
-        if data and data.script then
-            local scriptData = data.script
-            
-            local parent = game
-            local parts = string.split(scriptData.path, ".")
-            for i, part in ipairs(parts) do
-                if i > 1 then
-                    local nextParent = parent:FindFirstChild(part)
-                    if nextParent then
-                        parent = nextParent
-                    else
-                        break
-                    end
-                end
-            end
-            
-            local newScript = Instance.new(scriptData.type)
-            newScript.Name = scriptData.type
-            newScript.Source = scriptData.code
-            newScript.Parent = parent
-        end
-    end
-end
-
-local function applyNode(webNode, parentInstance)
-    local instance
-    
-    if webNode.id and not string.find(webNode.id, "-") then
-        local parts = string.split(webNode.id, ".")
-        local current = game
-        local found = true
-        for i, part in ipairs(parts) do
-            if i > 1 then
-                local nextChild = current:FindFirstChild(part)
-                if nextChild then
-                    current = nextChild
-                else
-                    found = false
-                    break
-                end
-            end
-        end
-        if found and current ~= game then
-            instance = current
-        end
-    end
-    
-    if not instance and parentInstance then
-        for _, child in ipairs(parentInstance:GetChildren()) do
-            if child.Name == webNode.Name and child.ClassName == webNode.ClassName then
-                instance = child
-                break
-            end
-        end
-    end
-    
-    if not instance and parentInstance then
-        local success, newInst = pcall(function() return Instance.new(webNode.ClassName) end)
-        if success and newInst then
-            instance = newInst
-            instance.Name = webNode.Name
-            instance.Parent = parentInstance
-        end
-    end
-    
-    if instance then
-        if instance.Name ~= webNode.Name then
-            pcall(function() instance.Name = webNode.Name end)
-        end
-        
-        if parentInstance and instance.Parent ~= parentInstance then
-            pcall(function() instance.Parent = parentInstance end)
-        end
-        
-        if webNode.Properties and webNode.Properties.Source then
-            pcall(function() instance.Source = webNode.Properties.Source end)
-        end
-        
-        if webNode.Children then
-            for _, childNode in ipairs(webNode.Children) do
-                applyNode(childNode, instance)
-            end
-        end
-    end
-end
-
-local function pollTree()
-    local success, response = pcall(function()
-        return HttpService:GetAsync(EXPORT_TREE_URL)
-    end)
-    
-    if success then
-        local data = HttpService:JSONDecode(response)
-        if data and data.tree then
-            local webTree = data.tree
-            if webTree.Children then
-                for _, childNode in ipairs(webTree.Children) do
-                    local success, service = pcall(function() return game:GetService(childNode.ClassName) end)
-                    if success and service then
-                        if childNode.Children then
-                            for _, grandChild in ipairs(childNode.Children) do
-                                applyNode(grandChild, service)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
-syncButton.Click:Connect(function()
-    sync()
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(2)
-        pollScripts()
-        pollTree()
-    end
-end)
-
-sync() -- Initial sync on load`}
-                  </pre>
+                {/* Modal Header */}
+                <div className="p-6 border-b border-white/5 bg-gradient-to-r from-[#4c97ff]/10 to-transparent flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[#4c97ff]/20 flex items-center justify-center">
+                      <RefreshCw className="text-[#4c97ff]" size={28} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-white tracking-tight uppercase">
+                        {currentLang === 'vi' ? 'ĐỒNG BỘ VỚI ROBLOX STUDIO' : 'SYNC WITH ROBLOX STUDIO'}
+                      </h3>
+                      <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 mt-2">
+                        <button 
+                          onClick={() => setActiveSyncTab('copy')}
+                          className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all ${activeSyncTab === 'copy' ? 'bg-[#4c97ff] text-white' : 'text-gray-500 hover:text-white'}`}
+                        >
+                          {currentLang === 'vi' ? 'THỦ CÔNG' : 'MANUAL'}
+                        </button>
+                        <button 
+                          onClick={() => setActiveSyncTab('plugin')}
+                          className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all ${activeSyncTab === 'plugin' ? 'bg-[#4c97ff] text-white' : 'text-gray-500 hover:text-white'}`}
+                        >
+                          {currentLang === 'vi' ? 'DÒNG TỆP (PLUGIN)' : 'FILE STREAM (PLUGIN)'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   <button 
-                    onClick={() => {
-                      const code = `local HttpService = game:GetService("HttpService")
-local BASE_URL = "${baseUrl}"
-local URL = BASE_URL .. "/api/sync"
-local EXPORT_URL = BASE_URL .. "/api/export"
-local EXPORT_TREE_URL = BASE_URL .. "/api/export_tree"
-
-local toolbar = plugin:CreateToolbar("BlockLua")
-local syncButton = toolbar:CreateButton("Sync Explorer", "Sync your Roblox Studio Explorer to BlockLua", "rbxassetid://6031280882")
-
-local function serializeInstance(instance, path)
-    local currentPath = path == "" and instance.Name or (path .. "." .. instance.Name)
-    local data = {
-        id = path == "game" and instance.Name:lower() or currentPath,
-        Name = instance.Name,
-        ClassName = instance.ClassName,
-        expanded = false,
-        Properties = {},
-        Children = {}
-    }
-    if instance:IsA("Script") or instance:IsA("LocalScript") or instance:IsA("ModuleScript") then
-        data.Properties.Source = instance.Source
-    end
-    for _, child in ipairs(instance:GetChildren()) do
-        table.insert(data.Children, serializeInstance(child, data.id))
-    end
-    return data
-end
-
-local function sync()
-    local root = {
-        id = "game",
-        Name = "game",
-        ClassName = "DataModel",
-        expanded = true,
-        Properties = {},
-        Children = {}
-    }
-
-    local services = {"Workspace", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterGui", "StarterPlayer", "Lighting", "SoundService", "Players", "Teams", "Chat", "LocalizationService", "TextChatService", "TestService"}
-    for _, serviceName in ipairs(services) do
-        local success, service = pcall(function() return game:GetService(serviceName) end)
-        if success and service then
-            table.insert(root.Children, serializeInstance(service, "game"))
-        end
-    end
-
-    pcall(function()
-        HttpService:PostAsync(URL, HttpService:JSONEncode({tree = root}), Enum.HttpContentType.ApplicationJson)
-    end)
-end
-
-local function pollScripts()
-    local success, response = pcall(function()
-        return HttpService:GetAsync(EXPORT_URL)
-    end)
-
-    if success then
-        local data = HttpService:JSONDecode(response)
-        if data and data.script then
-            local scriptData = data.script
-            
-            local parent = game
-            local parts = string.split(scriptData.path, ".")
-            for i, part in ipairs(parts) do
-                if i > 1 then
-                    local nextParent = parent:FindFirstChild(part)
-                    if nextParent then
-                        parent = nextParent
-                    else
-                        break
-                    end
-                end
-            end
-            
-            local newScript = Instance.new(scriptData.type)
-            newScript.Name = scriptData.type
-            newScript.Source = scriptData.code
-            newScript.Parent = parent
-        end
-    end
-end
-
-local function applyNode(webNode, parentInstance)
-    local instance
-    
-    if webNode.id and not string.find(webNode.id, "-") then
-        local parts = string.split(webNode.id, ".")
-        local current = game
-        local found = true
-        for i, part in ipairs(parts) do
-            if i > 1 then
-                local nextChild = current:FindFirstChild(part)
-                if nextChild then
-                    current = nextChild
-                else
-                    found = false
-                    break
-                end
-            end
-        end
-        if found and current ~= game then
-            instance = current
-        end
-    end
-    
-    if not instance and parentInstance then
-        for _, child in ipairs(parentInstance:GetChildren()) do
-            if child.Name == webNode.Name and child.ClassName == webNode.ClassName then
-                instance = child
-                break
-            end
-        end
-    end
-    
-    if not instance and parentInstance then
-        local success, newInst = pcall(function() return Instance.new(webNode.ClassName) end)
-        if success and newInst then
-            instance = newInst
-            instance.Name = webNode.Name
-            instance.Parent = parentInstance
-        end
-    end
-    
-    if instance then
-        if instance.Name ~= webNode.Name then
-            pcall(function() instance.Name = webNode.Name end)
-        end
-        
-        if parentInstance and instance.Parent ~= parentInstance then
-            pcall(function() instance.Parent = parentInstance end)
-        end
-        
-        if webNode.Properties and webNode.Properties.Source then
-            pcall(function() instance.Source = webNode.Properties.Source end)
-        end
-        
-        if webNode.Children then
-            for _, childNode in ipairs(webNode.Children) do
-                applyNode(childNode, instance)
-            end
-        end
-    end
-end
-
-local function pollTree()
-    local success, response = pcall(function()
-        return HttpService:GetAsync(EXPORT_TREE_URL)
-    end)
-    
-    if success then
-        local data = HttpService:JSONDecode(response)
-        if data and data.tree then
-            local webTree = data.tree
-            if webTree.Children then
-                for _, childNode in ipairs(webTree.Children) do
-                    local success, service = pcall(function() return game:GetService(childNode.ClassName) end)
-                    if success and service then
-                        if childNode.Children then
-                            for _, grandChild in ipairs(childNode.Children) do
-                                applyNode(grandChild, service)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
-syncButton.Click:Connect(function()
-    sync()
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(2)
-        pollScripts()
-        pollTree()
-    end
-end)
-
-sync() -- Initial sync on load`;
-                      navigator.clipboard.writeText(code);
-                      alert(currentLang === 'vi' ? 'Đã sao chép!' : 'Copied!');
-                    }}
-                    className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all"
-                    title="Copy Code"
+                    onClick={() => setShowSyncModal(false)} 
+                    className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-xl flex items-center justify-center text-gray-400 hover:text-white transition-all"
                   >
-                    <Copy size={16} />
+                    <X size={20} />
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-500 italic">
-                  * {currentLang === 'vi' ? 'Lưu ý: Bạn cần bật HTTP Requests trong Game Settings > Security.' : 'Note: You must enable HTTP Requests in Game Settings > Security.'}
-                </p>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                  {activeSyncTab === 'copy' ? (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
+                          <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                            <Copy className="text-orange-500" size={20} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-white mb-1 uppercase">{currentLang === 'vi' ? 'Sao chép Lua' : 'Copy Lua'}</h4>
+                            <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                              {currentLang === 'vi' ? 'Sao chép đoạn mã đã tạo để dán thủ công vào Script trong Studio.' : 'Copy the generated code to manually paste into Studio.'}
+                            </p>
+                          </div>
+                          <button 
+                             onClick={() => {
+                               navigator.clipboard.writeText(generatedCode);
+                               showToast(currentLang === 'vi' ? 'Đã sao chép mã!' : 'Code copied!');
+                             }}
+                             className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-black rounded-xl border border-white/10 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Copy size={14} />
+                            {currentLang === 'vi' ? 'SAO CHÉP MÃ' : 'COPY CODE'}
+                          </button>
+                        </div>
+
+                        <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
+                          <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                            <Download className="text-green-500" size={20} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-white mb-1 uppercase">{currentLang === 'vi' ? 'Tải tệp .lua' : 'Download .lua'}</h4>
+                            <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                              {currentLang === 'vi' ? 'Tải mã xuống thành tệp vật lý để quản lý dễ dàng hơn.' : 'Download code as a physical file for easier management.'}
+                            </p>
+                          </div>
+                          <button 
+                             onClick={downloadCurrentScript}
+                             className="w-full py-2.5 bg-green-500/10 hover:bg-green-500/20 text-green-500 text-[10px] font-black rounded-xl border border-green-500/20 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Download size={14} />
+                            {currentLang === 'vi' ? 'TẢI TỆP XUỐNG' : 'DOWNLOAD FILE'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-5 bg-[#4c97ff]/5 rounded-2xl border border-[#4c97ff]/10">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Zap size={14} className="text-[#4c97ff]" />
+                          <h4 className="text-[10px] font-black text-white uppercase tracking-widest">{currentLang === 'vi' ? 'Xuất nhanh tới Explorer' : 'Quick Export to Explorer'}</h4>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mb-4 font-medium italic">
+                          {currentLang === 'vi' ? '*Yêu cầu Plugin đang chạy trong Studio' : '*Requires Plugin running in Studio'}
+                        </p>
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={() => { handleQuickExport('Script'); setShowSyncModal(false); }}
+                            className="flex-1 py-2.5 bg-[#4c97ff] hover:bg-[#3a86ff] text-white text-[10px] font-black rounded-xl shadow-lg shadow-[#4c97ff]/20 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Server size={14} />
+                            SERVER SCRIPT
+                          </button>
+                          <button 
+                            onClick={() => { handleQuickExport('LocalScript'); setShowSyncModal(false); }}
+                            className="flex-1 py-2.5 bg-[#ff4c4c] hover:bg-[#ea3c3c] text-white text-[10px] font-black rounded-xl shadow-lg shadow-[#ff4c4c]/20 transition-all flex items-center justify-center gap-2"
+                          >
+                            <User size={14} />
+                            LOCAL SCRIPT
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                       <div className="p-5 bg-black/30 rounded-2xl border border-white/5">
+                          <div className="flex items-start gap-4 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-[#4c97ff]/10 flex items-center justify-center shrink-0">
+                              <Zap className="text-[#4c97ff]" size={20} />
+                            </div>
+                            <div>
+                               <h4 className="text-sm font-black text-white mb-1 uppercase">{currentLang === 'vi' ? 'Đồng bộ tự động (File Stream)' : 'Auto-Sync (File Stream)'}</h4>
+                               <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
+                                {currentLang === 'vi' 
+                                  ? 'Sử dụng đoạn mã này để tạo một Plugin địa phương. Nó sẽ tự động nhận diện mã nguồn từ trình duyệt và đưa vào game của bạn.' 
+                                  : 'Use this code to create a local Plugin. It will automatically detect source code from the browser and bring it into your game.'}
+                               </p>
+                            </div>
+                          </div>
+                       </div>
+
+                       <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{currentLang === 'vi' ? 'Mã nguồn Plugin' : 'Plugin Source Code'}</span>
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(robloxSyncPluginCode);
+                                showToast(currentLang === 'vi' ? 'Đã sao chép Plugin!' : 'Plugin copied!');
+                              }}
+                              className="text-[9px] font-black text-[#4c97ff] hover:underline flex items-center gap-1"
+                            >
+                              <Copy size={10} />
+                              {currentLang === 'vi' ? 'SAO CHÉP TẤT CẢ' : 'COPY ALL'}
+                            </button>
+                          </div>
+                          <div className="relative group">
+                            <div className="absolute inset-0 bg-[#4c97ff]/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+                            <pre className="bg-black/50 p-5 rounded-xl text-[10px] font-mono text-gray-400 border border-white/5 max-h-48 overflow-y-auto custom-scrollbar">
+                              {robloxSyncPluginCode}
+                            </pre>
+                          </div>
+                       </div>
+
+                       <div className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-xl">
+                          <p className="text-[10px] text-orange-500 font-bold flex items-center gap-2">
+                             <Info size={12} />
+                             {currentLang === 'vi' 
+                               ? 'QUAN TRỌNG: Bạn phải bật "Allow HTTP Requests" trong phần Game Settings > Security của Studio.' 
+                               : 'IMPORTANT: You must enable "Allow HTTP Requests" in Studio Game Settings > Security.'}
+                          </p>
+                       </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 bg-white/5 border-t border-white/5 flex items-center justify-between px-8">
+                  <div className="flex items-center gap-2">
+                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                     <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Connect Established</span>
+                  </div>
+                  <div className="text-[9px] font-black text-gray-600 uppercase tracking-widest">
+                    v2.5 Sync Protocol
+                  </div>
+                </div>
               </motion.div>
             </motion.div>
           )}
+
+
+          
 
           {showCanvasModal && (
             <motion.div 
@@ -9112,37 +9897,6 @@ sync() -- Initial sync on load`;
               />
             </div>
 
-            {/* User Profile / Login */}
-            <div className="px-4 py-4 border-t border-white/5 bg-[#1a1a1a]">
-              {user ? (
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
-                    className="w-8 h-8 rounded-full border border-white/10" 
-                    alt="Avatar" 
-                    referrerPolicy="no-referrer" 
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold text-white truncate">{user.displayName}</p>
-                    <button 
-                      onClick={logout} 
-                      className="text-[9px] text-gray-500 hover:text-red-400 transition-colors uppercase font-black tracking-widest"
-                    >
-                      {currentLang === 'vi' ? 'ĐĂNG XUẤT' : 'LOGOUT'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button 
-                  onClick={login}
-                  className="w-full py-2 bg-[#4c97ff] hover:bg-[#3b82f6] text-white text-[10px] font-black rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
-                >
-                  <User size={14} />
-                  {currentLang === 'vi' ? 'ĐĂNG NHẬP GOOGLE' : 'GOOGLE LOGIN'}
-                </button>
-              )}
-            </div>
-
             {selectorTarget && (
               <div className={`p-3 border-t ${selectorTarget === 'export' ? 'bg-red-500/10 border-red-500/20' : 'bg-[#4c97ff]/10 border-[#4c97ff]/20'}`}>
                 <p className="text-[10px] text-gray-400 mb-2">
@@ -9184,6 +9938,332 @@ sync() -- Initial sync on load`;
         )}
       </AnimatePresence>
     </div>
+
+      {/* Authentication Modal */}
+      <AnimatePresence>
+        {showAuthModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed top-0 left-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-4 w-full h-full"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1e1e1e] border border-white/10 rounded-3xl max-w-md w-full shadow-2xl relative overflow-hidden flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-white/5 bg-gradient-to-r from-[#4c97ff]/10 to-transparent flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#4c97ff]/20 flex items-center justify-center">
+                    <User className="text-[#4c97ff]" size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-white tracking-tight uppercase">
+                      {authMode === 'login' 
+                        ? (currentLang === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN') 
+                        : (currentLang === 'vi' ? 'ĐĂNG KÝ HỆ THỐNG' : 'SYSTEM REGISTRATION')}
+                    </h3>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">
+                      {authMode === 'login' 
+                        ? (currentLang === 'vi' ? 'Truy cập vào tài khoản của bạn' : 'Access your account') 
+                        : (currentLang === 'vi' ? 'Khởi tạo tài khoản BlockLua mới' : 'Create a new BlockLua account')}
+                    </p>
+                  </div>
+                </div>
+                <motion.button 
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowAuthModal(false)} 
+                  className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-xl flex items-center justify-center text-gray-400 hover:text-white transition-all outline-none"
+                >
+                  <X size={20} />
+                </motion.button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                {authMode === 'login' ? (
+                  <>
+                    <motion.button 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={login}
+                      className="w-full py-3.5 bg-white text-black text-[12px] font-black rounded-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-3 shadow-xl active:scale-95"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                      </svg>
+                      {currentLang === 'vi' ? 'TIẾP TỤC VỚI GOOGLE' : 'CONTINUE WITH GOOGLE'}
+                    </motion.button>
+
+                    <div className="flex items-center gap-4 py-2">
+                      <div className="flex-1 h-px bg-white/5"></div>
+                      <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{currentLang === 'vi' ? 'HOẶC' : 'OR'}</span>
+                      <div className="flex-1 h-px bg-white/5"></div>
+                    </div>
+
+                    <form onSubmit={handleEmailLogin} className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'TÊN ĐĂNG NHẬP' : 'USERNAME'}</label>
+                        <motion.div 
+                          animate={{ 
+                            scale: authEmailFocus === 'login_email' ? 1.02 : 1,
+                            borderColor: authEmailFocus === 'login_email' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
+                          }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          className="relative group bg-black/40 border rounded-xl"
+                        >
+                          <motion.div 
+                            animate={{ 
+                              scale: authEmailFocus === 'login_email' ? 1.2 : 1,
+                              color: authEmailFocus === 'login_email' ? '#4c97ff' : '#4b5563',
+                              x: authEmailFocus === 'login_email' ? 2 : 0
+                            }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                          >
+                            <User size={16} />
+                          </motion.div>
+                          <input 
+                            type="text"
+                            value={authEmailLogin}
+                            onFocus={() => setAuthEmailFocus('login_email')}
+                            onBlur={() => setAuthEmailFocus(null)}
+                            onChange={(e) => setAuthEmailLogin(e.target.value)}
+                            placeholder={currentLang === 'vi' ? 'Nhập tên người dùng...' : 'Enter your username...'}
+                            className="w-full bg-transparent py-3.5 pl-12 pr-4 text-sm text-white placeholder:text-gray-700 outline-none transition-none"
+                          />
+                        </motion.div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'MẬT KHẨU' : 'PASSWORD'}</label>
+                        <motion.div 
+                          animate={{ 
+                            scale: authEmailFocus === 'login_pass' ? 1.02 : 1,
+                            borderColor: authEmailFocus === 'login_pass' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
+                          }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          className="relative group bg-black/40 border rounded-xl"
+                        >
+                          <motion.div 
+                            animate={{ 
+                              scale: authEmailFocus === 'login_pass' ? 1.2 : 1,
+                              color: authEmailFocus === 'login_pass' ? '#4c97ff' : '#4b5563',
+                              x: authEmailFocus === 'login_pass' ? 2 : 0
+                            }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                          >
+                            <Lock size={16} />
+                          </motion.div>
+                          <input 
+                            type="password"
+                            value={authPassword}
+                            onFocus={() => setAuthEmailFocus('login_pass')}
+                            onBlur={() => setAuthEmailFocus(null)}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full bg-transparent py-3.5 pl-12 pr-4 text-sm text-white placeholder:text-gray-700 outline-none transition-none"
+                          />
+                        </motion.div>
+                      </div>
+
+                      <motion.button 
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="submit"
+                        disabled={authLoading}
+                        className="w-full py-3.5 bg-[#4c97ff] hover:bg-[#3a86ff] text-white text-[12px] font-black rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                      >
+                        {authLoading ? (
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                          <>
+                            <LogIn size={16} />
+                            {currentLang === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN'}
+                          </>
+                        )}
+                      </motion.button>
+                    </form>
+
+                    <div className="text-center pt-4">
+                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">
+                        {currentLang === 'vi' ? 'Bạn chưa có tài khoản?' : "Don't have an account?"}
+                        <button 
+                          onClick={() => setAuthMode('register')}
+                          className="ml-2 text-[#4c97ff] hover:underline cursor-pointer"
+                        >
+                          {currentLang === 'vi' ? 'ĐĂNG KÝ' : 'REGISTER'}
+                        </button>
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'TÊN NGƯỜI DÙNG' : 'USERNAME'}</label>
+                       <motion.div 
+                          animate={{ 
+                            scale: authEmailFocus === 'reg_user' ? 1.02 : 1,
+                            borderColor: authEmailFocus === 'reg_user' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
+                          }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          className="relative group bg-black/40 border rounded-xl"
+                        >
+                          <motion.div 
+                            animate={{ 
+                              scale: authEmailFocus === 'reg_user' ? 1.2 : 1,
+                              color: authEmailFocus === 'reg_user' ? '#4c97ff' : '#4b5563',
+                              x: authEmailFocus === 'reg_user' ? 2 : 0
+                            }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                          >
+                            <User size={16} />
+                          </motion.div>
+                          <input 
+                            type="text"
+                            value={authUsername}
+                            onFocus={() => setAuthEmailFocus('reg_user')}
+                            onBlur={() => setAuthEmailFocus(null)}
+                            onChange={(e) => setAuthUsername(e.target.value)}
+                            placeholder={currentLang === 'vi' ? 'Tên hiển thị của bạn...' : 'Your display name...'}
+                            className="w-full bg-transparent py-3 pl-12 pr-4 text-sm text-white placeholder:text-gray-700 outline-none transition-none"
+                          />
+                       </motion.div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'MẬT KHẨU' : 'PASSWORD'}</label>
+                        <motion.div 
+                          animate={{ 
+                            scale: authEmailFocus === 'reg_pass' ? 1.02 : 1,
+                            borderColor: authEmailFocus === 'reg_pass' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
+                          }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          className="relative group bg-black/40 border rounded-xl"
+                        >
+                          <motion.div 
+                            animate={{ 
+                              scale: authEmailFocus === 'reg_pass' ? 1.2 : 1,
+                              color: authEmailFocus === 'reg_pass' ? '#4c97ff' : '#4b5563',
+                              x: authEmailFocus === 'reg_pass' ? 2 : 0
+                            }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                          >
+                            <Lock size={16} />
+                          </motion.div>
+                          <input 
+                            type="password"
+                            value={authPassword}
+                            onFocus={() => setAuthEmailFocus('reg_pass')}
+                            onBlur={() => setAuthEmailFocus(null)}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full bg-transparent py-3 pl-12 pr-4 text-sm text-white placeholder:text-gray-700 outline-none transition-none"
+                          />
+                        </motion.div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'NGÀY SINH (DD/MM/YYYY)' : 'BIRTH DATE (DD/MM/YYYY)'}</label>
+                        <div className="flex gap-2">
+                          <motion.div 
+                            animate={{ 
+                              borderColor: authEmailFocus === 'reg_day' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
+                            }}
+                            className="flex-1 bg-black/40 border rounded-xl overflow-hidden"
+                          >
+                            <input 
+                              type="text"
+                              maxLength={2}
+                              value={birthDay}
+                              onFocus={() => setAuthEmailFocus('reg_day')}
+                              onBlur={() => setAuthEmailFocus(null)}
+                              onChange={(e) => setBirthDay(e.target.value.replace(/\D/g, ''))}
+                              placeholder="DD"
+                              className="w-full bg-transparent py-3 px-4 text-center text-sm text-white placeholder:text-gray-700 outline-none"
+                            />
+                          </motion.div>
+                          <motion.div 
+                            animate={{ 
+                              borderColor: authEmailFocus === 'reg_month' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
+                            }}
+                            className="flex-1 bg-black/40 border rounded-xl overflow-hidden"
+                          >
+                            <input 
+                              type="text"
+                              maxLength={2}
+                              value={birthMonth}
+                              onFocus={() => setAuthEmailFocus('reg_month')}
+                              onBlur={() => setAuthEmailFocus(null)}
+                              onChange={(e) => setBirthMonth(e.target.value.replace(/\D/g, ''))}
+                              placeholder="MM"
+                              className="w-full bg-transparent py-3 px-4 text-center text-sm text-white placeholder:text-gray-700 outline-none"
+                            />
+                          </motion.div>
+                          <motion.div 
+                            animate={{ 
+                              borderColor: authEmailFocus === 'reg_year' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
+                            }}
+                            className="flex-[1.5] bg-black/40 border rounded-xl overflow-hidden"
+                          >
+                            <input 
+                              type="text"
+                              maxLength={4}
+                              value={birthYear}
+                              onFocus={() => setAuthEmailFocus('reg_year')}
+                              onBlur={() => setAuthEmailFocus(null)}
+                              onChange={(e) => setBirthYear(e.target.value.replace(/\D/g, ''))}
+                              placeholder="YYYY"
+                              className="w-full bg-transparent py-3 px-4 text-center text-sm text-white placeholder:text-gray-700 outline-none"
+                            />
+                          </motion.div>
+                        </div>
+                    </div>
+
+                    <motion.button 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={authLoading}
+                      className="w-full py-3.5 bg-[#4c97ff] hover:bg-[#3a86ff] text-white text-[12px] font-black rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                    >
+                      {authLoading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <UserPlus size={16} />
+                          {currentLang === 'vi' ? 'HOÀN TẤT ĐĂNG KÝ' : 'COMPLETE REGISTRATION'}
+                        </>
+                      )}
+                    </motion.button>
+
+                    <div className="text-center pt-2">
+                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">
+                        {currentLang === 'vi' ? 'Bạn đã có tài khoản?' : 'Already have an account?'}
+                        <button 
+                          onClick={() => setAuthMode('login')}
+                          className="ml-2 text-[#4c97ff] hover:underline cursor-pointer"
+                        >
+                          {currentLang === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN'}
+                        </button>
+                      </p>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style>{`
         /* Hide Blockly's default UI elements we don't want */
@@ -9551,7 +10631,7 @@ sync() -- Initial sync on load`;
               }
             }}
             exit={{ x: 400, opacity: 0 }}
-            className="fixed bottom-10 right-10 z-[3000] flex items-center gap-4 bg-[#1a1a1a] border-2 border-[#4c97ff] rounded-3xl p-6 shadow-[0_0_50px_rgba(76,151,255,0.3)] min-w-[320px]"
+            className="fixed bottom-10 right-10 z-[9998] flex items-center gap-4 bg-[#1a1a1a] border-2 border-[#4c97ff] rounded-3xl p-6 shadow-[0_0_50px_rgba(76,151,255,0.3)] min-w-[320px]"
           >
             <motion.div 
               animate={{ y: [0, -8, 0] }}
@@ -9603,7 +10683,7 @@ sync() -- Initial sync on load`;
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md ${
+            className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md ${
               toast.type === 'success' 
                 ? 'bg-emerald-500/90 border-emerald-400/50 text-white' 
                 : 'bg-red-500/90 border-red-400/50 text-white'
@@ -9611,6 +10691,9 @@ sync() -- Initial sync on load`;
           >
             {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
             <span className="text-sm font-bold tracking-wide">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
