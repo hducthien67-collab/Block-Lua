@@ -1,5 +1,5 @@
 {
   "name": "BlockLua Pro",
-  "description": "Nền tảng lập trình Roblox chuyên nghiệp sử dụng khối lệnh (Blockly) tiếng Việt. Hỗ trợ tạo mã Luau, lưu trữ đám mây và tích hợp AI.",
+  "description": "Nền tảng lập trình Roblox chuyên nghiệp sử dụng khối lệnh (Blockly) tiếng Việt. Hỗ trợ tạo mã Luau và lưu trữ đám mây.",
   "requestFramePermissions": []
 }

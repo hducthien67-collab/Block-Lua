@@ -102,27 +102,28 @@ html, body {
 .blocklyEditableText > tspan {
   fill: #ffffff !important;
   color: #ffffff !important;
-  font-size: 20px !important;
-  font-weight: 700 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
   stroke: none !important;
 }
 
 .blocklyHtmlInput {
-  background-color: rgba(30, 30, 30, 0.95) !important;
-  border: 2px solid rgba(255, 255, 255, 0.3) !important;
-  border-radius: 10px !important;
+  background-color: rgba(30, 30, 30, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 6px !important;
   font-family: 'Inter', sans-serif !important;
+  font-size: 14px !important;
   outline: none !important;
   color: #ffffff !important;
-  padding: 12px 20px !important;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7) !important;
+  padding: 6px 10px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
 }
 
 .blocklyEditableText rect {
-  fill: rgba(0, 0, 0, 0.5) !important;
+  fill: rgba(0, 0, 0, 0.4) !important;
   fill-opacity: 1 !important;
-  rx: 8px !important;
-  ry: 8px !important;
+  rx: 4px !important;
+  ry: 4px !important;
 }
 
 .faded-placeholder-text {

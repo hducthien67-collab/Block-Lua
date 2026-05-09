@@ -10,9 +10,9 @@ import { luaGenerator, Order } from 'blockly/lua';
 class CustomZelosConstantProvider extends Blockly.zelos.ConstantProvider {
   constructor() {
     super();
-    this.FIELD_TEXT_FONTSIZE = 20;
-    this.FIELD_TEXT_HEIGHT = 36;
-    this.FIELD_TEXT_FONTWEIGHT = '700';
+    this.FIELD_TEXT_FONTSIZE = 14;
+    this.FIELD_TEXT_HEIGHT = 20;
+    this.FIELD_TEXT_FONTWEIGHT = '500';
   }
   shapeFor(connection: Blockly.RenderedConnection) {
     const shape = super.shapeFor(connection);
@@ -349,8 +349,8 @@ const getBlockDescription = (block: any, lang: string) => {
     }
     if (type.includes('workspace_raycast')) {
       return lang === 'vi'
-        ? "Bắn một tia tàng hình từ vị trí gốc (Origin) theo một hướng và chiều dài xác định (Direction). Nếu tia này chạm vào bất kỳ vật thể nào có tính chất va chạm trong không gian 3D, nó sẽ trả về một 'RaycastResult' chứa thông tin cực kỳ chi tiết: Vật thể đó là gì, tọa độ chính xác điểm chạm, bề mặt đó hướng về đâu. Đây là công nghệ hiện đại nhất để làm súng (Hitscan gun), kiểm tra khoảng cách rơi, hoặc làm AI xác định mục tiêu."
-        : "Fires an invisible ray from an origin point in a specific direction and length. If the ray hits any collidable object in 3D space, it returns a 'RaycastResult' containing extremely detailed info: What object was hit, exact hit coordinates, and surface normal. This is the state-of-the-art technology for Hitscan guns, fall-distance checks, or AI targeting systems.";
+        ? "Bắn một tia tàng hình từ vị trí gốc (Origin) theo một hướng và chiều dài xác định (Direction). Nếu tia này chạm vào bất kỳ vật thể nào có tính chất va chạm trong không gian 3D, nó sẽ trả về một 'RaycastResult' chứa thông tin cực kỳ chi tiết: Vật thể đó là gì, tọa độ chính xác điểm chạm, bề mặt đó hướng về đâu. Đây là công nghệ hiện đại nhất để làm súng (Hitscan gun), kiểm tra khoảng cách rơi, hoặc các hệ thống nhận diện mục tiêu."
+        : "Fires an invisible ray from an origin point in a specific direction and length. If the ray hits any collidable object in 3D space, it returns a 'RaycastResult' containing extremely detailed info: What object was hit, exact hit coordinates, and surface normal. This is the state-of-the-art technology for Hitscan guns, fall-distance checks, or automated targeting systems.";
     }
     if (type.includes('get_result_property')) {
       return lang === 'vi'
@@ -651,16 +651,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authEmail, setAuthEmail] = useState('');
-  const [authEmailLogin, setAuthEmailLogin] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authUsername, setAuthUsername] = useState('');
-  const [birthDay, setBirthDay] = useState('');
-  const [birthMonth, setBirthMonth] = useState('');
-  const [birthYear, setBirthYear] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
-  const [authEmailFocus, setAuthEmailFocus] = useState<string | null>(null);
   const [showBlockInfoModal, setShowBlockInfoModal] = useState<boolean>(false);
   const [selectedBlockInfo, setSelectedBlockInfo] = useState<any>(null);
   const [infoActiveCategory, setInfoActiveCategory] = useState<string | null>(null);
@@ -687,7 +678,7 @@ export default function App() {
   ];
 
   const [showControlCenter, setShowControlCenter] = useState(false);
-  const [controlCenterTab, setControlCenterTab] = useState<'storage' | 'achievements' | 'ai' | 'test'>('storage');
+  const [controlCenterTab, setControlCenterTab] = useState<'storage' | 'achievements' | 'test'>('storage');
   const [achievements, setAchievements] = useState<string[]>([]);
   const [achievementsLoaded, setAchievementsLoaded] = useState(false);
   const isInitialLoading = useRef(true);
@@ -725,14 +716,14 @@ export default function App() {
     { id: 'rich_kid', icon: <Trophy size={20} />, title: { vi: 'Đại Gia', en: 'Rich Kid' }, desc: { vi: 'Đăng nhập để lưu trữ đám mây.', en: 'Login for cloud storage.' } },
   ];
 
-  const unlockAchievement = async (id: string) => {
-    if (!achievementsLoaded) return;
+  const unlockAchievement = async (id: string, force: boolean = false) => {
+    if (!achievementsLoaded && !force) return;
     if (achievementsRef.current.includes(id)) return;
     
     const achievement = achievementList.find(a => a.id === id);
     if (!achievement) return;
 
-    const newAchievements = [...achievementsRef.current, id];
+    const newAchievements = Array.from(new Set([...achievementsRef.current, id]));
     setAchievements(newAchievements);
     achievementsRef.current = newAchievements; // Update ref synchronously
     
@@ -749,10 +740,13 @@ export default function App() {
         await updateDoc(userRef, { achievements: newAchievements });
       } catch (error) {
         console.error("Error saving achievements:", error);
+        // We still save locally as fallback
+        localStorage.setItem('blocklua_achievements', JSON.stringify(newAchievements));
       } finally {
         setTimeout(() => setIsAutoSaving(false), 1000);
       }
     } else {
+      // Local storage only for guest users
       localStorage.setItem('blocklua_achievements', JSON.stringify(newAchievements));
     }
   };
@@ -784,13 +778,41 @@ export default function App() {
       setIsAuthReady(true);
 
       if (firebaseUser) {
+        // Force state update immediately for auth ready state
+        setUser(firebaseUser);
+        userRefState.current = firebaseUser;
+
+        const isVirtualEmail = firebaseUser.email?.endsWith('@mcb.app');
+        
         // Ensure user document exists
         const userRef = doc(db, 'users', firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
+        let userSnap = await getDoc(userRef);
         
         let currentAchievements: string[] = [];
+        const localAchievements = JSON.parse(localStorage.getItem('blocklua_achievements') || '[]');
 
         if (!userSnap.exists()) {
+          // If this is a virtual email, we wait for the manual doc creation from handleSignup
+          if (isVirtualEmail) {
+            // Wait up to 5 seconds for the document to appear (manual registration is in progress)
+            let attempts = 0;
+            const checkExist = setInterval(async () => {
+              attempts++;
+              userSnap = await getDoc(userRef);
+              if (userSnap.exists()) {
+                clearInterval(checkExist);
+                const userData = userSnap.data();
+                const merged = Array.from(new Set([...(userData.achievements || []), ...localAchievements]));
+                achievementsRef.current = merged;
+                setAchievements(merged);
+                setAchievementsLoaded(true);
+                if (!merged.includes('rich_kid')) unlockAchievement('rich_kid', true);
+              }
+              if (attempts >= 10) clearInterval(checkExist);
+            }, 500);
+            return;
+          }
+
           // If new user from Google, try to set up a default username mapping if possible
           let assignedUsername = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.slice(0, 5)}`;
           assignedUsername = assignedUsername.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
@@ -803,31 +825,33 @@ export default function App() {
              batch.set(doc(db, 'usernames', assignedUsername), {
                email: firebaseUser.email,
                uid: firebaseUser.uid,
-               username: firebaseUser.displayName || assignedUsername
+               username: firebaseUser.displayName || assignedUsername,
+               createdAt: Timestamp.now()
              });
              batch.set(userRef, {
                uid: firebaseUser.uid,
                email: firebaseUser.email,
                displayName: firebaseUser.displayName || assignedUsername,
-               username: assignedUsername, // Store the lowercase unique username
+               username: assignedUsername,
                photoURL: firebaseUser.photoURL,
                hasSeenTutorial: false,
-               achievements: [],
+               achievements: localAchievements,
                createdAt: Timestamp.now()
              });
              await batch.commit();
+             currentAchievements = localAchievements;
           } else {
              // Username taken, just create the user doc without a mapping for now
-             // They'll have to pick one later or we just use UID-based one
              await setDoc(userRef, {
                uid: firebaseUser.uid,
                email: firebaseUser.email,
                displayName: firebaseUser.displayName,
                photoURL: firebaseUser.photoURL,
                hasSeenTutorial: false,
-               achievements: [],
+               achievements: localAchievements,
                createdAt: Timestamp.now()
              });
+             currentAchievements = localAchievements;
           }
           setShowTutorialModal(false);
         } else {
@@ -838,17 +862,25 @@ export default function App() {
           } else {
             setShowTutorialModal(false);
           }
-          currentAchievements = userData.achievements || [];
+          
+          // Merge local achievements into cloud
+          const cloudAchievements = userData.achievements || [];
+          currentAchievements = Array.from(new Set([...cloudAchievements, ...localAchievements]));
+          
+          // One-time sync if something new added from guest session
+          if (currentAchievements.length > cloudAchievements.length) {
+            updateDoc(userRef, { achievements: currentAchievements }).catch(console.error);
+          }
         }
         
         // Update state and ref synchronously to prevent race conditions
-        setAchievements(currentAchievements);
         achievementsRef.current = currentAchievements;
+        setAchievements(currentAchievements);
         setAchievementsLoaded(true);
 
         // Now unlock rich_kid if not already unlocked
         if (!currentAchievements.includes('rich_kid')) {
-          unlockAchievement('rich_kid');
+          unlockAchievement('rich_kid', true);
         }
       } else {
         // Guest mode: only show tutorial if they haven't seen it and they didn't just log out
@@ -913,19 +945,8 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  useEffect(() => {
-    if (!showAuthModal) {
-      setAuthEmail('');
-      setAuthEmailLogin('');
-      setAuthPassword('');
-      setAuthUsername('');
-      setBirthDay('');
-      setBirthMonth('');
-      setBirthYear('');
-    }
-  }, [showAuthModal]);
-
   const login = async () => {
+    setAuthLoading(true);
     try {
       await signInWithPopup(auth, googleProvider);
       showToast(currentLang === 'vi' ? 'Đăng nhập thành công!' : 'Logged in successfully!', 'success');
@@ -940,153 +961,11 @@ export default function App() {
       }
       console.error(error);
       showToast(currentLang === 'vi' ? 'Lỗi đăng nhập!' : 'Login failed!', 'error');
-    }
-  };
-
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authEmailLogin || !authPassword) {
-      showToast(currentLang === 'vi' ? 'Vui lòng điền đầy đủ thông tin.' : 'Please fill in all fields.', 'warning');
-      return;
-    }
-    setAuthLoading(true);
-    try {
-      let emailToUse = authEmailLogin;
-      
-      // If it doesn't look like an email, try to look up as a username
-      const identifier = authEmailLogin.trim();
-      if (!identifier.includes('@')) {
-        const usernameDoc = await getDoc(doc(db, 'usernames', identifier.toLowerCase()));
-        if (usernameDoc.exists()) {
-          emailToUse = usernameDoc.data().email;
-        } else {
-          showToast(currentLang === 'vi' ? 'Tên người dùng không tồn tại.' : 'Username does not exist.', 'error');
-          setAuthLoading(false);
-          return;
-        }
-      } else {
-        emailToUse = identifier;
-      }
-
-      await signInWithEmailAndPassword(auth, emailToUse, authPassword);
-      showToast(currentLang === 'vi' ? 'Đăng nhập thành công!' : 'Logged in successfully!', 'success');
-      setShowAuthModal(false);
-      setAuthPassword('');
-      setAuthEmailLogin('');
-    } catch (error: any) {
-      console.error(error);
-      let message = currentLang === 'vi' ? 'Lỗi đăng nhập!' : 'Login failed!';
-      if (error.code === 'auth/operation-not-allowed') {
-        message = currentLang === 'vi' 
-          ? 'Tính năng đăng nhập bằng tên người dùng chưa được bật. Vui lòng liên hệ quản trị viên hoặc bật "Email/Password" trong Firebase Console.' 
-          : 'Username login is not enabled. Please enable "Email/Password" in Firebase Console.';
-      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        message = currentLang === 'vi' ? 'Thông tin đăng nhập không chính xác.' : 'Incorrect login credentials.';
-      }
-      showToast(message, 'error');
     } finally {
       setAuthLoading(false);
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanUsername = authUsername.trim();
-    const lowercaseUsername = cleanUsername.toLowerCase();
-
-    if (!cleanUsername || !authPassword || !birthDay || !birthMonth || !birthYear) {
-      showToast(currentLang === 'vi' ? 'Vui lòng điền đầy đủ thông tin.' : 'Please fill in all fields.', 'warning');
-      return;
-    }
-    
-    // Validate birth date
-    const d = parseInt(birthDay);
-    const m = parseInt(birthMonth);
-    const y = parseInt(birthYear);
-    if (isNaN(d) || isNaN(m) || isNaN(y) || d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > new Date().getFullYear()) {
-      showToast(currentLang === 'vi' ? 'Ngày sinh không hợp lệ.' : 'Invalid birth date.', 'warning');
-      return;
-    }
-
-    if (authPassword.length < 6) {
-      showToast(currentLang === 'vi' ? 'Mật khẩu phải từ 6 ký tự trở lên.' : 'Password must be at least 6 characters.', 'warning');
-      return;
-    }
-    if (!/^[a-zA-Z0-9_]{3,20}$/.test(cleanUsername)) {
-      showToast(currentLang === 'vi' ? 'Tên người dùng chỉ gồm chữ, số, gạch dưới (3-20 ký tự).' : 'Username must be 3-20 chars (letters, numbers, underscore).', 'warning');
-      return;
-    }
-
-    setAuthLoading(true);
-    try {
-      // 1. Check if username exists globally
-      const usernameDoc = await getDoc(doc(db, 'usernames', lowercaseUsername));
-      if (usernameDoc.exists()) {
-        showToast(currentLang === 'vi' ? 'Tên người dùng này đã được sử dụng!' : 'Username is already taken!', 'error');
-        setAuthLoading(false);
-        return;
-      }
-
-      // 2. Generate a virtual email for Firebase Auth
-      const virtualEmail = `${lowercaseUsername}_${Math.floor(Date.now() / 1000)}@mcb.app`;
-
-      // 3. Create user
-      const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, authPassword);
-      await updateProfile(userCredential.user, { displayName: cleanUsername });
-      
-      // 4. Save mapping and profile
-      const batch = writeBatch(db);
-      
-      // Username mapping (global)
-      batch.set(doc(db, 'usernames', lowercaseUsername), {
-        email: virtualEmail,
-        uid: userCredential.user.uid,
-        username: cleanUsername
-      });
-
-      // User profile
-      batch.set(doc(db, 'users', userCredential.user.uid), {
-        uid: userCredential.user.uid,
-        email: virtualEmail,
-        displayName: cleanUsername,
-        username: cleanUsername,
-        birthDate: { day: d, month: m, year: y },
-        createdAt: Timestamp.now(),
-        hasSeenTutorial: false,
-        achievements: []
-      });
-
-      await batch.commit();
-
-      showToast(currentLang === 'vi' ? 'Đăng ký thành công!' : 'Registered successfully!', 'success');
-      setShowAuthModal(false);
-      setAuthPassword('');
-      setAuthUsername('');
-      setBirthDay('');
-      setBirthMonth('');
-      setBirthYear('');
-    } catch (error: any) {
-      console.error(error);
-      let message = currentLang === 'vi' ? 'Lỗi đăng ký!' : 'Registration failed!';
-      if (error.code === 'auth/operation-not-allowed') {
-        message = currentLang === 'vi' 
-          ? 'Tính năng đăng ký chưa được bật. Vui lòng bật "Email/Password" trong Firebase Console.' 
-          : 'Registration is not enabled. Please enable "Email/Password" in Firebase Console.';
-      } else if (error.code === 'auth/email-already-in-use' || error.message?.includes('auth/email-already-in-use')) {
-        message = currentLang === 'vi' 
-          ? 'Tài khoản này đã tồn tại.' 
-          : 'This account already exists.';
-        setAuthMode('login');
-      } else if (error.code === 'auth/invalid-email') {
-        message = currentLang === 'vi' ? 'Định dạng đăng ký không hợp lệ.' : 'Invalid registration format.';
-      } else if (error.code === 'auth/weak-password') {
-        message = currentLang === 'vi' ? 'Mật khẩu phải có ít nhất 6 ký tự.' : 'Password must be at least 6 characters.';
-      }
-      showToast(message, 'error');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
 
   const logout = async () => {
     try {
@@ -8413,17 +8292,10 @@ end)`;
           ) : (
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => { setAuthMode('register'); setShowAuthModal(true); }}
-                className="px-5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-500/50 text-blue-400 text-[10px] font-black rounded-lg transition-all flex items-center gap-2 uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/5"
+                onClick={() => { setShowAuthModal(true); }}
+                className="px-6 py-2 bg-[#4c97ff] hover:bg-[#3a86ff] text-white text-[11px] font-black rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 uppercase tracking-widest active:scale-95"
               >
-                <UserPlus size={14} />
-                {currentLang === 'vi' ? 'Đăng ký' : 'Register'}
-              </button>
-              <button 
-                onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
-                className="px-5 py-1.5 bg-[#4c97ff] hover:bg-[#3a86ff] text-white text-[10px] font-black rounded-lg shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 uppercase tracking-widest active:scale-95"
-              >
-                <LogIn size={14} />
+                <LogIn size={15} />
                 {currentLang === 'vi' ? 'Đăng nhập' : 'Login'}
               </button>
             </div>
@@ -9191,17 +9063,15 @@ end)`;
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className={`fixed top-0 left-0 z-[1000] flex items-center justify-center w-full h-full transition-all duration-500 ${controlCenterTab === 'ai' ? 'bg-black p-0' : 'bg-black/60 backdrop-blur-sm p-4'}`}
+              className="fixed top-0 left-0 z-[1000] flex items-center justify-center w-full h-full transition-all duration-500 bg-black/60 backdrop-blur-sm p-4"
             >
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className={`bg-[#1a1a1a] border border-white/10 shadow-2xl flex overflow-hidden transition-all duration-500 ${controlCenterTab === 'ai' ? 'w-full h-full rounded-none border-none' : 'max-w-4xl w-full h-[80vh] rounded-3xl'}`}
+                className="bg-[#1a1a1a] border border-white/10 shadow-2xl flex overflow-hidden transition-all duration-500 max-w-4xl w-full h-[80vh] rounded-3xl"
               >
-                {/* Sidebar - Hidden in AI mode */}
-                {controlCenterTab !== 'ai' && (
-                  <div className="w-64 bg-black/40 border-r border-white/5 flex flex-col p-6">
+                <div className="w-64 bg-black/40 border-r border-white/5 flex flex-col p-6">
                   <div className="flex items-center gap-3 mb-10">
                     <div className="w-10 h-10 bg-[#4c97ff] rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                       <LayoutDashboard className="text-white" size={20} />
@@ -9233,7 +9103,6 @@ end)`;
                     {currentLang === 'vi' ? 'Đóng' : 'Close'}
                   </button>
                 </div>
-                )}
 
                 {/* Content Area */}
                 <div className="flex-1 flex flex-col overflow-hidden bg-[#1e1e1e]">
@@ -9706,14 +9575,10 @@ end)`;
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-white tracking-tight uppercase">
-                      {authMode === 'login' 
-                        ? (currentLang === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN') 
-                        : (currentLang === 'vi' ? 'ĐĂNG KÝ HỆ THỐNG' : 'SYSTEM REGISTRATION')}
+                      {currentLang === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN'}
                     </h3>
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">
-                      {authMode === 'login' 
-                        ? (currentLang === 'vi' ? 'Truy cập vào tài khoản của bạn' : 'Access your account') 
-                        : (currentLang === 'vi' ? 'Khởi tạo tài khoản BlockLua mới' : 'Create a new BlockLua account')}
+                      {currentLang === 'vi' ? 'Truy cập vào tài khoản của bạn' : 'Access your account'}
                     </p>
                   </div>
                 </div>
@@ -9727,282 +9592,29 @@ end)`;
                 </motion.button>
               </div>
 
-              <div className="p-8 space-y-6">
-                {authMode === 'login' ? (
-                  <>
-                    <motion.button 
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={login}
-                      className="w-full py-3.5 bg-white text-black text-[12px] font-black rounded-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-3 shadow-xl active:scale-95"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                      </svg>
-                      {currentLang === 'vi' ? 'TIẾP TỤC VỚI GOOGLE' : 'CONTINUE WITH GOOGLE'}
-                    </motion.button>
+              <div className="p-8 pb-10 space-y-6">
+                <div className="space-y-4">
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={login}
+                    className="w-full py-4 bg-white text-black text-[14px] font-black rounded-2xl hover:bg-gray-100 transition-all flex items-center justify-center gap-4 shadow-xl active:scale-95"
+                  >
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    {currentLang === 'vi' ? 'ĐĂNG NHẬP VỚI GOOGLE' : 'LOGIN WITH GOOGLE'}
+                  </motion.button>
 
-                    <div className="flex items-center gap-4 py-2">
-                      <div className="flex-1 h-px bg-white/5"></div>
-                      <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{currentLang === 'vi' ? 'HOẶC' : 'OR'}</span>
-                      <div className="flex-1 h-px bg-white/5"></div>
-                    </div>
-
-                    <form onSubmit={handleEmailLogin} className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'TÊN ĐĂNG NHẬP' : 'USERNAME'}</label>
-                        <motion.div 
-                          animate={{ 
-                            scale: authEmailFocus === 'login_email' ? 1.02 : 1,
-                            borderColor: authEmailFocus === 'login_email' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
-                          }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          className="relative group bg-black/40 border rounded-xl"
-                        >
-                          <motion.div 
-                            animate={{ 
-                              scale: authEmailFocus === 'login_email' ? 1.2 : 1,
-                              color: authEmailFocus === 'login_email' ? '#4c97ff' : '#4b5563',
-                              x: authEmailFocus === 'login_email' ? 2 : 0
-                            }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
-                          >
-                            <User size={16} />
-                          </motion.div>
-                          <input 
-                            type="text"
-                            value={authEmailLogin}
-                            onFocus={() => setAuthEmailFocus('login_email')}
-                            onBlur={() => setAuthEmailFocus(null)}
-                            onChange={(e) => setAuthEmailLogin(e.target.value)}
-                            placeholder={currentLang === 'vi' ? 'Nhập tên người dùng...' : 'Enter your username...'}
-                            className="w-full bg-transparent py-3.5 pl-12 pr-4 text-sm text-white placeholder:text-gray-700 outline-none transition-none"
-                          />
-                        </motion.div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'MẬT KHẨU' : 'PASSWORD'}</label>
-                        <motion.div 
-                          animate={{ 
-                            scale: authEmailFocus === 'login_pass' ? 1.02 : 1,
-                            borderColor: authEmailFocus === 'login_pass' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
-                          }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          className="relative group bg-black/40 border rounded-xl"
-                        >
-                          <motion.div 
-                            animate={{ 
-                              scale: authEmailFocus === 'login_pass' ? 1.2 : 1,
-                              color: authEmailFocus === 'login_pass' ? '#4c97ff' : '#4b5563',
-                              x: authEmailFocus === 'login_pass' ? 2 : 0
-                            }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
-                          >
-                            <Lock size={16} />
-                          </motion.div>
-                          <input 
-                            type="password"
-                            value={authPassword}
-                            onFocus={() => setAuthEmailFocus('login_pass')}
-                            onBlur={() => setAuthEmailFocus(null)}
-                            onChange={(e) => setAuthPassword(e.target.value)}
-                            placeholder="••••••••"
-                            className="w-full bg-transparent py-3.5 pl-12 pr-4 text-sm text-white placeholder:text-gray-700 outline-none transition-none"
-                          />
-                        </motion.div>
-                      </div>
-
-                      <motion.button 
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        type="submit"
-                        disabled={authLoading}
-                        className="w-full py-3.5 bg-[#4c97ff] hover:bg-[#3a86ff] text-white text-[12px] font-black rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-                      >
-                        {authLoading ? (
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        ) : (
-                          <>
-                            <LogIn size={16} />
-                            {currentLang === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN'}
-                          </>
-                        )}
-                      </motion.button>
-                    </form>
-
-                    <div className="text-center pt-4">
-                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">
-                        {currentLang === 'vi' ? 'Bạn chưa có tài khoản?' : "Don't have an account?"}
-                        <button 
-                          onClick={() => setAuthMode('register')}
-                          className="ml-2 text-[#4c97ff] hover:underline cursor-pointer"
-                        >
-                          {currentLang === 'vi' ? 'ĐĂNG KÝ' : 'REGISTER'}
-                        </button>
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <form onSubmit={handleRegister} className="space-y-4">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'TÊN NGƯỜI DÙNG' : 'USERNAME'}</label>
-                       <motion.div 
-                          animate={{ 
-                            scale: authEmailFocus === 'reg_user' ? 1.02 : 1,
-                            borderColor: authEmailFocus === 'reg_user' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
-                          }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          className="relative group bg-black/40 border rounded-xl"
-                        >
-                          <motion.div 
-                            animate={{ 
-                              scale: authEmailFocus === 'reg_user' ? 1.2 : 1,
-                              color: authEmailFocus === 'reg_user' ? '#4c97ff' : '#4b5563',
-                              x: authEmailFocus === 'reg_user' ? 2 : 0
-                            }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
-                          >
-                            <User size={16} />
-                          </motion.div>
-                          <input 
-                            type="text"
-                            value={authUsername}
-                            onFocus={() => setAuthEmailFocus('reg_user')}
-                            onBlur={() => setAuthEmailFocus(null)}
-                            onChange={(e) => setAuthUsername(e.target.value)}
-                            placeholder={currentLang === 'vi' ? 'Tên hiển thị của bạn...' : 'Your display name...'}
-                            className="w-full bg-transparent py-3 pl-12 pr-4 text-sm text-white placeholder:text-gray-700 outline-none transition-none"
-                          />
-                       </motion.div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'MẬT KHẨU' : 'PASSWORD'}</label>
-                        <motion.div 
-                          animate={{ 
-                            scale: authEmailFocus === 'reg_pass' ? 1.02 : 1,
-                            borderColor: authEmailFocus === 'reg_pass' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
-                          }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          className="relative group bg-black/40 border rounded-xl"
-                        >
-                          <motion.div 
-                            animate={{ 
-                              scale: authEmailFocus === 'reg_pass' ? 1.2 : 1,
-                              color: authEmailFocus === 'reg_pass' ? '#4c97ff' : '#4b5563',
-                              x: authEmailFocus === 'reg_pass' ? 2 : 0
-                            }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
-                          >
-                            <Lock size={16} />
-                          </motion.div>
-                          <input 
-                            type="password"
-                            value={authPassword}
-                            onFocus={() => setAuthEmailFocus('reg_pass')}
-                            onBlur={() => setAuthEmailFocus(null)}
-                            onChange={(e) => setAuthPassword(e.target.value)}
-                            placeholder="••••••••"
-                            className="w-full bg-transparent py-3 pl-12 pr-4 text-sm text-white placeholder:text-gray-700 outline-none transition-none"
-                          />
-                        </motion.div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{currentLang === 'vi' ? 'NGÀY SINH (DD/MM/YYYY)' : 'BIRTH DATE (DD/MM/YYYY)'}</label>
-                        <div className="flex gap-2">
-                          <motion.div 
-                            animate={{ 
-                              borderColor: authEmailFocus === 'reg_day' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
-                            }}
-                            className="flex-1 bg-black/40 border rounded-xl overflow-hidden"
-                          >
-                            <input 
-                              type="text"
-                              maxLength={2}
-                              value={birthDay}
-                              onFocus={() => setAuthEmailFocus('reg_day')}
-                              onBlur={() => setAuthEmailFocus(null)}
-                              onChange={(e) => setBirthDay(e.target.value.replace(/\D/g, ''))}
-                              placeholder="DD"
-                              className="w-full bg-transparent py-3 px-4 text-center text-sm text-white placeholder:text-gray-700 outline-none"
-                            />
-                          </motion.div>
-                          <motion.div 
-                            animate={{ 
-                              borderColor: authEmailFocus === 'reg_month' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
-                            }}
-                            className="flex-1 bg-black/40 border rounded-xl overflow-hidden"
-                          >
-                            <input 
-                              type="text"
-                              maxLength={2}
-                              value={birthMonth}
-                              onFocus={() => setAuthEmailFocus('reg_month')}
-                              onBlur={() => setAuthEmailFocus(null)}
-                              onChange={(e) => setBirthMonth(e.target.value.replace(/\D/g, ''))}
-                              placeholder="MM"
-                              className="w-full bg-transparent py-3 px-4 text-center text-sm text-white placeholder:text-gray-700 outline-none"
-                            />
-                          </motion.div>
-                          <motion.div 
-                            animate={{ 
-                              borderColor: authEmailFocus === 'reg_year' ? 'rgba(76, 151, 255, 0.4)' : 'rgba(255, 255, 255, 0.05)'
-                            }}
-                            className="flex-[1.5] bg-black/40 border rounded-xl overflow-hidden"
-                          >
-                            <input 
-                              type="text"
-                              maxLength={4}
-                              value={birthYear}
-                              onFocus={() => setAuthEmailFocus('reg_year')}
-                              onBlur={() => setAuthEmailFocus(null)}
-                              onChange={(e) => setBirthYear(e.target.value.replace(/\D/g, ''))}
-                              placeholder="YYYY"
-                              className="w-full bg-transparent py-3 px-4 text-center text-sm text-white placeholder:text-gray-700 outline-none"
-                            />
-                          </motion.div>
-                        </div>
-                    </div>
-
-                    <motion.button 
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      type="submit"
-                      disabled={authLoading}
-                      className="w-full py-3.5 bg-[#4c97ff] hover:bg-[#3a86ff] text-white text-[12px] font-black rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
-                    >
-                      {authLoading ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      ) : (
-                        <>
-                          <UserPlus size={16} />
-                          {currentLang === 'vi' ? 'HOÀN TẤT ĐĂNG KÝ' : 'COMPLETE REGISTRATION'}
-                        </>
-                      )}
-                    </motion.button>
-
-                    <div className="text-center pt-2">
-                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-tight">
-                        {currentLang === 'vi' ? 'Bạn đã có tài khoản?' : 'Already have an account?'}
-                        <button 
-                          onClick={() => setAuthMode('login')}
-                          className="ml-2 text-[#4c97ff] hover:underline cursor-pointer"
-                        >
-                          {currentLang === 'vi' ? 'ĐĂNG NHẬP' : 'LOGIN'}
-                        </button>
-                      </p>
-                    </div>
-                  </form>
-                )}
+                  <p className="text-center text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-6 opacity-50 px-4">
+                    {currentLang === 'vi' 
+                      ? 'Sử dụng tài khoản Google để đồng bộ thành tựu và dự án của bạn lên đám mây.' 
+                      : 'Use your Google account to sync your achievements and projects to the cloud.'}
+                  </p>
+                </div>
               </div>
             </motion.div>
           </motion.div>
